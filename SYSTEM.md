@@ -8,9 +8,9 @@
 
 | Atribut | Detail |
 |---|---|
-| **Nama Sistem** | *(belum diputuskan — gunakan env `VITE_APP_NAME` sebagai placeholder)* |
+| **Nama Sistem** | *(belum diputuskan — gunakan env `NEXT_PUBLIC_APP_NAME` sebagai placeholder)* |
 | **Organisasi** | Ikatan Akuntan Indonesia (IAI) Wilayah DKI Jakarta |
-| **Domain / URL** | *(belum diputuskan — gunakan env `VITE_APP_URL` sebagai placeholder)* |
+| **Domain / URL** | *(belum diputuskan — gunakan env `NEXT_PUBLIC_APP_URL` sebagai placeholder bila mulai dibutuhkan di UI/client)* |
 | **Tujuan** | Digitalisasi pengelolaan surat masuk, surat keluar, disposisi, dan data kepegawaian internal |
 | **Pengguna** | Admin, Pejabat Penandatangan, Staff Divisi (semua internal IAI Jakarta) |
 | **Bahasa UI** | Bahasa Indonesia Formal (baku) |
@@ -24,14 +24,14 @@
 
 | Layer | Teknologi | Alasan Pemilihan |
 |---|---|---|
-| **Framework** | [TanStack Start](https://tanstack.com/start) | Full-stack React, file-based routing, SSR support |
-| **Routing** | [TanStack Router](https://tanstack.com/router) | Type-safe routing, nested layouts, search params typed |
-| **Server State** | [TanStack Query](https://tanstack.com/query) | Caching, background refetch, optimistic updates |
+| **Framework** | [Next.js App Router](https://nextjs.org/docs/app) | Full-stack React, nested layout, Server/Client Components, SSR/streaming |
+| **Routing** | Next.js file-based routing | Selaras dengan struktur repo `src/app`, route groups, layout bertingkat |
+| **Server State** | Server Components + revalidation path-based | Sederhana untuk internal app, cocok dengan bentuk data CRUD saat ini |
 | **Table** | [TanStack Table](https://tanstack.com/table) | Headless table untuk arsip surat — sorting, filter, pagination |
-| **Form** | [TanStack Form](https://tanstack.com/form) | Type-safe form handling, validasi schema terintegrasi Zod |
-| **ORM** | [Drizzle ORM](https://orm.drizzle.team) | Lightweight, type-safe, cocok dengan TanStack Start |
+| **Form** | [React Hook Form](https://react-hook-form.com) + [Zod](https://zod.dev) | Validasi type-safe, sudah terpasang di codebase saat ini |
+| **ORM** | [Drizzle ORM](https://orm.drizzle.team) | Lightweight, type-safe, cocok dengan pola Server Actions di Next.js |
 | **Database** | [PostgreSQL](https://postgresql.org) via [Neon](https://neon.tech) | Serverless-friendly, free tier tersedia |
-| **Auth** | [Better Auth](https://better-auth.com) | Modern auth untuk TanStack Start, support RBAC |
+| **Auth** | [Better Auth](https://better-auth.com) | Session auth modern, terintegrasi dengan route handler dan guard helper |
 | **Styling** | [Tailwind CSS v4](https://tailwindcss.com) | Utility-first, iteration cepat |
 | **UI Components** | [shadcn/ui](https://ui.shadcn.com) | Composable, accessible, mudah dikustomisasi |
 | **File Storage** | [Cloudinary](https://cloudinary.com) | Upload scan surat PDF/gambar, transformasi otomatis |
@@ -46,9 +46,9 @@
 ```
 - TypeScript (strict mode)
 - ESLint + Prettier
-- Vitest (unit testing)
-- Drizzle Kit (migrations)
-- Zod (schema validation di form & server function)
+- Drizzle Kit (generate / push / migrate schema)
+- Zod (schema validation di form & server action)
+- next lint + tsc --noEmit sebagai baseline verification
 ```
 
 ---
@@ -57,106 +57,53 @@
 
 ```
 [nama-repo]/
-├── app/
-│   ├── routes/
-│   │   ├── __root.tsx                      # Root layout: sidebar + header + auth guard
-│   │   ├── _auth/
-│   │   │   └── login.tsx                   # Halaman login
-│   │   ├── dashboard/
-│   │   │   └── index.tsx                   # Dashboard (statistik, shortcut)
-│   │   ├── surat-keluar/
-│   │   │   ├── index.tsx                   # List surat keluar + filter + search
-│   │   │   ├── buat.tsx                    # Form buat surat keluar baru
-│   │   │   └── $id/
-│   │   │       └── index.tsx               # Detail surat keluar + stepper workflow
-│   │   ├── surat-masuk/
-│   │   │   ├── index.tsx                   # List surat masuk
-│   │   │   ├── tambah.tsx                  # Form input surat masuk
-│   │   │   └── $id.tsx                     # Detail + aksi disposisi
-│   │   ├── surat-keputusan/
-│   │   │   ├── index.tsx
-│   │   │   ├── buat.tsx
-│   │   │   └── $id.tsx
-│   │   ├── surat-mou/
-│   │   │   ├── index.tsx
-│   │   │   ├── buat.tsx
-│   │   │   └── $id.tsx
-│   │   ├── disposisi/
-│   │   │   ├── index.tsx                   # Inbox disposisi milik user login
-│   │   │   └── $id.tsx                     # Detail + aksi disposisi
-│   │   ├── nomor-surat/
-│   │   │   └── index.tsx                   # Bulk generate & manajemen nomor surat
-│   │   ├── pegawai/
-│   │   │   ├── index.tsx                   # List pegawai
-│   │   │   └── $id/
-│   │   │       ├── index.tsx               # Tab: Profil Karyawan
-│   │   │       ├── kelengkapan.tsx         # Tab: Kelengkapan Karyawan
-│   │   │       ├── keluarga.tsx            # Tab: Data Keluarga
-│   │   │       ├── pendidikan.tsx          # Tab: Riwayat Pendidikan
-│   │   │       ├── pekerjaan.tsx           # Tab: Riwayat Pekerjaan
-│   │   │       ├── kesehatan.tsx           # Tab: Riwayat Kesehatan
-│   │   │       └── integritas.tsx          # Tab: Pernyataan Integritas
-│   │   ├── divisi/
-│   │   │   └── index.tsx
-│   │   └── pejabat/
-│   │       └── index.tsx
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx                      # Root layout + global styles + toaster
+│   │   ├── page.tsx                        # Entry page (jika dipakai)
+│   │   ├── api/
+│   │   │   └── auth/[...all]/route.ts      # Better Auth route handler
+│   │   ├── (auth)/
+│   │   │   └── login/page.tsx              # Halaman login
+│   │   └── (dashboard)/
+│   │       ├── layout.tsx                  # Auth guard server-side + shell dashboard
+│   │       ├── dashboard/page.tsx
+│   │       ├── divisi/page.tsx
+│   │       ├── pegawai/page.tsx
+│   │       ├── surat-masuk/page.tsx
+│   │       ├── surat-keluar/page.tsx
+│   │       ├── disposisi/page.tsx
+│   │       ├── nomor-surat/page.tsx
+│   │       ├── surat-keputusan/page.tsx
+│   │       ├── surat-mou/page.tsx
+│   │       └── pejabat/page.tsx
 │   ├── components/
-│   │   ├── ui/                             # shadcn/ui components
-│   │   ├── layout/
-│   │   │   ├── Sidebar.tsx
-│   │   │   ├── Header.tsx
-│   │   │   └── PageWrapper.tsx
-│   │   ├── surat/
-│   │   │   ├── SuratTable.tsx              # TanStack Table — shared semua jenis surat
-│   │   │   ├── SuratKeluar/
-│   │   │   │   ├── SuratKeluarForm.tsx     # TanStack Form buat/edit
-│   │   │   │   ├── SuratKeluarDetail.tsx
-│   │   │   │   └── SuratKeluarStepper.tsx  # Stepper 5 tahap workflow
-│   │   │   ├── SuratMasuk/
-│   │   │   │   ├── SuratMasukForm.tsx
-│   │   │   │   └── SuratMasukDetail.tsx
-│   │   │   ├── NomorSuratBadge.tsx         # Badge nomor atau tombol "Generate"
-│   │   │   └── QRCodeDisplay.tsx           # Reusable QR component
-│   │   ├── disposisi/
-│   │   │   ├── DisposisiCard.tsx
-│   │   │   ├── DisposisiForm.tsx
-│   │   │   └── DisposisiTimeline.tsx       # Chain disposisi A → B → C
-│   │   └── pegawai/
-│   │       ├── PegawaiTabs.tsx             # Tab navigation profil pegawai
-│   │       ├── BiodataForm.tsx
-│   │       └── QRContactDisplay.tsx        # QR vCard pegawai
+│   │   ├── ui/                             # shadcn/ui primitives
+│   │   ├── layout/                         # Sidebar, Header, PageWrapper
+│   │   └── divisi/                         # Manager/Form modul divisi
 │   ├── server/
-│   │   ├── db/
-│   │   │   ├── schema.ts                   # Semua Drizzle table definitions
-│   │   │   └── index.ts                    # Koneksi Neon PostgreSQL
-│   │   ├── functions/
-│   │   │   ├── suratKeluar.ts
-│   │   │   ├── suratMasuk.ts
-│   │   │   ├── disposisi.ts
-│   │   │   ├── pegawai.ts
-│   │   │   ├── nomor.ts
-│   │   │   └── qr.ts                       # Generate QR surat & QR contact
-│   │   └── auth.ts                         # Better Auth config + RBAC
+│   │   ├── actions/                        # Server Actions per domain
+│   │   ├── auth.ts                         # Better Auth config
+│   │   └── db/                             # Drizzle schema + koneksi DB
 │   ├── lib/
 │   │   ├── validators/
-│   │   │   ├── suratKeluar.schema.ts
-│   │   │   ├── suratMasuk.schema.ts
-│   │   │   ├── disposisi.schema.ts
-│   │   │   └── pegawai.schema.ts
 │   │   ├── pdf/
-│   │   │   └── generateSurat.tsx           # react-pdf template surat resmi
-│   │   ├── email/
-│   │   │   └── mailjet.ts
 │   │   ├── qr/
-│   │   │   └── generateQR.ts               # Wrapper qrcode library
-│   │   └── utils.ts                        # formatBulanRomawi, formatTanggal, dsb.
-│   └── styles/
-│       └── globals.css
+│   │   ├── email/
+│   │   ├── env.ts
+│   │   └── utils.ts
+│   ├── styles/
+│   │   └── globals.css
+│   └── proxy.ts                            # Route protection berbasis cookie
+├── scripts/
+│   ├── apply-schema.ts
+│   └── seed-admin.ts
 ├── drizzle/
 │   └── migrations/
 ├── public/
 ├── .env.local                              # Lihat Bagian 8
 ├── drizzle.config.ts
+├── next.config.ts
 ├── tsconfig.json
 └── package.json
 ```
@@ -538,22 +485,30 @@ export const auditLog = pgTable("audit_log", {
 ### 5.1 Diagram Alur
 
 ```
-Browser (React + TanStack Router)
+Browser
     │
-    ├── Route Loaders ──► Server Functions (prefetch data sebelum render)
-    ├── TanStack Query  ──► Server Functions (mutations, background refetch)
-    └── TanStack Form   ──► Server Functions (submit + validasi server-side)
+    ├── Request halaman ──► Next.js App Router
+    │                       ├── Root Layout (`src/app/layout.tsx`)
+    │                       ├── Route Group `(auth)` untuk login
+    │                       └── Route Group `(dashboard)` untuk area internal
+    │
+    ├── Route protection ringan ──► `src/proxy.ts`
+    │                               └── cek cookie session lalu redirect ke `/login?redirect=...`
+    │
+    ├── Server Component ──► baca data awal / validasi session
+    └── Client Component ──► interaksi tabel, dialog, form submit
 
-Server Functions (TanStack Start — berjalan di server)
+Server Actions / Route Handler
     │
     ├── 1. Zod validation (input)
     ├── 2. Better Auth session + role check
     ├── 3. Drizzle ORM → Neon PostgreSQL
-    └── 4. Side effects:
-            ├── Mailjet  → notifikasi disposisi via email
+    ├── 4. `revalidatePath()` untuk sinkronisasi UI setelah mutasi
+    └── 5. Side effects:
+            ├── Mailjet    → notifikasi disposisi via email
             ├── Cloudinary → upload/retrieve file PDF/gambar
-            ├── qrcode   → generate QR surat & QR contact pegawai
-            └── auditLog → catat semua aksi penting
+            ├── qrcode     → generate QR surat & QR contact pegawai
+            └── auditLog   → catat semua aksi penting
 ```
 
 ### 5.2 Workflow Surat Keluar — Stepper 5 Tahap
@@ -639,7 +594,7 @@ Bulan Romawi: I II III IV V VI VII VIII IX X XI XII
 Prefix dikonfigurasi per jenis surat (tabel nomor_surat_counter.prefix)
   Contoh: "DE/IAI-DKIJKT", "PPL/IAI-DKIJKT", "IAI-DKIJKT"
 
-Server Function: generateNomorSurat({ jenisSurat, bulan, tahun })
+Server Action: generateNomorSurat({ jenisSurat, bulan, tahun })
   1. BEGIN TRANSACTION
   2. SELECT ... FOR UPDATE WHERE tahun=? AND bulan=? AND jenis_surat=?
   3. Jika tidak ada → INSERT counter=1
@@ -677,43 +632,41 @@ State di tabel surat_keluar:
 | Bulk Nomor Surat | ✅ | ❌ | ❌ | ❌ |
 | Lihat Audit Log | ✅ | ❌ | ❌ | ❌ |
 
-### 6.2 Pattern Server Function dengan Auth Check
+### 6.2 Pattern Server Action dengan Auth Check
 
 ```typescript
-import { createServerFn } from "@tanstack/start";
-import { auth } from "~/server/auth";
+"use server";
 
-export const createSuratKeluar = createServerFn({ method: "POST" })
-  .validator(suratKeluarSchema)
-  .handler(async ({ data, context }) => {
-    // 1. Auth check
-    const session = await auth.api.getSession({
-      headers: context.request.headers
-    });
-    if (!session) throw new Error("Unauthorized");
+import { suratKeluarCreateSchema } from "@/lib/validators/suratKeluar.schema";
+import { requireRole } from "@/server/actions/auth";
 
-    // 2. Role check
-    if (!["admin", "pejabat", "staff"].includes(session.user.role)) {
-      throw new Error("Forbidden");
-    }
+export async function createSuratKeluar(input: unknown) {
+  // 1. Validasi input
+  const data = suratKeluarCreateSchema.parse(input);
 
-    // 3. DB operation
-    const [newSurat] = await db.insert(suratKeluar).values({
+  // 2. Auth + role check
+  const session = await requireRole(["admin", "pejabat", "staff"]);
+
+  // 3. DB operation
+  const [newSurat] = await db
+    .insert(suratKeluar)
+    .values({
       ...data,
       dibuatOleh: session.user.id,
-    }).returning();
+    })
+    .returning();
 
-    // 4. Audit log
-    await db.insert(auditLog).values({
-      userId: session.user.id,
-      aksi: "CREATE_SURAT_KELUAR",
-      entitasType: "surat_keluar",
-      entitasId: newSurat.id,
-      detail: { perihal: data.perihal, tujuan: data.tujuan },
-    });
-
-    return newSurat;
+  // 4. Audit log
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "CREATE_SURAT_KELUAR",
+    entitasType: "surat_keluar",
+    entitasId: newSurat.id,
+    detail: { perihal: data.perihal, tujuan: data.tujuan },
   });
+
+  return newSurat;
+}
 ```
 
 ---
@@ -819,11 +772,11 @@ MAILJET_FROM_EMAIL=""
 MAILJET_FROM_NAME=""
 
 # App — nama dan URL belum diputuskan
-VITE_APP_NAME=""
-VITE_APP_URL=""
+NEXT_PUBLIC_APP_NAME=""
+NEXT_PUBLIC_APP_URL=""
 ```
 
-> **Catatan untuk agent:** Jangan hardcode nilai apapun dari env ini. Selalu baca dari `import.meta.env.VITE_*` (client-side) atau `process.env.*` (server-side). Jika env kosong saat development lokal, tampilkan warning yang informatif — jangan crash.
+> **Catatan untuk agent:** Jangan hardcode nilai apapun dari env ini. Di repo ini, baca env melalui `process.env.*`. Untuk nilai yang perlu tersedia di client component, gunakan prefix `NEXT_PUBLIC_*`. Jika env kosong saat development lokal, tampilkan warning yang informatif atau fallback aman — jangan crash kecuali env tersebut memang wajib untuk proses server tertentu.
 
 ---
 
@@ -832,54 +785,47 @@ VITE_APP_URL=""
 ### 9.1 Penamaan
 
 ```
-File route       : kebab-case         → surat-masuk.tsx, $id.tsx
+Folder route     : kebab-case         → `surat-masuk`, `surat-keluar`, `nomor-surat`
+Entry route file : `page.tsx` / `layout.tsx` / `route.ts`
 Komponen         : PascalCase         → SuratTable.tsx, PegawaiTabs.tsx
-Server function  : camelCase          → createSuratKeluar, generateNomorSurat
+Server action    : camelCase          → createDivisi, updatePegawai, generateNomorSurat
 DB table         : snake_case         → surat_keluar, pegawai_biodata
 Zod schema file  : camelCase.schema   → suratKeluar.schema.ts
 Env var          : UPPER_SNAKE_CASE   → MAILJET_API_KEY
 ```
 
-### 9.2 Struktur Server Function (Template Standar)
+### 9.2 Struktur Server Action (Template Standar)
 
 ```typescript
-export const [namaAksi] = createServerFn({ method: "POST" | "GET" })
-  .validator(zodSchema)
-  .handler(async ({ data, context }) => {
-    // 1. Auth check (WAJIB di semua endpoint)
-    // 2. Role/permission check
-    // 3. Business logic
-    // 4. DB operation (Drizzle — gunakan transaction jika ada multiple insert/update)
-    // 5. Side effects (email notif, QR generate, file upload)
-    // 6. Audit log insert
-    // 7. Return response
-  });
+"use server";
+
+export async function namaAksi(input: InputType) {
+  // 1. Parse & validasi input via Zod
+  // 2. Auth check (WAJIB di semua action mutasi)
+  // 3. Role/permission check
+  // 4. Business logic
+  // 5. DB operation (Drizzle — gunakan transaction jika ada multiple insert/update)
+  // 6. Side effects (email notif, QR generate, file upload)
+  // 7. Audit log insert jika aksi penting
+  // 8. revalidatePath("/route-terkait")
+  // 9. Return shape konsisten: { ok: true, data } atau { ok: false, error }
+}
 ```
 
-### 9.3 Query Keys Convention (TanStack Query)
+### 9.3 Konvensi Data Fetching & Revalidation
 
 ```typescript
-export const queryKeys = {
-  suratKeluar: {
-    all: ["surat-keluar"] as const,
-    list: (f: SuratFilter) => ["surat-keluar", "list", f] as const,
-    detail: (id: string) => ["surat-keluar", "detail", id] as const,
-  },
-  suratMasuk: {
-    all: ["surat-masuk"] as const,
-    list: (f: SuratFilter) => ["surat-masuk", "list", f] as const,
-    detail: (id: string) => ["surat-masuk", "detail", id] as const,
-  },
-  disposisi: {
-    inbox: (userId: string) => ["disposisi", "inbox", userId] as const,
-    detail: (id: string) => ["disposisi", "detail", id] as const,
-  },
-  pegawai: {
-    all: ["pegawai"] as const,
-    list: (f: PegawaiFilter) => ["pegawai", "list", f] as const,
-    detail: (id: string) => ["pegawai", "detail", id] as const,
-  },
-};
+// Baca data awal sedapat mungkin di Server Component.
+// Untuk mutasi, panggil Server Action lalu revalidate path yang terdampak.
+
+await createDivisi(data);
+revalidatePath("/divisi");
+
+// Prinsip:
+// - Hindari fetch client-side bila data cukup dirender server-side.
+// - Gunakan client component hanya untuk interaksi: dialog, form, table state.
+// - Jika nanti diperkenalkan cache/query client, dokumentasikan terpisah
+//   dan jangan diasumsikan sudah ada di repo ini.
 ```
 
 ---
@@ -887,9 +833,11 @@ export const queryKeys = {
 ## 10. Roadmap Pengembangan
 
 ### Phase 1 — Foundation (Minggu 1–2)
-- [ ] Setup TanStack Start + Drizzle + Neon + Better Auth
+- [ ] Setup Next.js App Router + Drizzle + Neon + Better Auth
 - [ ] Drizzle schema lengkap + migration awal
-- [ ] Layout: sidebar (sesuai menu existing), header, auth flow login/logout
+- [ ] Layout: sidebar, header, auth flow login/logout, dan proxy redirect `/login?redirect=...`
+- [ ] Shell UI Phase 1 dengan arah visual institusional modern
+- [ ] Modul di luar Phase 1 tetap tampil di navigasi, tetapi diberi status/disabled state yang jelas
 - [ ] CRUD Divisi
 - [ ] CRUD Pegawai — semua 7 tab (biodata, kelengkapan, keluarga, pendidikan, pekerjaan, kesehatan, integritas)
 
@@ -937,6 +885,8 @@ export const queryKeys = {
 8. **Tidak ada akses publik** — semua route di-protect auth.
 9. **Pejabat Penandatangan aktif** (dari data existing): *Monalisa — Direktur Eksekutif IAI Wilayah DKI Jakarta*.
 10. **Divisi existing** (dari data terlihat): HRD dan Umum, Divisi Kursus, Panitia Seminar Nasional — tambahkan sesuai data aktual.
+11. **UI Phase 1** harus terasa seperti produk internal yang siap dipakai, bukan scaffold default. Prioritas: shell aplikasi, login, dashboard, empty state, dan konsistensi visual.
+12. **Navigasi modul**: fitur lintas phase boleh tetap terlihat sebagai roadmap, tetapi modul yang belum masuk scope aktif harus dibuat nonaktif atau diberi penanda phase agar tidak menipu ekspektasi user.
 
 ---
 
@@ -944,11 +894,11 @@ export const queryKeys = {
 
 | Resource | URL |
 |---|---|
-| TanStack Start | https://tanstack.com/start/latest |
-| TanStack Router | https://tanstack.com/router/latest |
-| TanStack Query | https://tanstack.com/query/latest |
+| Next.js App Router | https://nextjs.org/docs/app |
+| Next.js Server Actions | https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations |
 | TanStack Table | https://tanstack.com/table/latest |
-| TanStack Form | https://tanstack.com/form/latest |
+| React Hook Form | https://react-hook-form.com |
+| Zod | https://zod.dev |
 | Drizzle ORM | https://orm.drizzle.team |
 | Better Auth | https://better-auth.com |
 | Neon Database | https://neon.tech |
@@ -962,4 +912,4 @@ export const queryKeys = {
 ---
 
 *Dokumen ini diperbarui berdasarkan observasi langsung sistem SIMPEG IAI existing (screenshot April 2026).*
-*Last updated: April 2026 — v2.0*
+*Last updated: April 2026 — v2.1 (diselaraskan dengan codebase Next.js aktual)*

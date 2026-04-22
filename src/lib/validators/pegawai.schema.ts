@@ -18,6 +18,15 @@ export const pegawaiCreateSchema = z.object({
   tanggalMasuk: isoDate.optional(),
 });
 
+export const pegawaiUpdateSchema = pegawaiCreateSchema.extend({
+  id: z.string().uuid(),
+  isActive: z.boolean().optional(),
+});
+
+export const pegawaiDeleteSchema = z.object({
+  id: z.string().uuid(),
+});
+
 export const biodataSchema = z.object({
   userId: z.string().uuid(),
   noKtp: z.string().optional(),
@@ -33,4 +42,5 @@ export const biodataSchema = z.object({
 });
 
 export type PegawaiCreateInput = z.infer<typeof pegawaiCreateSchema>;
+export type PegawaiUpdateInput = z.infer<typeof pegawaiUpdateSchema>;
 export type BiodataInput = z.infer<typeof biodataSchema>;

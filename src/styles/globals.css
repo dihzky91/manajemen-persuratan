@@ -6,6 +6,8 @@
 :root {
   --background: hsl(0 0% 100%);
   --foreground: hsl(222.2 47.4% 11.2%);
+  --surface: hsl(220 45% 99%);
+  --surface-strong: hsl(216 48% 96%);
 
   --muted: hsl(210 40% 96.1%);
   --muted-foreground: hsl(215.4 16.3% 46.9%);
@@ -51,6 +53,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
@@ -91,12 +95,17 @@
     border-color: var(--border);
   }
   body {
-    background-color: var(--background);
+    background:
+      radial-gradient(circle at top, hsl(221 83% 53% / 0.08), transparent 32%),
+      linear-gradient(180deg, var(--surface) 0%, var(--background) 24%, var(--background) 100%);
     color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
   html {
     color-scheme: light;
+  }
+  ::selection {
+    background-color: hsl(221.2 83.2% 53.3% / 0.16);
   }
 }

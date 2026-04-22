@@ -1,16 +1,41 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { PegawaiManager } from "@/components/pegawai/PegawaiManager";
+import { getSession } from "@/server/actions/auth";
+import { listDivisi } from "@/server/actions/divisi";
+import { getPegawaiById, listPegawai } from "@/server/actions/pegawai";
 
 export const metadata: Metadata = {
   title: "Data Pegawai | Manajemen Surat IAI Jakarta",
 };
 
-export default function Page() {
+export default async function Page() {
+  const [session, pegawaiRows, divisiRows] = await Promise.all([
+    getSession(),
+    listPegawai(),
+    listDivisi(),
+  ]);
+
+  const detailRows = await Promise.all(
+    pegawaiRows.map(async (row) => {
+      const detail = await getPegawaiById(row.id);
+      return {
+        ...row,
+        biodata: detail.biodata,
+      };
+    }),
+  );
+
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const canManage = role === "admin";
+
   return (
     <PageWrapper title="Data Pegawai" description="Daftar dan manajemen pegawai.">
-      <div className="bg-card border rounded-lg p-8 text-center text-sm text-muted-foreground">
-        Implementasi dalam pengembangan.
-      </div>
+      <PegawaiManager
+        initialData={detailRows}
+        divisiOptions={divisiRows.map((row) => ({ id: row.id, nama: row.nama }))}
+        canManage={canManage}
+      />
     </PageWrapper>
   );
 }
