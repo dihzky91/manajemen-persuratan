@@ -1,0 +1,2113 @@
+{
+  "id": "b760e1c6-63c8-404b-b771-c35cac698cee",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.account": {
+      "name": "account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "account_user_id_users_id_fk": {
+          "name": "account_user_id_users_id_fk",
+          "tableFrom": "account",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.audit_log": {
+      "name": "audit_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aksi": {
+          "name": "aksi",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entitas_type": {
+          "name": "entitas_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entitas_id": {
+          "name": "entitas_id",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "detail": {
+          "name": "detail",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "audit_log_user_id_users_id_fk": {
+          "name": "audit_log_user_id_users_id_fk",
+          "tableFrom": "audit_log",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.disposisi": {
+      "name": "disposisi",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "surat_masuk_id": {
+          "name": "surat_masuk_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dari_user_id": {
+          "name": "dari_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kepada_user_id": {
+          "name": "kepada_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "catatan": {
+          "name": "catatan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "instruksi": {
+          "name": "instruksi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batas_waktu": {
+          "name": "batas_waktu",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_disposisi",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'belum_dibaca'"
+        },
+        "tanggal_disposisi": {
+          "name": "tanggal_disposisi",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "tanggal_dibaca": {
+          "name": "tanggal_dibaca",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_selesai": {
+          "name": "tanggal_selesai",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_disposisi_id": {
+          "name": "parent_disposisi_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "disposisi_surat_masuk_id_surat_masuk_id_fk": {
+          "name": "disposisi_surat_masuk_id_surat_masuk_id_fk",
+          "tableFrom": "disposisi",
+          "tableTo": "surat_masuk",
+          "columnsFrom": [
+            "surat_masuk_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "disposisi_dari_user_id_users_id_fk": {
+          "name": "disposisi_dari_user_id_users_id_fk",
+          "tableFrom": "disposisi",
+          "tableTo": "users",
+          "columnsFrom": [
+            "dari_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "disposisi_kepada_user_id_users_id_fk": {
+          "name": "disposisi_kepada_user_id_users_id_fk",
+          "tableFrom": "disposisi",
+          "tableTo": "users",
+          "columnsFrom": [
+            "kepada_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.divisi": {
+      "name": "divisi",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama": {
+          "name": "nama",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kode": {
+          "name": "kode",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "divisi_kode_unique": {
+          "name": "divisi_kode_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "kode"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.nomor_surat_counter": {
+      "name": "nomor_surat_counter",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tahun": {
+          "name": "tahun",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bulan": {
+          "name": "bulan",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenis_surat": {
+          "name": "jenis_surat",
+          "type": "jenis_surat",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "counter": {
+          "name": "counter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "prefix": {
+          "name": "prefix",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "nomor_surat_counter_period_uniq": {
+          "name": "nomor_surat_counter_period_uniq",
+          "columns": [
+            {
+              "expression": "tahun",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bulan",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "jenis_surat",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pegawai_biodata": {
+      "name": "pegawai_biodata",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "no_ktp": {
+          "name": "no_ktp",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gender": {
+          "name": "gender",
+          "type": "gender",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_pernikahan": {
+          "name": "status_pernikahan",
+          "type": "status_pernikahan",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tempat_lahir": {
+          "name": "tempat_lahir",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_lahir": {
+          "name": "tanggal_lahir",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alamat_tinggal": {
+          "name": "alamat_tinggal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kode_pos": {
+          "name": "kode_pos",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provinsi": {
+          "name": "provinsi",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kota_kabupaten": {
+          "name": "kota_kabupaten",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alamat_ktp": {
+          "name": "alamat_ktp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pegawai_biodata_user_id_users_id_fk": {
+          "name": "pegawai_biodata_user_id_users_id_fk",
+          "tableFrom": "pegawai_biodata",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pegawai_biodata_user_id_unique": {
+          "name": "pegawai_biodata_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pegawai_kelengkapan": {
+      "name": "pegawai_kelengkapan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "foto_url": {
+          "name": "foto_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ktp_url": {
+          "name": "ktp_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "npwp_url": {
+          "name": "npwp_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bpjs_url": {
+          "name": "bpjs_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ijazah_url": {
+          "name": "ijazah_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dokumen_lain_url": {
+          "name": "dokumen_lain_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pegawai_kelengkapan_user_id_users_id_fk": {
+          "name": "pegawai_kelengkapan_user_id_users_id_fk",
+          "tableFrom": "pegawai_kelengkapan",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pegawai_kelengkapan_user_id_unique": {
+          "name": "pegawai_kelengkapan_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pegawai_keluarga": {
+      "name": "pegawai_keluarga",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hubungan": {
+          "name": "hubungan",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nama_anggota": {
+          "name": "nama_anggota",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tempat_lahir": {
+          "name": "tempat_lahir",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_lahir": {
+          "name": "tanggal_lahir",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pekerjaan": {
+          "name": "pekerjaan",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pegawai_keluarga_user_id_users_id_fk": {
+          "name": "pegawai_keluarga_user_id_users_id_fk",
+          "tableFrom": "pegawai_keluarga",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pegawai_kesehatan": {
+      "name": "pegawai_kesehatan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "golongan_darah": {
+          "name": "golongan_darah",
+          "type": "varchar(5)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tinggi_badan": {
+          "name": "tinggi_badan",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "berat_badan": {
+          "name": "berat_badan",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "riwayat_penyakit": {
+          "name": "riwayat_penyakit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alergi": {
+          "name": "alergi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "catatan_kesehatan": {
+          "name": "catatan_kesehatan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pegawai_kesehatan_user_id_users_id_fk": {
+          "name": "pegawai_kesehatan_user_id_users_id_fk",
+          "tableFrom": "pegawai_kesehatan",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pegawai_kesehatan_user_id_unique": {
+          "name": "pegawai_kesehatan_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pegawai_pendidikan": {
+      "name": "pegawai_pendidikan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenjang": {
+          "name": "jenjang",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nama_institusi": {
+          "name": "nama_institusi",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "jurusan": {
+          "name": "jurusan",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tahun_masuk": {
+          "name": "tahun_masuk",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tahun_lulus": {
+          "name": "tahun_lulus",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ijazah_url": {
+          "name": "ijazah_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pegawai_pendidikan_user_id_users_id_fk": {
+          "name": "pegawai_pendidikan_user_id_users_id_fk",
+          "tableFrom": "pegawai_pendidikan",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pegawai_pernyataan_integritas": {
+      "name": "pegawai_pernyataan_integritas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tanggal_pernyataan": {
+          "name": "tanggal_pernyataan",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_tanda_tangan": {
+          "name": "status_tanda_tangan",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "catatan": {
+          "name": "catatan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pegawai_pernyataan_integritas_user_id_users_id_fk": {
+          "name": "pegawai_pernyataan_integritas_user_id_users_id_fk",
+          "tableFrom": "pegawai_pernyataan_integritas",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pegawai_pernyataan_integritas_user_id_unique": {
+          "name": "pegawai_pernyataan_integritas_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pegawai_riwayat_pekerjaan": {
+      "name": "pegawai_riwayat_pekerjaan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nama_perusahaan": {
+          "name": "nama_perusahaan",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "jabatan": {
+          "name": "jabatan",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_mulai": {
+          "name": "tanggal_mulai",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_selesai": {
+          "name": "tanggal_selesai",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "keterangan": {
+          "name": "keterangan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pegawai_riwayat_pekerjaan_user_id_users_id_fk": {
+          "name": "pegawai_riwayat_pekerjaan_user_id_users_id_fk",
+          "tableFrom": "pegawai_riwayat_pekerjaan",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pejabat_penandatangan": {
+      "name": "pejabat_penandatangan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nama_jabatan": {
+          "name": "nama_jabatan",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wilayah": {
+          "name": "wilayah",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ttd_url": {
+          "name": "ttd_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pejabat_penandatangan_user_id_users_id_fk": {
+          "name": "pejabat_penandatangan_user_id_users_id_fk",
+          "tableFrom": "pejabat_penandatangan",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.session": {
+      "name": "session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "session_user_id_users_id_fk": {
+          "name": "session_user_id_users_id_fk",
+          "tableFrom": "session",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "session_token_unique": {
+          "name": "session_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.surat_keluar": {
+      "name": "surat_keluar",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nomor_surat": {
+          "name": "nomor_surat",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "perihal": {
+          "name": "perihal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tujuan": {
+          "name": "tujuan",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tujuan_alamat": {
+          "name": "tujuan_alamat",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_surat": {
+          "name": "tanggal_surat",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenis_surat": {
+          "name": "jenis_surat",
+          "type": "jenis_surat",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isi_singkat": {
+          "name": "isi_singkat",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_surat_keluar",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'draft'"
+        },
+        "file_draft_url": {
+          "name": "file_draft_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_final_url": {
+          "name": "file_final_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lampiran_url": {
+          "name": "lampiran_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qr_code_url": {
+          "name": "qr_code_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pejabat_id": {
+          "name": "pejabat_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dibuat_oleh": {
+          "name": "dibuat_oleh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "divisi_id": {
+          "name": "divisi_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disetujui_oleh": {
+          "name": "disetujui_oleh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_disetujui": {
+          "name": "tanggal_disetujui",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "catatan_reviu": {
+          "name": "catatan_reviu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "surat_keluar_pejabat_id_pejabat_penandatangan_id_fk": {
+          "name": "surat_keluar_pejabat_id_pejabat_penandatangan_id_fk",
+          "tableFrom": "surat_keluar",
+          "tableTo": "pejabat_penandatangan",
+          "columnsFrom": [
+            "pejabat_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "surat_keluar_dibuat_oleh_users_id_fk": {
+          "name": "surat_keluar_dibuat_oleh_users_id_fk",
+          "tableFrom": "surat_keluar",
+          "tableTo": "users",
+          "columnsFrom": [
+            "dibuat_oleh"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "surat_keluar_divisi_id_divisi_id_fk": {
+          "name": "surat_keluar_divisi_id_divisi_id_fk",
+          "tableFrom": "surat_keluar",
+          "tableTo": "divisi",
+          "columnsFrom": [
+            "divisi_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "surat_keluar_disetujui_oleh_users_id_fk": {
+          "name": "surat_keluar_disetujui_oleh_users_id_fk",
+          "tableFrom": "surat_keluar",
+          "tableTo": "users",
+          "columnsFrom": [
+            "disetujui_oleh"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "surat_keluar_nomor_surat_unique": {
+          "name": "surat_keluar_nomor_surat_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nomor_surat"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.surat_keputusan": {
+      "name": "surat_keputusan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nomor_sk": {
+          "name": "nomor_sk",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "perihal": {
+          "name": "perihal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tentang": {
+          "name": "tentang",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tanggal_sk": {
+          "name": "tanggal_sk",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tanggal_berlaku": {
+          "name": "tanggal_berlaku",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_berakhir": {
+          "name": "tanggal_berakhir",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pejabat_id": {
+          "name": "pejabat_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qr_code_url": {
+          "name": "qr_code_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dibuat_oleh": {
+          "name": "dibuat_oleh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "surat_keputusan_pejabat_id_pejabat_penandatangan_id_fk": {
+          "name": "surat_keputusan_pejabat_id_pejabat_penandatangan_id_fk",
+          "tableFrom": "surat_keputusan",
+          "tableTo": "pejabat_penandatangan",
+          "columnsFrom": [
+            "pejabat_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "surat_keputusan_dibuat_oleh_users_id_fk": {
+          "name": "surat_keputusan_dibuat_oleh_users_id_fk",
+          "tableFrom": "surat_keputusan",
+          "tableTo": "users",
+          "columnsFrom": [
+            "dibuat_oleh"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "surat_keputusan_nomor_sk_unique": {
+          "name": "surat_keputusan_nomor_sk_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nomor_sk"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.surat_masuk": {
+      "name": "surat_masuk",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nomor_agenda": {
+          "name": "nomor_agenda",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nomor_surat_asal": {
+          "name": "nomor_surat_asal",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "perihal": {
+          "name": "perihal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pengirim": {
+          "name": "pengirim",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pengirim_alamat": {
+          "name": "pengirim_alamat",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_surat": {
+          "name": "tanggal_surat",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tanggal_diterima": {
+          "name": "tanggal_diterima",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenis_surat": {
+          "name": "jenis_surat",
+          "type": "jenis_surat",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "status_surat_masuk",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'diterima'"
+        },
+        "isi_singkat": {
+          "name": "isi_singkat",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dicatat_oleh": {
+          "name": "dicatat_oleh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "surat_masuk_dicatat_oleh_users_id_fk": {
+          "name": "surat_masuk_dicatat_oleh_users_id_fk",
+          "tableFrom": "surat_masuk",
+          "tableTo": "users",
+          "columnsFrom": [
+            "dicatat_oleh"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.surat_mou": {
+      "name": "surat_mou",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nomor_mou": {
+          "name": "nomor_mou",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "perihal": {
+          "name": "perihal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pihak_kedua": {
+          "name": "pihak_kedua",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pihak_kedua_alamat": {
+          "name": "pihak_kedua_alamat",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_mou": {
+          "name": "tanggal_mou",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tanggal_berlaku": {
+          "name": "tanggal_berlaku",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tanggal_berakhir": {
+          "name": "tanggal_berakhir",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nilai_kerjasama": {
+          "name": "nilai_kerjasama",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qr_code_url": {
+          "name": "qr_code_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pejabat_id": {
+          "name": "pejabat_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dibuat_oleh": {
+          "name": "dibuat_oleh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "surat_mou_pejabat_id_pejabat_penandatangan_id_fk": {
+          "name": "surat_mou_pejabat_id_pejabat_penandatangan_id_fk",
+          "tableFrom": "surat_mou",
+          "tableTo": "pejabat_penandatangan",
+          "columnsFrom": [
+            "pejabat_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "surat_mou_dibuat_oleh_users_id_fk": {
+          "name": "surat_mou_dibuat_oleh_users_id_fk",
+          "tableFrom": "surat_mou",
+          "tableTo": "users",
+          "columnsFrom": [
+            "dibuat_oleh"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "surat_mou_nomor_mou_unique": {
+          "name": "surat_mou_nomor_mou_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nomor_mou"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama_lengkap": {
+          "name": "nama_lengkap",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "email_pribadi": {
+          "name": "email_pribadi",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "no_hp": {
+          "name": "no_hp",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'staff'"
+        },
+        "divisi_id": {
+          "name": "divisi_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "jabatan": {
+          "name": "jabatan",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "level_jabatan": {
+          "name": "level_jabatan",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "jenis_pegawai": {
+          "name": "jenis_pegawai",
+          "type": "jenis_pegawai",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'Tetap'"
+        },
+        "tanggal_masuk": {
+          "name": "tanggal_masuk",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qr_contact_url": {
+          "name": "qr_contact_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "users_divisi_id_divisi_id_fk": {
+          "name": "users_divisi_id_divisi_id_fk",
+          "tableFrom": "users",
+          "tableTo": "divisi",
+          "columnsFrom": [
+            "divisi_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.verification": {
+      "name": "verification",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.gender": {
+      "name": "gender",
+      "schema": "public",
+      "values": [
+        "Laki-laki",
+        "Perempuan"
+      ]
+    },
+    "public.jenis_pegawai": {
+      "name": "jenis_pegawai",
+      "schema": "public",
+      "values": [
+        "Tetap",
+        "Kontrak",
+        "Magang",
+        "Paruh Waktu"
+      ]
+    },
+    "public.jenis_surat": {
+      "name": "jenis_surat",
+      "schema": "public",
+      "values": [
+        "undangan",
+        "pemberitahuan",
+        "permohonan",
+        "keputusan",
+        "mou",
+        "balasan",
+        "edaran",
+        "keterangan",
+        "tugas",
+        "lainnya"
+      ]
+    },
+    "public.role": {
+      "name": "role",
+      "schema": "public",
+      "values": [
+        "admin",
+        "staff",
+        "pejabat",
+        "viewer"
+      ]
+    },
+    "public.status_disposisi": {
+      "name": "status_disposisi",
+      "schema": "public",
+      "values": [
+        "belum_dibaca",
+        "dibaca",
+        "diproses",
+        "selesai"
+      ]
+    },
+    "public.status_pernikahan": {
+      "name": "status_pernikahan",
+      "schema": "public",
+      "values": [
+        "BM",
+        "M",
+        "C",
+        "D",
+        "J"
+      ]
+    },
+    "public.status_surat_keluar": {
+      "name": "status_surat_keluar",
+      "schema": "public",
+      "values": [
+        "draft",
+        "permohonan_persetujuan",
+        "reviu",
+        "pengarsipan",
+        "selesai",
+        "dibatalkan"
+      ]
+    },
+    "public.status_surat_masuk": {
+      "name": "status_surat_masuk",
+      "schema": "public",
+      "values": [
+        "diterima",
+        "diproses",
+        "diarsip",
+        "dibatalkan"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

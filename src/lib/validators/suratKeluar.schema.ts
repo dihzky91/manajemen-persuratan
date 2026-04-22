@@ -1,0 +1,37 @@
+import { z } from "zod";
+import { jenisSuratEnum, statusSuratKeluarEnum } from "@/server/db/schema";
+
+const jenisSuratValues = jenisSuratEnum.enumValues;
+const statusValues = statusSuratKeluarEnum.enumValues;
+
+// CATATAN: tanggalSurat TIDAK punya validasi range (backdate diizinkan per SYSTEM.md §5.3).
+// Satu-satunya validasi: harus ISO date string valid.
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD");
+
+export const suratKeluarCreateSchema = z.object({
+  perihal: z.string().min(1, "Perihal wajib diisi"),
+  tujuan: z.string().min(1, "Tujuan wajib diisi"),
+  tujuanAlamat: z.string().optional(),
+  tanggalSurat: isoDate,
+  jenisSurat: z.enum(jenisSuratValues),
+  isiSingkat: z.string().optional(),
+  fileDraftUrl: z.string().url().optional(),
+  pejabatId: z.number().int().positive().optional(),
+  divisiId: z.number().int().positive().optional(),
+});
+
+export const suratKeluarUpdateSchema = suratKeluarCreateSchema.partial().extend({
+  id: z.string().uuid(),
+});
+
+export const suratKeluarStatusSchema = z.object({
+  id: z.string().uuid(),
+  status: z.enum(statusValues),
+  catatanReviu: z.string().optional(),
+});
+
+export type SuratKeluarCreateInput = z.infer<typeof suratKeluarCreateSchema>;
+export type SuratKeluarUpdateInput = z.infer<typeof suratKeluarUpdateSchema>;
+export type SuratKeluarStatusInput = z.infer<typeof suratKeluarStatusSchema>;
