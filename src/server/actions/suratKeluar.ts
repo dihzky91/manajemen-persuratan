@@ -12,6 +12,8 @@ import {
   pejabatPenandatangan,
   nomorSuratCounter,
 } from "@/server/db/schema";
+import { getStorageProvider } from "@/lib/storage";
+import { prepareUploadPayload } from "@/lib/storage/utils";
 import {
   suratKeluarCreateSchema,
   suratKeluarUpdateSchema,
@@ -32,6 +34,8 @@ export type SuratKeluarRow = {
   isiSingkat: string | null;
   status: string | null;
   fileDraftUrl: string | null;
+  fileFinalUrl: string | null;
+  lampiranUrl: string | null;
   catatanReviu: string | null;
   pejabatId: number | null;
   divisiId: number | null;
@@ -54,6 +58,11 @@ export type DivisiOption = {
 };
 
 const idSchema = z.object({ id: z.string().uuid() });
+const uploadFileSchema = z.object({
+  fileName: z.string().min(1, "Nama file wajib ada."),
+  contentType: z.string().min(1).optional(),
+  dataUrl: z.string().min(1, "Data file wajib ada."),
+});
 
 async function ensureSuratStatus(
   id: string,
@@ -95,6 +104,8 @@ export async function listSuratKeluar(): Promise<SuratKeluarRow[]> {
       isiSingkat: suratKeluar.isiSingkat,
       status: suratKeluar.status,
       fileDraftUrl: suratKeluar.fileDraftUrl,
+      fileFinalUrl: suratKeluar.fileFinalUrl,
+      lampiranUrl: suratKeluar.lampiranUrl,
       catatanReviu: suratKeluar.catatanReviu,
       pejabatId: suratKeluar.pejabatId,
       divisiId: suratKeluar.divisiId,
@@ -166,6 +177,92 @@ export async function createSuratKeluar(data: unknown) {
 
   revalidatePath("/surat-keluar");
   return { ok: true as const, data: row! };
+}
+
+export async function uploadSuratKeluarDraft(data: unknown) {
+  const parsed = uploadFileSchema.parse(data);
+  await requireRole(["admin", "pejabat", "staff"]);
+  const prepared = prepareUploadPayload(parsed);
+
+  const storage = getStorageProvider();
+  const uploaded = await storage.upload({
+    body: prepared.body,
+    fileName: prepared.fileName,
+    contentType: prepared.contentType,
+    folder: "surat-keluar/draft",
+  });
+
+  return {
+    ok: true as const,
+    data: uploaded,
+  };
+}
+
+export async function uploadSuratKeluarLampiran(data: unknown) {
+  const parsed = uploadFileSchema.parse(data);
+  await requireRole(["admin", "pejabat", "staff"]);
+  const prepared = prepareUploadPayload(parsed);
+
+  const storage = getStorageProvider();
+  const uploaded = await storage.upload({
+    body: prepared.body,
+    fileName: prepared.fileName,
+    contentType: prepared.contentType,
+    folder: "surat-keluar/lampiran",
+  });
+
+  return {
+    ok: true as const,
+    data: uploaded,
+  };
+}
+
+export async function uploadSuratKeluarFinal(data: unknown) {
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      fileName: z.string().min(1, "Nama file wajib ada."),
+      contentType: z.string().min(1).optional(),
+      dataUrl: z.string().min(1, "Data file wajib ada."),
+    })
+    .parse(data);
+  await requireRole(["admin", "pejabat"]);
+  const prepared = prepareUploadPayload(parsed);
+
+  const [existing] = await db
+    .select({ status: suratKeluar.status })
+    .from(suratKeluar)
+    .where(eq(suratKeluar.id, parsed.id));
+
+  if (!existing) {
+    return { ok: false as const, error: "Surat tidak ditemukan." };
+  }
+
+  if (existing.status !== "pengarsipan" && existing.status !== "selesai") {
+    return {
+      ok: false as const,
+      error: "File final hanya boleh diunggah saat pengarsipan atau setelah selesai.",
+    };
+  }
+
+  const storage = getStorageProvider();
+  const uploaded = await storage.upload({
+    body: prepared.body,
+    fileName: prepared.fileName,
+    contentType: prepared.contentType,
+    folder: "surat-keluar/final",
+  });
+
+  await db
+    .update(suratKeluar)
+    .set({
+      fileFinalUrl: uploaded.url,
+      updatedAt: new Date(),
+    })
+    .where(eq(suratKeluar.id, parsed.id));
+
+  revalidatePath("/surat-keluar");
+  return { ok: true as const, data: uploaded };
 }
 
 // ─── Update ──────────────────────────────────────────────────────────────────
@@ -441,52 +538,70 @@ export async function batalkanSurat(data: { id: string }) {
 export async function assignNomorSuratKeluar(data: { id: string }) {
   const { id } = idSchema.parse(data);
   const session = await requireRole(["admin", "pejabat"]);
+  const [surat] = await db
+    .select({
+      nomorSurat: suratKeluar.nomorSurat,
+      tanggalSurat: suratKeluar.tanggalSurat,
+      jenisSurat: suratKeluar.jenisSurat,
+      status: suratKeluar.status,
+    })
+    .from(suratKeluar)
+    .where(eq(suratKeluar.id, id));
 
-  const nomorSurat = await db.transaction(async (tx) => {
-    const [surat] = await tx
-      .select()
-      .from(suratKeluar)
-      .where(eq(suratKeluar.id, id));
+  if (!surat) {
+    return { ok: false as const, error: "Surat tidak ditemukan." };
+  }
 
-    if (!surat) throw new Error("Surat tidak ditemukan");
-    if (surat.nomorSurat) throw new Error("Nomor surat sudah digenerate");
-    if (surat.status !== "pengarsipan") {
-      throw new Error(
-        "Nomor surat hanya bisa digenerate saat status Pengarsipan",
-      );
-    }
+  if (surat.nomorSurat) {
+    return { ok: false as const, error: "Nomor surat sudah digenerate." };
+  }
 
-    const tanggal = new Date(surat.tanggalSurat);
-    const bulan = tanggal.getMonth() + 1;
-    const tahun = tanggal.getFullYear();
-    const jenisSurat = surat.jenisSurat;
+  if (surat.status !== "pengarsipan") {
+    return {
+      ok: false as const,
+      error: "Nomor surat hanya bisa digenerate saat status Pengarsipan.",
+    };
+  }
 
-    const upsert = await tx.execute(sql`
-      INSERT INTO nomor_surat_counter (tahun, bulan, jenis_surat, counter, prefix, updated_at)
-      VALUES (${tahun}, ${bulan}, ${jenisSurat}, 1, ${"IAI-DKIJKT"}, NOW())
-      ON CONFLICT (tahun, bulan, jenis_surat)
-      DO UPDATE SET
-        counter = nomor_surat_counter.counter + 1,
-        updated_at = NOW()
-      RETURNING counter, prefix
-    `);
+  const tanggal = new Date(surat.tanggalSurat);
+  const bulan = tanggal.getMonth() + 1;
+  const tahun = tanggal.getFullYear();
+  const jenisSurat = surat.jenisSurat;
 
-    const row = (upsert.rows as { counter: number; prefix: string | null }[])[0];
-    if (!row) throw new Error("Gagal menggenerate nomor surat");
+  const counterResult = await db.execute(sql`
+    INSERT INTO nomor_surat_counter (tahun, bulan, jenis_surat, counter, prefix, updated_at)
+    VALUES (${tahun}, ${bulan}, ${jenisSurat}, 1, ${"IAI-DKIJKT"}, NOW())
+    ON CONFLICT (tahun, bulan, jenis_surat)
+    DO UPDATE SET
+      counter = nomor_surat_counter.counter + 1,
+      updated_at = NOW()
+    RETURNING counter, prefix
+  `);
 
-    const counter = row.counter;
-    const prefix = row.prefix ?? "IAI-DKIJKT";
+  const counterRow = (
+    counterResult.rows as Array<{ counter: number; prefix: string | null }>
+  )[0];
 
-    const bulanRomawi = formatBulanRomawi(bulan);
-    const nomor = `${counter}/${prefix}/${bulanRomawi}/${tahun}`;
+  if (!counterRow) {
+    return { ok: false as const, error: "Gagal menggenerate nomor surat." };
+  }
 
-    await tx
-      .update(suratKeluar)
-      .set({ nomorSurat: nomor, updatedAt: new Date() })
-      .where(eq(suratKeluar.id, id));
+  const bulanRomawi = formatBulanRomawi(bulan);
+  const prefix = counterRow.prefix ?? "IAI-DKIJKT";
+  const nomorSurat = `${counterRow.counter}/${prefix}/${bulanRomawi}/${tahun}`;
 
-    return nomor;
-  });
+  const updated = await db
+    .update(suratKeluar)
+    .set({ nomorSurat, updatedAt: new Date() })
+    .where(and(eq(suratKeluar.id, id), sql`${suratKeluar.nomorSurat} IS NULL`))
+    .returning({ id: suratKeluar.id });
+
+  if (!updated[0]) {
+    return {
+      ok: false as const,
+      error: "Nomor surat gagal disimpan karena data berubah. Coba muat ulang.",
+    };
+  }
 
   await db.insert(auditLog).values({
     userId: session.user.id as string,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { jenisSuratEnum, statusSuratKeluarEnum } from "@/server/db/schema";
+import { fileUrlSchema } from "@/lib/validators/fileUrl";
 
 const jenisSuratValues = jenisSuratEnum.enumValues;
 const statusValues = statusSuratKeluarEnum.enumValues;
@@ -17,7 +18,9 @@ export const suratKeluarCreateSchema = z.object({
   tanggalSurat: isoDate,
   jenisSurat: z.enum(jenisSuratValues),
   isiSingkat: z.string().optional(),
-  fileDraftUrl: z.string().url().optional(),
+  fileDraftUrl: fileUrlSchema.optional(),
+  lampiranUrl: fileUrlSchema.optional(),
+  fileFinalUrl: fileUrlSchema.optional(),
   pejabatId: z.number().int().positive().optional(),
   divisiId: z.number().int().positive().optional(),
 });

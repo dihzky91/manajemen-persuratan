@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/actions/auth";
+import { countUnreadDisposisi } from "@/server/actions/disposisi";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 
@@ -15,9 +16,11 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const unreadDisposisiCount = await countUnreadDisposisi();
+
   return (
     <div className="min-h-screen bg-background lg:flex">
-      <Sidebar />
+      <Sidebar unreadDisposisiCount={unreadDisposisiCount} />
       <div className="flex min-h-screen flex-1 flex-col">
         <Header userName={session.user.name} />
         <main className="flex-1 bg-linear-to-b from-background via-muted/30 to-background px-4 py-6 lg:px-6">

@@ -1,6 +1,7 @@
 "use server";
 
-import { desc, eq, and } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { disposisi, suratMasuk, users, auditLog } from "@/server/db/schema";
 import {
@@ -9,14 +10,159 @@ import {
 } from "@/lib/validators/disposisi.schema";
 import { requireRole, requireSession } from "./auth";
 import { sendEmail, buildDisposisiEmail } from "@/lib/email/mailjet";
+import { markSuratMasukDiproses } from "./suratMasuk";
 
-export async function inboxDisposisi() {
+export type DisposisiRecipientOption = {
+  id: string;
+  namaLengkap: string;
+  email: string;
+  role: string | null;
+  jabatan: string | null;
+};
+
+export type DisposisiTimelineRow = {
+  id: string;
+  suratMasukId: string;
+  dariUserId: string;
+  dariNama: string | null;
+  kepadaUserId: string;
+  kepadaNama: string | null;
+  catatan: string | null;
+  instruksi: string | null;
+  batasWaktu: string | null;
+  status: string | null;
+  tanggalDisposisi: Date | null;
+  tanggalDibaca: Date | null;
+  tanggalSelesai: Date | null;
+  parentDisposisiId: string | null;
+  suratPerihal: string | null;
+  suratPengirim: string | null;
+};
+
+async function hydrateTimelineRows(
+  rows: Array<{
+    id: string;
+    suratMasukId: string;
+    dariUserId: string;
+    kepadaUserId: string;
+    catatan: string | null;
+    instruksi: string | null;
+    batasWaktu: string | null;
+    status: string | null;
+    tanggalDisposisi: Date | null;
+    tanggalDibaca: Date | null;
+    tanggalSelesai: Date | null;
+    parentDisposisiId: string | null;
+    suratPerihal: string | null;
+    suratPengirim: string | null;
+  }>,
+): Promise<DisposisiTimelineRow[]> {
+  if (!rows.length) return [];
+
+  const userIds = Array.from(
+    new Set(rows.flatMap((row) => [row.dariUserId, row.kepadaUserId])),
+  );
+
+  const userRows = await db
+    .select({
+      id: users.id,
+      namaLengkap: users.namaLengkap,
+    })
+    .from(users)
+    .where(inArray(users.id, userIds));
+
+  const userMap = Object.fromEntries(
+    userRows.map((row) => [row.id, row.namaLengkap]),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    dariNama: userMap[row.dariUserId] ?? null,
+    kepadaNama: userMap[row.kepadaUserId] ?? null,
+  }));
+}
+
+export async function inboxDisposisi(): Promise<DisposisiTimelineRow[]> {
   const session = await requireSession();
-  return db
-    .select()
+  const rows = await db
+    .select({
+      id: disposisi.id,
+      suratMasukId: disposisi.suratMasukId,
+      dariUserId: disposisi.dariUserId,
+      kepadaUserId: disposisi.kepadaUserId,
+      catatan: disposisi.catatan,
+      instruksi: disposisi.instruksi,
+      batasWaktu: disposisi.batasWaktu,
+      status: disposisi.status,
+      tanggalDisposisi: disposisi.tanggalDisposisi,
+      tanggalDibaca: disposisi.tanggalDibaca,
+      tanggalSelesai: disposisi.tanggalSelesai,
+      parentDisposisiId: disposisi.parentDisposisiId,
+      suratPerihal: suratMasuk.perihal,
+      suratPengirim: suratMasuk.pengirim,
+    })
     .from(disposisi)
+    .innerJoin(suratMasuk, eq(disposisi.suratMasukId, suratMasuk.id))
     .where(eq(disposisi.kepadaUserId, session.user.id as string))
     .orderBy(desc(disposisi.tanggalDisposisi));
+
+  return hydrateTimelineRows(rows);
+}
+
+export async function listDisposisiTimeline(): Promise<DisposisiTimelineRow[]> {
+  await requireSession();
+  const rows = await db
+    .select({
+      id: disposisi.id,
+      suratMasukId: disposisi.suratMasukId,
+      dariUserId: disposisi.dariUserId,
+      kepadaUserId: disposisi.kepadaUserId,
+      catatan: disposisi.catatan,
+      instruksi: disposisi.instruksi,
+      batasWaktu: disposisi.batasWaktu,
+      status: disposisi.status,
+      tanggalDisposisi: disposisi.tanggalDisposisi,
+      tanggalDibaca: disposisi.tanggalDibaca,
+      tanggalSelesai: disposisi.tanggalSelesai,
+      parentDisposisiId: disposisi.parentDisposisiId,
+      suratPerihal: suratMasuk.perihal,
+      suratPengirim: suratMasuk.pengirim,
+    })
+    .from(disposisi)
+    .innerJoin(suratMasuk, eq(disposisi.suratMasukId, suratMasuk.id))
+    .orderBy(asc(disposisi.tanggalDisposisi));
+
+  return hydrateTimelineRows(rows);
+}
+
+export async function countUnreadDisposisi(): Promise<number> {
+  const session = await requireSession();
+  const [row] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(disposisi)
+    .where(
+      and(
+        eq(disposisi.kepadaUserId, session.user.id as string),
+        eq(disposisi.status, "belum_dibaca"),
+      ),
+    );
+
+  return row?.total ?? 0;
+}
+
+export async function listDisposisiRecipients(): Promise<DisposisiRecipientOption[]> {
+  const session = await requireSession();
+  return db
+    .select({
+      id: users.id,
+      namaLengkap: users.namaLengkap,
+      email: users.email,
+      role: users.role,
+      jabatan: users.jabatan,
+    })
+    .from(users)
+    .where(and(eq(users.isActive, true), ne(users.id, session.user.id as string)))
+    .orderBy(asc(users.namaLengkap));
 }
 
 export async function createDisposisi(data: unknown) {
@@ -32,7 +178,8 @@ export async function createDisposisi(data: unknown) {
     })
     .returning();
 
-  // Ambil data penerima + surat untuk email notifikasi
+  await markSuratMasukDiproses([parsed.suratMasukId]);
+
   const [penerima] = await db
     .select()
     .from(users)
@@ -52,7 +199,6 @@ export async function createDisposisi(data: unknown) {
       batasWaktu: parsed.batasWaktu ?? null,
       inboxUrl: `${appUrl}/disposisi`,
     });
-    // fire-and-forget — jangan block response
     void sendEmail({ to: penerima.email, toName: penerima.namaLengkap, ...email });
   }
 
@@ -64,14 +210,18 @@ export async function createDisposisi(data: unknown) {
     detail: { suratMasukId: parsed.suratMasukId, kepada: parsed.kepadaUserId },
   });
 
-  return row!;
+  revalidatePath("/surat-masuk");
+  revalidatePath("/disposisi");
+  return { ok: true as const, data: row! };
 }
 
 export async function updateStatusDisposisi(data: unknown) {
   const parsed = disposisiUpdateStatusSchema.parse(data);
   const session = await requireSession();
 
-  const patch: Record<string, unknown> = { status: parsed.status };
+  const patch: Record<string, unknown> = {
+    status: parsed.status,
+  };
   if (parsed.status === "dibaca") patch.tanggalDibaca = new Date();
   if (parsed.status === "selesai") patch.tanggalSelesai = new Date();
 
@@ -86,5 +236,11 @@ export async function updateStatusDisposisi(data: unknown) {
     )
     .returning();
 
-  return row ?? null;
+  if (!row) {
+    return { ok: false as const, error: "Disposisi tidak ditemukan." };
+  }
+
+  revalidatePath("/surat-masuk");
+  revalidatePath("/disposisi");
+  return { ok: true as const, data: row };
 }

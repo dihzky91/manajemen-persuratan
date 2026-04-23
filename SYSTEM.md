@@ -903,11 +903,13 @@ Catatan status April 2026: Phase 2 selesai dan aktif. Sudah diaudit ulang, guard
 - Backdate tetap berlaku: tidak ada validasi range pada `tanggalSurat`
 
 ### Phase 3 â€” Surat Masuk + Disposisi (Minggu 4)
-- [ ] Form input surat masuk (tanggalSurat + tanggalDiterima, keduanya manual)
-- [ ] List & detail surat masuk
-- [ ] Alur disposisi + chain disposisi (parentDisposisiId)
-- [ ] DisposisiInbox + badge notif di sidebar
-- [ ] Email notifikasi via Mailjet
+- [x] Form input surat masuk (tanggalSurat + tanggalDiterima, keduanya manual)
+- [x] List & detail surat masuk
+- [x] Alur disposisi + chain disposisi (parentDisposisiId)
+- [x] DisposisiInbox + badge notif di sidebar
+- [x] Email notifikasi via Mailjet
+
+Catatan status April 2026: Phase 3 selesai dan aktif. Modul surat masuk, halaman detail, chain disposisi, inbox pengguna, badge unread di sidebar, dan integrasi email Mailjet sudah terpasang serta lolos `npm run typecheck`.
 
 ### Phase 4 â€” QR + File + Fitur Lanjutan (Minggu 5â€“6)
 - [ ] QR Code generate untuk surat (verifikasi)

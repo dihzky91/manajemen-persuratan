@@ -79,14 +79,14 @@ export const navigationSections: NavigationSection[] = [
         href: "/surat-masuk",
         label: "Surat Masuk",
         icon: Inbox,
-        active: false,
+        active: true,
         phase: "Phase 3",
       },
       {
         href: "/disposisi",
         label: "Disposisi",
         icon: Mail,
-        active: false,
+        active: true,
         phase: "Phase 3",
       },
     ],
@@ -151,7 +151,7 @@ const phaseMetaMap: Record<PhaseKey, PhaseMeta> = {
     badge: "Phase 3",
     title: "Surat Masuk dan Disposisi",
     description:
-      "Menunggu aktivasi modul surat masuk, disposisi, inbox, dan notifikasi terkait.",
+      "Fokus saat ini: surat masuk, chain disposisi, inbox pengguna, dan notifikasi terkait.",
   },
   "Phase 4": {
     badge: "Phase 4",

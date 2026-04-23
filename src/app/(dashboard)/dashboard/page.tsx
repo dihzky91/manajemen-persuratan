@@ -15,24 +15,24 @@ export default function DashboardPage() {
         <div className="bg-linear-to-r from-primary/10 via-primary/5 to-transparent px-6 py-8 lg:px-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <Badge variant="outline">Dashboard Foundation</Badge>
+              <Badge variant="outline">Phase 3 Active</Badge>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground lg:text-4xl">
-                Operasional persuratan dimulai dari fondasi yang tertata.
+                Operasional persuratan kini mencakup surat keluar, surat masuk, dan disposisi.
               </h1>
               <p className="mt-3 text-sm leading-6 text-muted-foreground lg:text-base">
-                Phase 1 memprioritaskan shell aplikasi, autentikasi, visual konsisten, serta modul inti administrasi internal yang dibutuhkan untuk mulai bekerja.
+                Fondasi aplikasi sudah stabil. Workflow aktif sekarang mencakup pencatatan surat masuk, disposisi berantai, inbox pengguna, dan notifikasi terkait di samping modul phase sebelumnya.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/divisi">
-                  Kelola Divisi
+                <Link href="/surat-masuk">
+                  Kelola Surat Masuk
                   <ArrowUpRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline">
-                <Link href="/pegawai">Lihat Pegawai</Link>
+                <Link href="/disposisi">Buka Inbox Disposisi</Link>
               </Button>
             </div>
           </div>
@@ -42,13 +42,13 @@ export default function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Modul Aktif"
-          value="4"
-          hint="Dashboard, Divisi, Pegawai, Surat Keluar"
+          value="6"
+          hint="Dashboard, Divisi, Pegawai, Surat Keluar, Surat Masuk, Disposisi"
           icon={FolderKanban}
         />
         <StatCard
           label="Roadmap Tertunda"
-          value="6"
+          value="4"
           hint="Ditandai jelas per phase"
           icon={Clock3}
         />
@@ -71,10 +71,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
-                Fokus Implementasi Phase 1
+                Fokus Implementasi Saat Ini
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Tampilan awal sudah disusun agar terasa seperti produk internal yang siap dipakai.
+                Phase 1 sampai Phase 3 sudah aktif dan terhubung dalam satu alur kerja operasional.
               </p>
             </div>
             <Badge>Aktif</Badge>
@@ -83,9 +83,9 @@ export default function DashboardPage() {
           <div className="mt-6 grid gap-3">
             {[
               "Shell aplikasi dengan sidebar, header, dan struktur halaman yang konsisten.",
-              "Halaman login formal berbahasa Indonesia dan siap menerima redirect setelah autentikasi.",
-              "Dashboard foundation untuk mengarahkan pekerjaan administrasi awal.",
-              "Roadmap modul lanjutan tetap terlihat tetapi diberi status nonaktif yang eksplisit.",
+              "Surat keluar tetap aktif dengan workflow 5 tahap dan penomoran otomatis.",
+              "Surat masuk kini mendukung list, detail, edit, dan tindak lanjut operasional.",
+              "Disposisi sudah aktif dengan chain, inbox pengguna, badge sidebar, dan notifikasi email.",
             ].map((item) => (
               <div
                 key={item}
@@ -109,7 +109,11 @@ export default function DashboardPage() {
               label="Surat Keluar dan penomoran"
               status="Sudah aktif pada shell saat ini."
             />
-            <PhaseItem phase="Phase 3" label="Surat Masuk dan disposisi" />
+            <PhaseItem
+              phase="Phase 3"
+              label="Surat Masuk dan disposisi"
+              status="Sudah aktif pada shell saat ini."
+            />
             <PhaseItem phase="Phase 4" label="QR, file, SK, MOU, pejabat" />
             <PhaseItem phase="Phase 5" label="Polish, RBAC, deploy, dan E2E" />
           </div>

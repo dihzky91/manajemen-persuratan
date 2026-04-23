@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   Send,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatTanggal } from "@/lib/utils";
 import {
@@ -31,6 +33,7 @@ import {
   selesaikanSurat,
   batalkanSurat,
   assignNomorSuratKeluar,
+  uploadSuratKeluarFinal,
 } from "@/server/actions/suratKeluar";
 import type { SuratKeluarRow } from "@/server/actions/suratKeluar";
 
@@ -113,9 +116,11 @@ export function SuratKeluarStepper({
   role,
   onEditClick,
 }: SuratKeluarStepperProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showTolakForm, setShowTolakForm] = useState(false);
   const [catatanReviu, setCatatanReviu] = useState("");
+  const [finalFile, setFinalFile] = useState<File | null>(null);
 
   const status = row.status ?? "draft";
   const isAdmin = role === "admin";
@@ -133,6 +138,7 @@ export function SuratKeluarStepper({
         }
 
         toast.success("Status surat berhasil diperbarui.");
+        router.refresh();
         onOpenChange(false);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Terjadi kesalahan.");
@@ -153,6 +159,36 @@ export function SuratKeluarStepper({
 
   function handleGenerateNomor() {
     runAction(() => assignNomorSuratKeluar({ id: row.id }));
+  }
+
+  function handleUploadFinal() {
+    if (!finalFile) {
+      toast.error("Pilih file final terlebih dahulu.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const dataUrl = await fileToDataUrl(finalFile);
+        const res = await uploadSuratKeluarFinal({
+          id: row.id,
+          fileName: finalFile.name,
+          contentType: finalFile.type || "application/octet-stream",
+          dataUrl,
+        });
+
+        if (!res.ok) {
+          toast.error(res.error ?? "Upload file final gagal.");
+          return;
+        }
+
+        toast.success("File final surat berhasil diunggah.");
+        setFinalFile(null);
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Upload file final gagal.");
+      }
+    });
   }
 
   return (
@@ -199,6 +235,36 @@ export function SuratKeluarStepper({
               </a>
             ) : (
               <p className="font-medium">Belum dilampirkan</p>
+            )}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Lampiran</span>
+            {row.lampiranUrl ? (
+              <a
+                href={row.lampiranUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-primary underline underline-offset-2"
+              >
+                Buka lampiran
+              </a>
+            ) : (
+              <p className="font-medium">Belum dilampirkan</p>
+            )}
+          </div>
+          <div>
+            <span className="text-muted-foreground">File Final</span>
+            {row.fileFinalUrl ? (
+              <a
+                href={row.fileFinalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-primary underline underline-offset-2"
+              >
+                Buka file final
+              </a>
+            ) : (
+              <p className="font-medium">Belum diunggah</p>
             )}
           </div>
           {row.tujuanAlamat ? (
@@ -455,6 +521,32 @@ export function SuratKeluarStepper({
                     </Button>
                   )}
 
+                  <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Upload File Final
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setFinalFile(event.target.files?.[0] ?? null)
+                      }
+                    />
+                    {finalFile ? (
+                      <p className="text-xs text-foreground">
+                        File dipilih: {finalFile.name}
+                      </p>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleUploadFinal}
+                      disabled={isPending || !finalFile}
+                    >
+                      Upload File Final
+                    </Button>
+                  </div>
+
                   <Button
                     size="sm"
                     onClick={() => runAction(() => selesaikanSurat({ id: row.id }))}
@@ -496,4 +588,19 @@ export function SuratKeluarStepper({
       </DialogContent>
     </Dialog>
   );
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Gagal membaca file."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Gagal membaca file."));
+    reader.readAsDataURL(file);
+  });
 }

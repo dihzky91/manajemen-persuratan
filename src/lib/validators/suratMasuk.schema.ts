@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { jenisSuratEnum, statusSuratMasukEnum } from "@/server/db/schema";
+import { fileUrlSchema } from "@/lib/validators/fileUrl";
 
 const jenisSuratValues = jenisSuratEnum.enumValues;
 const statusValues = statusSuratMasukEnum.enumValues;
@@ -20,7 +21,7 @@ export const suratMasukCreateSchema = z.object({
   jenisSurat: z.enum(jenisSuratValues),
   status: z.enum(statusValues).optional(),
   isiSingkat: z.string().optional(),
-  fileUrl: z.string().url().optional(),
+  fileUrl: fileUrlSchema.optional(),
 });
 
 export const suratMasukUpdateSchema = suratMasukCreateSchema.partial().extend({

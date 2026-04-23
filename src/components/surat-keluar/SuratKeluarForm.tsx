@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,8 +32,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { createSuratKeluar, updateSuratKeluar } from "@/server/actions/suratKeluar";
+import {
+  createSuratKeluar,
+  updateSuratKeluar,
+  uploadSuratKeluarDraft,
+  uploadSuratKeluarLampiran,
+} from "@/server/actions/suratKeluar";
 import type { SuratKeluarRow, PejabatOption, DivisiOption } from "@/server/actions/suratKeluar";
+import { optionalFileUrlSchema } from "@/lib/validators/fileUrl";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -65,11 +72,8 @@ const formSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
   jenisSurat: z.enum(JENIS_SURAT_VALUES as [string, ...string[]]),
   isiSingkat: z.string().optional(),
-  fileDraftUrl: z
-    .string()
-    .url("URL draft harus berupa URL yang valid")
-    .or(z.literal(""))
-    .optional(),
+  lampiranUrl: optionalFileUrlSchema,
+  fileDraftUrl: optionalFileUrlSchema,
   pejabatId: z.string().optional(),
   divisiId: z.string().optional(),
 });
@@ -99,7 +103,10 @@ export function SuratKeluarForm({
   pejabatList,
   divisiList,
 }: SuratKeluarFormProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedLampiran, setSelectedLampiran] = useState<File | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -110,6 +117,7 @@ export function SuratKeluarForm({
       tanggalSurat: todayISO(),
       jenisSurat: "undangan",
       isiSingkat: "",
+      lampiranUrl: "",
       fileDraftUrl: "",
       pejabatId: "__none__",
       divisiId: "__none__",
@@ -119,6 +127,8 @@ export function SuratKeluarForm({
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && initialData) {
+      setSelectedFile(null);
+      setSelectedLampiran(null);
       form.reset({
         perihal: initialData.perihal,
         tujuan: initialData.tujuan,
@@ -126,11 +136,14 @@ export function SuratKeluarForm({
         tanggalSurat: initialData.tanggalSurat,
         jenisSurat: initialData.jenisSurat,
         isiSingkat: initialData.isiSingkat ?? "",
+        lampiranUrl: initialData.lampiranUrl ?? "",
         fileDraftUrl: initialData.fileDraftUrl ?? "",
         pejabatId: initialData.pejabatId ? String(initialData.pejabatId) : "__none__",
         divisiId: initialData.divisiId ? String(initialData.divisiId) : "__none__",
       });
     } else {
+      setSelectedFile(null);
+      setSelectedLampiran(null);
       form.reset({
         perihal: "",
         tujuan: "",
@@ -138,6 +151,7 @@ export function SuratKeluarForm({
         tanggalSurat: todayISO(),
         jenisSurat: "undangan",
         isiSingkat: "",
+        lampiranUrl: "",
         fileDraftUrl: "",
         pejabatId: "__none__",
         divisiId: "__none__",
@@ -147,6 +161,41 @@ export function SuratKeluarForm({
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
+      let uploadedDraftUrl = values.fileDraftUrl || undefined;
+      let uploadedLampiranUrl = values.lampiranUrl || undefined;
+
+      if (selectedFile) {
+        const dataUrl = await fileToDataUrl(selectedFile);
+        const uploadResult = await uploadSuratKeluarDraft({
+          fileName: selectedFile.name,
+          contentType: selectedFile.type || "application/octet-stream",
+          dataUrl,
+        });
+
+        if (!uploadResult.ok) {
+          toast.error("Upload draft surat gagal.");
+          return;
+        }
+
+        uploadedDraftUrl = uploadResult.data.url;
+      }
+
+      if (selectedLampiran) {
+        const dataUrl = await fileToDataUrl(selectedLampiran);
+        const uploadResult = await uploadSuratKeluarLampiran({
+          fileName: selectedLampiran.name,
+          contentType: selectedLampiran.type || "application/octet-stream",
+          dataUrl,
+        });
+
+        if (!uploadResult.ok) {
+          toast.error("Upload lampiran surat gagal.");
+          return;
+        }
+
+        uploadedLampiranUrl = uploadResult.data.url;
+      }
+
       const payload = {
         ...values,
         pejabatId:
@@ -159,7 +208,8 @@ export function SuratKeluarForm({
             : undefined,
         tujuanAlamat: values.tujuanAlamat || undefined,
         isiSingkat: values.isiSingkat || undefined,
-        fileDraftUrl: values.fileDraftUrl || undefined,
+        lampiranUrl: uploadedLampiranUrl,
+        fileDraftUrl: uploadedDraftUrl,
       };
 
       const res =
@@ -174,6 +224,7 @@ export function SuratKeluarForm({
       toast.success(
         mode === "edit" ? "Surat keluar diperbarui." : "Surat keluar dibuat.",
       );
+      router.refresh();
       onOpenChange(false);
     });
   }
@@ -330,22 +381,81 @@ export function SuratKeluarForm({
 
             <FormField
               control={form.control}
-              name="fileDraftUrl"
+              name="lampiranUrl"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    URL Draft Surat{" "}
+                    Lampiran{" "}
                     <span className="text-muted-foreground font-normal">
                       (opsional)
                     </span>
                   </FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="https://contoh.com/draft-surat.pdf"
-                      {...field}
-                      value={field.value ?? ""}
-                    />
+                    <div className="space-y-3">
+                      <Input
+                        type="file"
+                        accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
+                        onChange={(event) =>
+                          setSelectedLampiran(event.target.files?.[0] ?? null)
+                        }
+                      />
+                      <Input
+                        placeholder="Atau isi URL lampiran manual"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </div>
                   </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Upload lampiran PDF, DOC, DOCX, atau gambar langsung, atau
+                    isi URL manual bila file sudah ada di storage lain.
+                  </p>
+                  {selectedLampiran ? (
+                    <p className="text-xs text-foreground">
+                      Lampiran dipilih: {selectedLampiran.name}
+                    </p>
+                  ) : null}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="fileDraftUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Draft Surat{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (opsional)
+                    </span>
+                  </FormLabel>
+                  <FormControl>
+                    <div className="space-y-3">
+                      <Input
+                        type="file"
+                        accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
+                        onChange={(event) =>
+                          setSelectedFile(event.target.files?.[0] ?? null)
+                        }
+                      />
+                      <Input
+                        placeholder="Atau isi URL draft manual"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </div>
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Upload draft PDF, DOC, DOCX, atau gambar langsung, atau isi
+                    URL manual jika draft sudah ada di storage lain.
+                  </p>
+                  {selectedFile ? (
+                    <p className="text-xs text-foreground">
+                      File dipilih: {selectedFile.name}
+                    </p>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}
@@ -448,4 +558,19 @@ export function SuratKeluarForm({
       </DialogContent>
     </Dialog>
   );
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Gagal membaca file."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Gagal membaca file."));
+    reader.readAsDataURL(file);
+  });
 }

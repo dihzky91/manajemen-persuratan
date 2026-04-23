@@ -11,7 +11,7 @@ import {
   navigationSections,
 } from "@/components/layout/navigation";
 
-export function Sidebar() {
+export function Sidebar({ unreadDisposisiCount = 0 }: { unreadDisposisiCount?: number }) {
   const pathname = usePathname();
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "IAI Jakarta";
   const activeItem = getNavigationItem(pathname);
@@ -82,6 +82,11 @@ export function Sidebar() {
                       >
                         <item.icon className="h-4 w-4" />
                         <span className="flex-1">{item.label}</span>
+                        {item.href === "/disposisi" && unreadDisposisiCount > 0 ? (
+                          <Badge variant="secondary" className="rounded-full">
+                            {unreadDisposisiCount}
+                          </Badge>
+                        ) : null}
                         {isActive ? (
                           <Badge
                             variant="secondary"
