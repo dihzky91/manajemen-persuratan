@@ -26,8 +26,10 @@ export default async function Page() {
     }),
   );
 
-  const role = (session?.user as { role?: string } | undefined)?.role;
+  const sessionUser = session?.user as { id?: string; role?: string } | undefined;
+  const role = sessionUser?.role;
   const canManage = role === "admin";
+  const currentUserId = sessionUser?.id ?? null;
 
   return (
     <PageWrapper title="Data Pegawai" description="Daftar dan manajemen pegawai.">
@@ -35,6 +37,7 @@ export default async function Page() {
         initialData={detailRows}
         divisiOptions={divisiRows.map((row) => ({ id: row.id, nama: row.nama }))}
         canManage={canManage}
+        currentUserId={currentUserId}
       />
     </PageWrapper>
   );

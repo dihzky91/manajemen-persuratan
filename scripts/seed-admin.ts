@@ -3,6 +3,9 @@
  * Jalankan: npx dotenv-cli -e .env.local -- npx tsx scripts/seed-admin.ts
  */
 import { auth } from "../src/server/auth";
+import { db } from "../src/server/db";
+import { users } from "../src/server/db/schema";
+import { eq } from "drizzle-orm";
 
 const ADMIN_EMAIL = "admin@iaijakarta.or.id";
 const ADMIN_PASSWORD = "141Jakarta";
@@ -25,17 +28,37 @@ async function main() {
       process.exit(1);
     }
 
+    await db
+      .update(users)
+      .set({
+        role: "admin",
+        isActive: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, result.user.id));
+
     console.log("✅ Admin berhasil dibuat:");
     console.log("   Email   :", ADMIN_EMAIL);
     console.log("   Password:", ADMIN_PASSWORD);
     console.log("   ID      :", result.user.id);
+    console.log("   Role    :", "admin");
     console.log("");
     console.log("⚠️  Ganti password setelah login pertama!");
   } catch (err: any) {
     if (err?.message?.includes("already exists") || err?.status === 422) {
+      await db
+        .update(users)
+        .set({
+          role: "admin",
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.email, ADMIN_EMAIL));
+
       console.log("ℹ️  User sudah ada — tidak perlu seed ulang.");
       console.log("   Email   :", ADMIN_EMAIL);
       console.log("   Password:", ADMIN_PASSWORD);
+      console.log("   Role    :", "admin");
     } else {
       console.error("❌ Error:", err?.message ?? err);
       process.exit(1);

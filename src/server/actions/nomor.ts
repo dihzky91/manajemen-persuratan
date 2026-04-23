@@ -24,44 +24,23 @@ export async function generateNomorSurat(input: unknown) {
   const session = await requireRole(["admin", "pejabat"]);
 
   const result = await db.transaction(async (tx) => {
-    const existing = await tx.execute(sql`
-      SELECT id, counter, prefix
-      FROM ${nomorSuratCounter}
-      WHERE tahun = ${data.tahun}
-        AND bulan = ${data.bulan}
-        AND jenis_surat = ${data.jenisSurat}
-      FOR UPDATE
+    const prefixCandidate = data.prefixOverride ?? "IAI-DKIJKT";
+    const upsert = await tx.execute(sql`
+      INSERT INTO nomor_surat_counter (tahun, bulan, jenis_surat, counter, prefix, updated_at)
+      VALUES (${data.tahun}, ${data.bulan}, ${data.jenisSurat}, 1, ${prefixCandidate}, NOW())
+      ON CONFLICT (tahun, bulan, jenis_surat)
+      DO UPDATE SET
+        counter = nomor_surat_counter.counter + 1,
+        prefix = COALESCE(${data.prefixOverride ?? null}, nomor_surat_counter.prefix, ${"IAI-DKIJKT"}),
+        updated_at = NOW()
+      RETURNING counter, prefix
     `);
 
-    let counter: number;
-    let prefix: string;
+    const row = (upsert.rows as { counter: number; prefix: string | null }[])[0];
+    if (!row) throw new Error("Gagal menggenerate nomor surat");
 
-    const row = (existing.rows as { id: number; counter: number; prefix: string | null }[])[0];
-
-    if (!row) {
-      counter = 1;
-      prefix = data.prefixOverride ?? "IAI-DKIJKT";
-      await tx.insert(nomorSuratCounter).values({
-        tahun: data.tahun,
-        bulan: data.bulan,
-        jenisSurat: data.jenisSurat,
-        counter,
-        prefix,
-      });
-    } else {
-      counter = row.counter + 1;
-      prefix = data.prefixOverride ?? row.prefix ?? "IAI-DKIJKT";
-      await tx
-        .update(nomorSuratCounter)
-        .set({ counter, prefix, updatedAt: new Date() })
-        .where(
-          and(
-            eq(nomorSuratCounter.tahun, data.tahun),
-            eq(nomorSuratCounter.bulan, data.bulan),
-            eq(nomorSuratCounter.jenisSurat, data.jenisSurat),
-          ),
-        );
-    }
+    const counter = row.counter;
+    const prefix = row.prefix ?? "IAI-DKIJKT";
 
     const bulanRomawi = formatBulanRomawi(data.bulan);
     const nomor = `${counter}/${prefix}/${bulanRomawi}/${data.tahun}`;

@@ -1,4 +1,4 @@
-# SYSTEM.md — Sistem Manajemen Surat & Kepegawaian IAI Wilayah DKI Jakarta
+﻿# SYSTEM.md â€” Sistem Manajemen Surat & Kepegawaian IAI Wilayah DKI Jakarta
 
 > Dokumen ini adalah **panduan arsitektur lengkap** untuk membangun sistem manajemen persuratan dan kepegawaian internal IAI Wilayah DKI Jakarta. Dirancang agar bisa dibaca dan langsung dieksekusi oleh agent manapun (Cursor, Windsurf, Claude Code, dsb.) tanpa konteks tambahan dari developer.
 
@@ -8,13 +8,13 @@
 
 | Atribut | Detail |
 |---|---|
-| **Nama Sistem** | *(belum diputuskan — gunakan env `NEXT_PUBLIC_APP_NAME` sebagai placeholder)* |
+| **Nama Sistem** | *(belum diputuskan â€” gunakan env `NEXT_PUBLIC_APP_NAME` sebagai placeholder)* |
 | **Organisasi** | Ikatan Akuntan Indonesia (IAI) Wilayah DKI Jakarta |
-| **Domain / URL** | *(belum diputuskan — gunakan env `NEXT_PUBLIC_APP_URL` sebagai placeholder bila mulai dibutuhkan di UI/client)* |
+| **Domain / URL** | *(belum diputuskan â€” gunakan env `NEXT_PUBLIC_APP_URL` sebagai placeholder bila mulai dibutuhkan di UI/client)* |
 | **Tujuan** | Digitalisasi pengelolaan surat masuk, surat keluar, disposisi, dan data kepegawaian internal |
 | **Pengguna** | Admin, Pejabat Penandatangan, Staff Divisi (semua internal IAI Jakarta) |
 | **Bahasa UI** | Bahasa Indonesia Formal (baku) |
-| **Akses** | **Internal only** — semua route di-protect autentikasi, tidak ada halaman publik |
+| **Akses** | **Internal only** â€” semua route di-protect autentikasi, tidak ada halaman publik |
 
 ---
 
@@ -27,7 +27,7 @@
 | **Framework** | [Next.js App Router](https://nextjs.org/docs/app) | Full-stack React, nested layout, Server/Client Components, SSR/streaming |
 | **Routing** | Next.js file-based routing | Selaras dengan struktur repo `src/app`, route groups, layout bertingkat |
 | **Server State** | Server Components + revalidation path-based | Sederhana untuk internal app, cocok dengan bentuk data CRUD saat ini |
-| **Table** | [TanStack Table](https://tanstack.com/table) | Headless table untuk arsip surat — sorting, filter, pagination |
+| **Table** | [TanStack Table](https://tanstack.com/table) | Headless table untuk arsip surat â€” sorting, filter, pagination |
 | **Form** | [React Hook Form](https://react-hook-form.com) + [Zod](https://zod.dev) | Validasi type-safe, sudah terpasang di codebase saat ini |
 | **ORM** | [Drizzle ORM](https://orm.drizzle.team) | Lightweight, type-safe, cocok dengan pola Server Actions di Next.js |
 | **Database** | [PostgreSQL](https://postgresql.org) via [Neon](https://neon.tech) | Serverless-friendly, free tier tersedia |
@@ -57,55 +57,55 @@
 
 ```
 [nama-repo]/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx                      # Root layout + global styles + toaster
-│   │   ├── page.tsx                        # Entry page (jika dipakai)
-│   │   ├── api/
-│   │   │   └── auth/[...all]/route.ts      # Better Auth route handler
-│   │   ├── (auth)/
-│   │   │   └── login/page.tsx              # Halaman login
-│   │   └── (dashboard)/
-│   │       ├── layout.tsx                  # Auth guard server-side + shell dashboard
-│   │       ├── dashboard/page.tsx
-│   │       ├── divisi/page.tsx
-│   │       ├── pegawai/page.tsx
-│   │       ├── surat-masuk/page.tsx
-│   │       ├── surat-keluar/page.tsx
-│   │       ├── disposisi/page.tsx
-│   │       ├── nomor-surat/page.tsx
-│   │       ├── surat-keputusan/page.tsx
-│   │       ├── surat-mou/page.tsx
-│   │       └── pejabat/page.tsx
-│   ├── components/
-│   │   ├── ui/                             # shadcn/ui primitives
-│   │   ├── layout/                         # Sidebar, Header, PageWrapper
-│   │   └── divisi/                         # Manager/Form modul divisi
-│   ├── server/
-│   │   ├── actions/                        # Server Actions per domain
-│   │   ├── auth.ts                         # Better Auth config
-│   │   └── db/                             # Drizzle schema + koneksi DB
-│   ├── lib/
-│   │   ├── validators/
-│   │   ├── pdf/
-│   │   ├── qr/
-│   │   ├── email/
-│   │   ├── env.ts
-│   │   └── utils.ts
-│   ├── styles/
-│   │   └── globals.css
-│   └── proxy.ts                            # Route protection berbasis cookie
-├── scripts/
-│   ├── apply-schema.ts
-│   └── seed-admin.ts
-├── drizzle/
-│   └── migrations/
-├── public/
-├── .env.local                              # Lihat Bagian 8
-├── drizzle.config.ts
-├── next.config.ts
-├── tsconfig.json
-└── package.json
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ app/
+â”‚   â”‚   â”œâ”€â”€ layout.tsx                      # Root layout + global styles + toaster
+â”‚   â”‚   â”œâ”€â”€ page.tsx                        # Entry page (jika dipakai)
+â”‚   â”‚   â”œâ”€â”€ api/
+â”‚   â”‚   â”‚   â””â”€â”€ auth/[...all]/route.ts      # Better Auth route handler
+â”‚   â”‚   â”œâ”€â”€ (auth)/
+â”‚   â”‚   â”‚   â””â”€â”€ login/page.tsx              # Halaman login
+â”‚   â”‚   â””â”€â”€ (dashboard)/
+â”‚   â”‚       â”œâ”€â”€ layout.tsx                  # Auth guard server-side + shell dashboard
+â”‚   â”‚       â”œâ”€â”€ dashboard/page.tsx
+â”‚   â”‚       â”œâ”€â”€ divisi/page.tsx
+â”‚   â”‚       â”œâ”€â”€ pegawai/page.tsx
+â”‚   â”‚       â”œâ”€â”€ surat-masuk/page.tsx
+â”‚   â”‚       â”œâ”€â”€ surat-keluar/page.tsx
+â”‚   â”‚       â”œâ”€â”€ disposisi/page.tsx
+â”‚   â”‚       â”œâ”€â”€ nomor-surat/page.tsx
+â”‚   â”‚       â”œâ”€â”€ surat-keputusan/page.tsx
+â”‚   â”‚       â”œâ”€â”€ surat-mou/page.tsx
+â”‚   â”‚       â””â”€â”€ pejabat/page.tsx
+â”‚   â”œâ”€â”€ components/
+â”‚   â”‚   â”œâ”€â”€ ui/                             # shadcn/ui primitives
+â”‚   â”‚   â”œâ”€â”€ layout/                         # Sidebar, Header, PageWrapper
+â”‚   â”‚   â””â”€â”€ divisi/                         # Manager/Form modul divisi
+â”‚   â”œâ”€â”€ server/
+â”‚   â”‚   â”œâ”€â”€ actions/                        # Server Actions per domain
+â”‚   â”‚   â”œâ”€â”€ auth.ts                         # Better Auth config
+â”‚   â”‚   â””â”€â”€ db/                             # Drizzle schema + koneksi DB
+â”‚   â”œâ”€â”€ lib/
+â”‚   â”‚   â”œâ”€â”€ validators/
+â”‚   â”‚   â”œâ”€â”€ pdf/
+â”‚   â”‚   â”œâ”€â”€ qr/
+â”‚   â”‚   â”œâ”€â”€ email/
+â”‚   â”‚   â”œâ”€â”€ env.ts
+â”‚   â”‚   â””â”€â”€ utils.ts
+â”‚   â”œâ”€â”€ styles/
+â”‚   â”‚   â””â”€â”€ globals.css
+â”‚   â””â”€â”€ proxy.ts                            # Route protection berbasis cookie
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ apply-schema.ts
+â”‚   â””â”€â”€ seed-admin.ts
+â”œâ”€â”€ drizzle/
+â”‚   â””â”€â”€ migrations/
+â”œâ”€â”€ public/
+â”œâ”€â”€ .env.local                              # Lihat Bagian 8
+â”œâ”€â”€ drizzle.config.ts
+â”œâ”€â”€ next.config.ts
+â”œâ”€â”€ tsconfig.json
+â””â”€â”€ package.json
 ```
 
 ---
@@ -115,20 +115,20 @@
 ### 4.1 ERD Overview
 
 ```
-divisi ◄──────────────────── users (pegawai)
-                                   │
-              ┌────────────────────┼──────────────────────┐
-              │                    │                       │
+divisi â—„â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ users (pegawai)
+                                   â”‚
+              â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+              â”‚                    â”‚                       â”‚
          surat_masuk         surat_keluar           pegawai_biodata
-              │                    │                pegawai_keluarga
+              â”‚                    â”‚                pegawai_keluarga
          disposisi           nomor_surat_counter    pegawai_pendidikan
          (chain/tree)        pejabat_penandatangan  pegawai_riwayat_pekerjaan
                                                     pegawai_kesehatan
                                                     pegawai_pernyataan_integritas
 
-surat_keputusan ──► pejabat_penandatangan
-surat_mou       ──► pejabat_penandatangan
-audit_log       ──► users
+surat_keputusan â”€â”€â–º pejabat_penandatangan
+surat_mou       â”€â”€â–º pejabat_penandatangan
+audit_log       â”€â”€â–º users
 ```
 
 ### 4.2 Drizzle Schema Lengkap
@@ -141,7 +141,7 @@ import {
   integer, serial, pgEnum, varchar, uuid, jsonb
 } from "drizzle-orm/pg-core";
 
-// ─── ENUMS ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ ENUMS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const roleEnum = pgEnum("role", ["admin", "staff", "pejabat", "viewer"]);
 
@@ -181,7 +181,7 @@ export const jenisPegawaiEnum = pgEnum("jenis_pegawai", [
   "Tetap", "Kontrak", "Magang", "Paruh Waktu"
 ]);
 
-// ─── DIVISI ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ DIVISI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const divisi = pgTable("divisi", {
   id: serial("id").primaryKey(),
@@ -191,7 +191,7 @@ export const divisi = pgTable("divisi", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── USERS (akun login + data dasar pegawai) ─────────────────────────────────
+// â”€â”€â”€ USERS (akun login + data dasar pegawai) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -212,7 +212,7 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── PEGAWAI DETAIL — Tab 1: Biodata ────────────────────────────────────────
+// â”€â”€â”€ PEGAWAI DETAIL â€” Tab 1: Biodata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pegawaiBiodata = pgTable("pegawai_biodata", {
   id: serial("id").primaryKey(),
@@ -230,7 +230,7 @@ export const pegawaiBiodata = pgTable("pegawai_biodata", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── PEGAWAI DETAIL — Tab 2: Kelengkapan Karyawan ───────────────────────────
+// â”€â”€â”€ PEGAWAI DETAIL â€” Tab 2: Kelengkapan Karyawan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pegawaiKelengkapan = pgTable("pegawai_kelengkapan", {
   id: serial("id").primaryKey(),
@@ -244,7 +244,7 @@ export const pegawaiKelengkapan = pgTable("pegawai_kelengkapan", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── PEGAWAI DETAIL — Tab 3: Data Keluarga ──────────────────────────────────
+// â”€â”€â”€ PEGAWAI DETAIL â€” Tab 3: Data Keluarga â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pegawaiKeluarga = pgTable("pegawai_keluarga", {
   id: serial("id").primaryKey(),
@@ -257,7 +257,7 @@ export const pegawaiKeluarga = pgTable("pegawai_keluarga", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ─── PEGAWAI DETAIL — Tab 4: Riwayat Pendidikan ─────────────────────────────
+// â”€â”€â”€ PEGAWAI DETAIL â€” Tab 4: Riwayat Pendidikan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pegawaiPendidikan = pgTable("pegawai_pendidikan", {
   id: serial("id").primaryKey(),
@@ -271,7 +271,7 @@ export const pegawaiPendidikan = pgTable("pegawai_pendidikan", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ─── PEGAWAI DETAIL — Tab 5: Riwayat Pekerjaan ──────────────────────────────
+// â”€â”€â”€ PEGAWAI DETAIL â€” Tab 5: Riwayat Pekerjaan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pegawaiRiwayatPekerjaan = pgTable("pegawai_riwayat_pekerjaan", {
   id: serial("id").primaryKey(),
@@ -284,7 +284,7 @@ export const pegawaiRiwayatPekerjaan = pgTable("pegawai_riwayat_pekerjaan", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ─── PEGAWAI DETAIL — Tab 6: Riwayat Kesehatan ──────────────────────────────
+// â”€â”€â”€ PEGAWAI DETAIL â€” Tab 6: Riwayat Kesehatan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pegawaiKesehatan = pgTable("pegawai_kesehatan", {
   id: serial("id").primaryKey(),
@@ -298,7 +298,7 @@ export const pegawaiKesehatan = pgTable("pegawai_kesehatan", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── PEGAWAI DETAIL — Tab 7: Pernyataan Integritas ──────────────────────────
+// â”€â”€â”€ PEGAWAI DETAIL â€” Tab 7: Pernyataan Integritas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pegawaiPernyataanIntegritas = pgTable("pegawai_pernyataan_integritas", {
   id: serial("id").primaryKey(),
@@ -310,7 +310,7 @@ export const pegawaiPernyataanIntegritas = pgTable("pegawai_pernyataan_integrita
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ─── PEJABAT PENANDATANGAN ───────────────────────────────────────────────────
+// â”€â”€â”€ PEJABAT PENANDATANGAN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const pejabatPenandatangan = pgTable("pejabat_penandatangan", {
   id: serial("id").primaryKey(),
@@ -323,7 +323,7 @@ export const pejabatPenandatangan = pgTable("pejabat_penandatangan", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ─── NOMOR SURAT COUNTER ─────────────────────────────────────────────────────
+// â”€â”€â”€ NOMOR SURAT COUNTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const nomorSuratCounter = pgTable("nomor_surat_counter", {
   id: serial("id").primaryKey(),
@@ -334,13 +334,13 @@ export const nomorSuratCounter = pgTable("nomor_surat_counter", {
   prefix: varchar("prefix", { length: 80 }),
   // Contoh prefix dari data existing: "IAI-DKIJKT", "DE/IAI-DKIJKT", "PPL/IAI-DKIJKT"
   updatedAt: timestamp("updated_at").defaultNow(),
-  // UNIQUE constraint: (tahun, bulan, jenis_surat) — di migration
+  // UNIQUE constraint: (tahun, bulan, jenis_surat) â€” di migration
 });
 
 // Format final: {counter}/{prefix}/{bulan_romawi}/{tahun}
 // Contoh actual: 19.1-7/DE/IAI-DKIJKT/IV/2026  |  17/PPL/IAI-DKIJKT/IV/26
 
-// ─── SURAT KELUAR ────────────────────────────────────────────────────────────
+// â”€â”€â”€ SURAT KELUAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const suratKeluar = pgTable("surat_keluar", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -352,7 +352,7 @@ export const suratKeluar = pgTable("surat_keluar", {
   tujuan: varchar("tujuan", { length: 300 }).notNull(),
   tujuanAlamat: text("tujuan_alamat"),
 
-  // ⚠️ BACKDATE: tanggalSurat adalah input MANUAL BEBAS — tidak ada validasi range
+  // âš ï¸ BACKDATE: tanggalSurat adalah input MANUAL BEBAS â€” tidak ada validasi range
   // Bisa masa lalu (backdate), hari ini, atau masa depan
   tanggalSurat: date("tanggal_surat").notNull(),
 
@@ -384,7 +384,7 @@ export const suratKeluar = pgTable("surat_keluar", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── SURAT MASUK ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ SURAT MASUK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const suratMasuk = pgTable("surat_masuk", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -394,7 +394,7 @@ export const suratMasuk = pgTable("surat_masuk", {
   pengirim: varchar("pengirim", { length: 200 }).notNull(),
   pengirimAlamat: text("pengirim_alamat"),
 
-  // ⚠️ BACKDATE: keduanya input manual, tidak ada validasi range tanggal
+  // âš ï¸ BACKDATE: keduanya input manual, tidak ada validasi range tanggal
   tanggalSurat: date("tanggal_surat").notNull(),
   tanggalDiterima: date("tanggal_diterima").notNull(),
 
@@ -407,7 +407,7 @@ export const suratMasuk = pgTable("surat_masuk", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── DISPOSISI ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ DISPOSISI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const disposisi = pgTable("disposisi", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -425,14 +425,14 @@ export const disposisi = pgTable("disposisi", {
   // Self-reference untuk chain disposisi. Tidak pakai .references() agar tidak circular.
 });
 
-// ─── SURAT KEPUTUSAN ─────────────────────────────────────────────────────────
+// â”€â”€â”€ SURAT KEPUTUSAN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const suratKeputusan = pgTable("surat_keputusan", {
   id: uuid("id").defaultRandom().primaryKey(),
   nomorSK: varchar("nomor_sk", { length: 200 }).unique().notNull(),
   perihal: text("perihal").notNull(),
   tentang: text("tentang").notNull(),
-  tanggalSK: date("tanggal_sk").notNull(),         // ⚠️ BACKDATE: input manual bebas
+  tanggalSK: date("tanggal_sk").notNull(),         // âš ï¸ BACKDATE: input manual bebas
   tanggalBerlaku: date("tanggal_berlaku"),
   tanggalBerakhir: date("tanggal_berakhir"),
   pejabatId: integer("pejabat_id").references(() => pejabatPenandatangan.id),
@@ -443,7 +443,7 @@ export const suratKeputusan = pgTable("surat_keputusan", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── SURAT MOU ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ SURAT MOU â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const suratMou = pgTable("surat_mou", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -451,7 +451,7 @@ export const suratMou = pgTable("surat_mou", {
   perihal: text("perihal").notNull(),
   pihakKedua: varchar("pihak_kedua", { length: 200 }).notNull(),
   pihakKeduaAlamat: text("pihak_kedua_alamat"),
-  tanggalMOU: date("tanggal_mou").notNull(),        // ⚠️ BACKDATE: input manual bebas
+  tanggalMOU: date("tanggal_mou").notNull(),        // âš ï¸ BACKDATE: input manual bebas
   tanggalBerlaku: date("tanggal_berlaku"),
   tanggalBerakhir: date("tanggal_berakhir"),
   nilaiKerjasama: text("nilai_kerjasama"),
@@ -463,7 +463,7 @@ export const suratMou = pgTable("surat_mou", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ AUDIT LOG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const auditLog = pgTable("audit_log", {
   id: serial("id").primaryKey(),
@@ -486,76 +486,61 @@ export const auditLog = pgTable("audit_log", {
 
 ```
 Browser
-    │
-    ├── Request halaman ──► Next.js App Router
-    │                       ├── Root Layout (`src/app/layout.tsx`)
-    │                       ├── Route Group `(auth)` untuk login
-    │                       └── Route Group `(dashboard)` untuk area internal
-    │
-    ├── Route protection ringan ──► `src/proxy.ts`
-    │                               └── cek cookie session lalu redirect ke `/login?redirect=...`
-    │
-    ├── Server Component ──► baca data awal / validasi session
-    └── Client Component ──► interaksi tabel, dialog, form submit
+    â”‚
+    â”œâ”€â”€ Request halaman â”€â”€â–º Next.js App Router
+    â”‚                       â”œâ”€â”€ Root Layout (`src/app/layout.tsx`)
+    â”‚                       â”œâ”€â”€ Route Group `(auth)` untuk login
+    â”‚                       â””â”€â”€ Route Group `(dashboard)` untuk area internal
+    â”‚
+    â”œâ”€â”€ Route protection ringan â”€â”€â–º `src/proxy.ts`
+    â”‚                               â””â”€â”€ cek cookie session lalu redirect ke `/login?redirect=...`
+    â”‚
+    â”œâ”€â”€ Server Component â”€â”€â–º baca data awal / validasi session
+    â””â”€â”€ Client Component â”€â”€â–º interaksi tabel, dialog, form submit
 
 Server Actions / Route Handler
-    │
-    ├── 1. Zod validation (input)
-    ├── 2. Better Auth session + role check
-    ├── 3. Drizzle ORM → Neon PostgreSQL
-    ├── 4. `revalidatePath()` untuk sinkronisasi UI setelah mutasi
-    └── 5. Side effects:
-            ├── Mailjet    → notifikasi disposisi via email
-            ├── Cloudinary → upload/retrieve file PDF/gambar
-            ├── qrcode     → generate QR surat & QR contact pegawai
-            └── auditLog   → catat semua aksi penting
+    â”‚
+    â”œâ”€â”€ 1. Zod validation (input)
+    â”œâ”€â”€ 2. Better Auth session + role check
+    â”œâ”€â”€ 3. Drizzle ORM â†’ Neon PostgreSQL
+    â”œâ”€â”€ 4. `revalidatePath()` untuk sinkronisasi UI setelah mutasi
+    â””â”€â”€ 5. Side effects:
+            â”œâ”€â”€ Mailjet    â†’ notifikasi disposisi via email
+            â”œâ”€â”€ Cloudinary â†’ upload/retrieve file PDF/gambar
+            â”œâ”€â”€ qrcode     â†’ generate QR surat & QR contact pegawai
+            â””â”€â”€ auditLog   â†’ catat semua aksi penting
 ```
 
-### 5.2 Workflow Surat Keluar — Stepper 5 Tahap
+### 5.2 Workflow Surat Keluar â€” Stepper 5 Tahap
 
 ```
-┌──────────────┬──────────────────────────┬────────────────┬──────────────┬─────────┐
-│   Step 1     │         Step 2           │    Step 3      │   Step 4     │ Step 5  │
-│ Upload Draft │ Permohonan Persetujuan   │ Proses Reviu   │ Pengarsipan  │ Selesai │
-└──────────────┴──────────────────────────┴────────────────┴──────────────┴─────────┘
-
-Detail per step:
-
-Step 1 — Upload Draft Surat (status: "draft")
-  - Isi form: tujuan, perihal, jenis surat, tanggal surat (bebas/backdate), divisi pengirim
-  - Upload file draft PDF → Cloudinary (fileDraftUrl)
-  - nomorSurat masih NULL → badge "Generate No. Surat Keluar" muncul di list
-
-Step 2 — Permohonan Persetujuan (status: "permohonan_persetujuan")
-  - Klik tombol "Ajukan Persetujuan"
-  - Sistem kirim email notifikasi ke Pejabat via Mailjet
-
-Step 3 — Proses Reviu (status: "reviu")
-  - Pejabat review surat
-  - Jika minta revisi → status kembali ke "draft", catatanReviu terisi
-  - Jika disetujui → status "reviu", disetujuiOleh + tanggalDisetujui terisi
-
-Step 4 — Pengarsipan (status: "pengarsipan")
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   Step 1     â”‚         Step 2           â”‚    Step 3      â”‚   Step 4 â€” Pengarsipan (status: "pengarsipan")
   a. Generate Nomor Surat
      - Klik "Generate No. Surat Keluar"
-     - generateNomorSurat() → atomic counter (DB transaction)
+     - generateNomorSurat() â†’ atomic counter (DB transaction)
      - nomorSurat terisi, ditampilkan sebagai badge bernomor di list
   b. Generate QR Code
      - QR berisi data verifikasi surat (URL atau data ringkas surat)
      - Disimpan ke qrCodeUrl, bisa di-copy sebagai gambar
+     - Di modul internal, tampilkan tombol "Preview Halaman Verifikasi" dan "Salin Link Verifikasi"
   c. Upload Dokumen Final
      - User download draft, tambahkan nomor + QR secara manual ke PDF
-     - Re-upload PDF final → disimpan ke fileFinalUrl
+     - Re-upload PDF final â†’ disimpan ke fileFinalUrl
+  d. Checklist Pengarsipan
+     - nomorSurat sudah terisi
+     - qrCodeUrl sudah terisi
+     - fileFinalUrl sudah terisi
 
-Step 5 — Selesai (status: "selesai")
+Step 5 â€” Selesai (status: "selesai")
   - Konfirmasi pengarsipan selesai
+  - Status "selesai" idealnya hanya diberikan setelah checklist pengarsipan lengkap
   - Muncul badge "Selesai" hijau di list surat keluar
 ```
 
-### 5.3 Aturan Backdate — WAJIB DIBACA
-
+### 5.3 Aturan Backdate â€” WAJIB DIBACA
 ```
-⚠️ PERHATIAN UNTUK SEMUA AGENT/DEVELOPER:
+âš ï¸ PERHATIAN UNTUK SEMUA AGENT/DEVELOPER:
 
 Semua field tanggal surat berikut adalah INPUT MANUAL BEBAS:
   - suratKeluar.tanggalSurat
@@ -564,11 +549,11 @@ Semua field tanggal surat berikut adalah INPUT MANUAL BEBAS:
   - suratKeputusan.tanggalSK
   - suratMou.tanggalMOU
 
-✅ DIIZINKAN: Tanggal masa lalu (backdate)
-✅ DIIZINKAN: Tanggal hari ini
-✅ DIIZINKAN: Tanggal masa depan (untuk keperluan antedating)
+âœ… DIIZINKAN: Tanggal masa lalu (backdate)
+âœ… DIIZINKAN: Tanggal hari ini
+âœ… DIIZINKAN: Tanggal masa depan (untuk keperluan antedating)
 
-❌ DILARANG menambahkan validasi berikut:
+âŒ DILARANG menambahkan validasi berikut:
   - "Tanggal tidak boleh sebelum hari ini"
   - "Tanggal surat harus >= tanggal input sistem"
   - "Tanggal tidak boleh lebih dari N hari yang lalu"
@@ -576,7 +561,7 @@ Semua field tanggal surat berikut adalah INPUT MANUAL BEBAS:
 Satu-satunya validasi tanggal yang boleh: required (wajib diisi).
 
 ALASAN: Praktik persuratan organisasi sering memerlukan backdate
-untuk kebutuhan administrasi yang sah — misalnya surat menyusul,
+untuk kebutuhan administrasi yang sah â€” misalnya surat menyusul,
 koreksi arsip, atau dokumen yang dibuat setelah kejadian.
 ```
 
@@ -597,18 +582,18 @@ Prefix dikonfigurasi per jenis surat (tabel nomor_surat_counter.prefix)
 Server Action: generateNomorSurat({ jenisSurat, bulan, tahun })
   1. BEGIN TRANSACTION
   2. SELECT ... FOR UPDATE WHERE tahun=? AND bulan=? AND jenis_surat=?
-  3. Jika tidak ada → INSERT counter=1
-  4. Jika ada       → UPDATE SET counter = counter + 1
+  3. Jika tidak ada â†’ INSERT counter=1
+  4. Jika ada       â†’ UPDATE SET counter = counter + 1
   5. COMMIT
   6. Ambil prefix dari config
   7. Return: "{counter}/{prefix}/{bulanRomawi}/{tahun}"
 
-⚠️ WAJIB pakai DB transaction untuk menghindari race condition
+âš ï¸ WAJIB pakai DB transaction untuk menghindari race condition
    jika dua user generate nomor di waktu bersamaan.
 
 State di tabel surat_keluar:
-  nomorSurat = NULL  → tampil tombol "Generate No. Surat Keluar"
-  nomorSurat = "..." → tampil sebagai badge/teks nomor
+  nomorSurat = NULL  â†’ tampil tombol "Generate No. Surat Keluar"
+  nomorSurat = "..." â†’ tampil sebagai badge/teks nomor
 ```
 
 ---
@@ -619,18 +604,18 @@ State di tabel surat_keluar:
 
 | Fitur | admin | pejabat | staff | viewer |
 |---|---|---|---|---|
-| Buat Surat Keluar | ✅ | ✅ | ✅ | ❌ |
-| Lihat Arsip Surat Keluar | ✅ | ✅ | ✅ | ✅ |
-| Approve / Reviu Surat Keluar | ✅ | ✅ | ❌ | ❌ |
-| Generate Nomor Surat | ✅ | ✅ | ❌ | ❌ |
-| Input Surat Masuk | ✅ | ❌ | ✅ | ❌ |
-| Disposisi Surat | ✅ | ✅ | ❌ | ❌ |
-| Terima / Proses Disposisi | ✅ | ✅ | ✅ | ❌ |
-| Buat SK / MOU | ✅ | ✅ | ❌ | ❌ |
-| Kelola Data Pegawai | ✅ | ❌ | ❌ | ❌ |
-| Kelola Divisi | ✅ | ❌ | ❌ | ❌ |
-| Bulk Nomor Surat | ✅ | ❌ | ❌ | ❌ |
-| Lihat Audit Log | ✅ | ❌ | ❌ | ❌ |
+| Buat Surat Keluar | âœ… | âœ… | âœ… | âŒ |
+| Lihat Arsip Surat Keluar | âœ… | âœ… | âœ… | âœ… |
+| Approve / Reviu Surat Keluar | âœ… | âœ… | âŒ | âŒ |
+| Generate Nomor Surat | âœ… | âœ… | âŒ | âŒ |
+| Input Surat Masuk | âœ… | âŒ | âœ… | âŒ |
+| Disposisi Surat | âœ… | âœ… | âŒ | âŒ |
+| Terima / Proses Disposisi | âœ… | âœ… | âœ… | âŒ |
+| Buat SK / MOU | âœ… | âœ… | âŒ | âŒ |
+| Kelola Data Pegawai | âœ… | âŒ | âŒ | âŒ |
+| Kelola Divisi | âœ… | âŒ | âŒ | âŒ |
+| Bulk Nomor Surat | âœ… | âŒ | âŒ | âŒ |
+| Lihat Audit Log | âœ… | âŒ | âŒ | âŒ |
 
 ### 6.2 Pattern Server Action dengan Auth Check
 
@@ -682,10 +667,10 @@ Kolom untuk Surat Keluar (sesuai tampilan sistem existing):
   Tanda Terima (icon email/kirim) | Status Pengarsipan (badge warna) | Aksi (edit)
 
 Status badge warna:
-  "selesai"   → hijau
-  "disetujui" / "reviu" → hijau muda / biru
-  "reviu"     → kuning/orange
-  "draft"     → abu-abu
+  "selesai"   â†’ hijau
+  "disetujui" / "reviu" â†’ hijau muda / biru
+  "reviu"     â†’ kuning/orange
+  "draft"     â†’ abu-abu
 
 Fitur:
   - Server-side pagination (default 10/halaman, ada selector 10/25/50)
@@ -699,27 +684,70 @@ Fitur:
 
 ```
 Komponen visual progress stepper horizontal:
-  [1] Upload Draft ──► [2] Permohonan Persetujuan ──► [3] Proses Reviu
-  ──► [4] Pengarsipan ──► [5] Selesai
+  [1] Upload Draft â”€â”€â–º [2] Permohonan Persetujuan â”€â”€â–º [3] Proses Reviu
+  â”€â”€â–º [4] Pengarsipan â”€â”€â–º [5] Selesai
 
 Props: status (statusSuratKeluarEnum)
 Step aktif = step sesuai status saat ini
 Step selesai = step sebelum step aktif (warna/ikon berbeda)
 Setiap step card menampilkan aksi relevan (tombol, upload, info)
+
+Ketentuan implementasi:
+  - Phase 2: stepper internal wajib aktif untuk tracking progress surat keluar
+  - Step "Pengarsipan" adalah pusat kontrol finalisasi surat
+  - Di step "Pengarsipan", tampilkan checklist internal:
+      - Nomor surat sudah dibuat
+      - QR verifikasi sudah dibuat
+      - Dokumen final sudah diunggah
+  - Jika QR verifikasi sudah tersedia, tampilkan:
+      - preview QR kecil
+      - tombol "Preview Halaman Verifikasi"
+      - tombol "Salin Link Verifikasi"
+  - Tombol "Selesai" sebaiknya disabled jika checklist pengarsipan belum lengkap
+```
+
+### 7.2.1 Halaman Verifikasi Publik Surat
+
+```
+Route publik verifikasi surat direncanakan pada Phase 4.
+
+Tujuan:
+  - Menjadi landing page saat QR surat di-scan
+  - Menampilkan bukti bahwa surat tercatat resmi di sistem
+
+Contoh route:
+  - /verifikasi/surat-keluar/[id]
+  - atau route publik serupa yang stabil dan dapat di-embed ke QR
+
+Data minimum yang ditampilkan:
+  - Nomor surat
+  - Tanggal surat
+  - Perihal
+  - Tujuan / ditujukan kepada
+  - Nama pejabat penandatangan
+  - Status valid / tidak valid
+
+Opsional:
+  - Tombol download / preview file final jika kebijakan organisasi mengizinkan akses publik ke dokumen final
+
+Ketentuan penting:
+  - Route ini adalah pengecualian terbatas dari prinsip "internal only"
+  - Halaman publik verifikasi hanya untuk membaca status validitas surat, bukan untuk mengakses dashboard internal
+  - Jangan tampilkan data sensitif di luar kebutuhan verifikasi
+  - URL final harus berbasis env `NEXT_PUBLIC_APP_URL`, jangan hardcode domain
 ```
 
 ### 7.3 PegawaiTabs (7 Tab)
-
 ```
 Tab navigation di halaman detail pegawai:
-  1. Profil Karyawan    → Biodata (nama, email, HP, jabatan, divisi, jenis pegawai,
+  1. Profil Karyawan    â†’ Biodata (nama, email, HP, jabatan, divisi, jenis pegawai,
                           tanggal masuk) + tombol "Generate QR Contact"
-  2. Kelengkapan Karyawan → Upload dokumen (KTP, NPWP, BPJS, ijazah, dll)
-  3. Data Keluarga      → CRUD list anggota keluarga
-  4. Riwayat Pendidikan → CRUD riwayat pendidikan
-  5. Riwayat Pekerjaan  → CRUD pengalaman kerja sebelumnya
-  6. Riwayat Kesehatan  → Golongan darah, catatan medis
-  7. Pernyataan Integritas → Upload dokumen + status tanda tangan
+  2. Kelengkapan Karyawan â†’ Upload dokumen (KTP, NPWP, BPJS, ijazah, dll)
+  3. Data Keluarga      â†’ CRUD list anggota keluarga
+  4. Riwayat Pendidikan â†’ CRUD riwayat pendidikan
+  5. Riwayat Pekerjaan  â†’ CRUD pengalaman kerja sebelumnya
+  6. Riwayat Kesehatan  â†’ Golongan darah, catatan medis
+  7. Pernyataan Integritas â†’ Upload dokumen + status tanda tangan
 
 QR Contact:
   - Berisi vCard: Nama, No. HP, Email, Jabatan
@@ -735,7 +763,7 @@ Query: SELECT disposisi WHERE kepada_user_id = session.user.id ORDER BY tanggal 
 Badge di sidebar: jumlah status "belum_dibaca"
 
 DisposisiTimeline:
-  - Tampilkan chain: A (Ketua) → B (Sekretaris) → C (Staff)
+  - Tampilkan chain: A (Ketua) â†’ B (Sekretaris) â†’ C (Staff)
   - Gunakan parentDisposisiId untuk build tree
   - Filter: semua | belum dibaca | diproses | selesai
 
@@ -750,7 +778,7 @@ Notifikasi email (Mailjet):
 
 ```bash
 # .env.local
-# ⚠️ Semua value dikosongkan — diisi saat deployment setelah keputusan tim
+# âš ï¸ Semua value dikosongkan â€” diisi saat deployment setelah keputusan tim
 # Nama aplikasi dan URL belum diputuskan
 
 # Database (Neon PostgreSQL)
@@ -765,18 +793,18 @@ CLOUDINARY_CLOUD_NAME=""
 CLOUDINARY_API_KEY=""
 CLOUDINARY_API_SECRET=""
 
-# Email — provider dan konfigurasi belum final
+# Email â€” provider dan konfigurasi belum final
 MAILJET_API_KEY=""
 MAILJET_API_SECRET=""
 MAILJET_FROM_EMAIL=""
 MAILJET_FROM_NAME=""
 
-# App — nama dan URL belum diputuskan
+# App â€” nama dan URL belum diputuskan
 NEXT_PUBLIC_APP_NAME=""
 NEXT_PUBLIC_APP_URL=""
 ```
 
-> **Catatan untuk agent:** Jangan hardcode nilai apapun dari env ini. Di repo ini, baca env melalui `process.env.*`. Untuk nilai yang perlu tersedia di client component, gunakan prefix `NEXT_PUBLIC_*`. Jika env kosong saat development lokal, tampilkan warning yang informatif atau fallback aman — jangan crash kecuali env tersebut memang wajib untuk proses server tertentu.
+> **Catatan untuk agent:** Jangan hardcode nilai apapun dari env ini. Di repo ini, baca env melalui `process.env.*`. Untuk nilai yang perlu tersedia di client component, gunakan prefix `NEXT_PUBLIC_*`. Jika env kosong saat development lokal, tampilkan warning yang informatif atau fallback aman â€” jangan crash kecuali env tersebut memang wajib untuk proses server tertentu.
 
 ---
 
@@ -785,13 +813,13 @@ NEXT_PUBLIC_APP_URL=""
 ### 9.1 Penamaan
 
 ```
-Folder route     : kebab-case         → `surat-masuk`, `surat-keluar`, `nomor-surat`
+Folder route     : kebab-case         â†’ `surat-masuk`, `surat-keluar`, `nomor-surat`
 Entry route file : `page.tsx` / `layout.tsx` / `route.ts`
-Komponen         : PascalCase         → SuratTable.tsx, PegawaiTabs.tsx
-Server action    : camelCase          → createDivisi, updatePegawai, generateNomorSurat
-DB table         : snake_case         → surat_keluar, pegawai_biodata
-Zod schema file  : camelCase.schema   → suratKeluar.schema.ts
-Env var          : UPPER_SNAKE_CASE   → MAILJET_API_KEY
+Komponen         : PascalCase         â†’ SuratTable.tsx, PegawaiTabs.tsx
+Server action    : camelCase          â†’ createDivisi, updatePegawai, generateNomorSurat
+DB table         : snake_case         â†’ surat_keluar, pegawai_biodata
+Zod schema file  : camelCase.schema   â†’ suratKeluar.schema.ts
+Env var          : UPPER_SNAKE_CASE   â†’ MAILJET_API_KEY
 ```
 
 ### 9.2 Struktur Server Action (Template Standar)
@@ -804,7 +832,7 @@ export async function namaAksi(input: InputType) {
   // 2. Auth check (WAJIB di semua action mutasi)
   // 3. Role/permission check
   // 4. Business logic
-  // 5. DB operation (Drizzle — gunakan transaction jika ada multiple insert/update)
+  // 5. DB operation (Drizzle â€” gunakan transaction jika ada multiple insert/update)
   // 6. Side effects (email notif, QR generate, file upload)
   // 7. Audit log insert jika aksi penting
   // 8. revalidatePath("/route-terkait")
@@ -832,31 +860,59 @@ revalidatePath("/divisi");
 
 ## 10. Roadmap Pengembangan
 
-### Phase 1 — Foundation (Minggu 1–2)
-- [ ] Setup Next.js App Router + Drizzle + Neon + Better Auth
-- [ ] Drizzle schema lengkap + migration awal
-- [ ] Layout: sidebar, header, auth flow login/logout, dan proxy redirect `/login?redirect=...`
-- [ ] Shell UI Phase 1 dengan arah visual institusional modern
-- [ ] Modul di luar Phase 1 tetap tampil di navigasi, tetapi diberi status/disabled state yang jelas
-- [ ] CRUD Divisi
-- [ ] CRUD Pegawai — semua 7 tab (biodata, kelengkapan, keluarga, pendidikan, pekerjaan, kesehatan, integritas)
+### Phase 1 ï¿½ Foundation (Minggu 1ï¿½2)
+- [x] Setup Next.js App Router + Drizzle + Neon + Better Auth
+- [x] Drizzle schema lengkap + migration awal
+- [x] Layout: sidebar, header, auth flow login/logout, dan proxy redirect `/login?redirect=...`
+- [x] Shell UI Phase 1 dengan arah visual institusional modern
+- [x] Modul di luar Phase 1 tetap tampil di navigasi, tetapi diberi status/disabled state yang jelas
+- [x] CRUD Divisi
+- [x] CRUD Pegawai ï¿½ semua 7 tab (biodata, kelengkapan, keluarga, pendidikan, pekerjaan, kesehatan, integritas)
 
-### Phase 2 — Core Surat Keluar (Minggu 3)
-- [ ] Form buat surat keluar (field tanggal bebas, tanpa validasi range)
-- [ ] List surat keluar (TanStack Table dengan semua kolom)
-- [ ] Stepper 5 tahap + transisi status
-- [ ] Generate nomor surat otomatis (atomic DB transaction)
-- [ ] NomorSuratBadge: kondisi null vs terisi
+Catatan status April 2026: Phase 1 telah diverifikasi selesai berdasarkan implementasi codebase aktif dan lolos `npm run typecheck` setelah perapihan tipe pada dialog tab pegawai.
 
-### Phase 3 — Surat Masuk + Disposisi (Minggu 4)
+### Phase 2 â€” Core Surat Keluar (Minggu 3)
+- [x] Form buat surat keluar (field tanggal bebas, tanpa validasi range)
+- [x] List surat keluar (TanStack Table dengan semua kolom)
+- [x] Stepper 5 tahap + transisi status
+- [x] Generate nomor surat otomatis (atomic DB transaction)
+- [x] NomorSuratBadge: kondisi null vs terisi
+- [x] Progress tracker internal berbasis stepper untuk memantau status surat
+
+Catatan scope:
+- Phase 2 fokus pada workflow internal surat keluar
+- Preview QR, preview halaman verifikasi publik, dan route publik verifikasi belum wajib selesai di phase ini
+- Penyempurnaan UX kecil pada stepper/pengarsipan boleh dilakukan lebih awal selama tidak mengubah pembagian tanggung jawab antar phase
+
+Catatan status April 2026: Phase 2 selesai dan aktif. Sudah diaudit ulang, guard transisi status diperketat di server action, generator nomor surat dirapikan agar aman saat race pada periode baru, dan lolos `npm run typecheck`.
+
+**File yang dihasilkan Phase 2:**
+- `src/server/actions/suratKeluar.ts` — server actions lengkap: CRUD, 6 transisi status (`ajukanPersetujuan`, `mulaiReviu`, `setujuiSurat`, `tolakSurat`, `selesaikanSurat`, `batalkanSurat`), guard validasi state per transisi, `assignNomorSuratKeluar` berbasis atomic upsert transaction, `listPejabatAktif`, `listDivisiOptions`
+- `src/components/surat-keluar/SuratKeluarForm.tsx` — dialog form RHF + Zod, create/edit, field operasional inti termasuk URL draft, select pejabat, dan divisi
+- `src/components/surat-keluar/SuratKeluarStepper.tsx` — stepper 5 tahap visual, action buttons per status + role, tolak dengan textarea inline, detail surat menampilkan draft/pembuat/alamat/isi singkat
+- `src/components/surat-keluar/SuratKeluarManager.tsx` — tabel surat keluar dengan kolom operasional lebih lengkap, NomorSuratCell, StatusBadge, dropdown aksi per baris, konfirmasi hapus
+- `src/app/(dashboard)/surat-keluar/page.tsx` â€” Server Component, fetch parallel 4 query, wire ke Manager
+- `src/components/layout/navigation.ts` â€” Surat Keluar dipindah ke section "Persuratan" dengan `active: true`
+
+**Catatan implementasi untuk agent berikutnya:**
+- `suratKeluar.status` di Drizzle inferred sebagai `string | null` (tidak ada `.notNull()` di schema) — selalu fallback `status ?? "draft"` di client
+- Radix UI `<SelectItem>` tidak mengizinkan `value=""` — gunakan `"__none__"` sebagai sentinel untuk field optional (pejabatId, divisiId), konversi ke `undefined` saat submit
+- `assignNomorSuratKeluar` dan `generateNomorSurat` memakai pola `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` untuk increment counter yang lebih aman pada request paralel pertama di periode baru
+- `selesaikanSurat` mensyaratkan `nomorSurat` sudah terisi (enforced di UI, tombol disabled jika null)
+- Transisi workflow utama sekarang wajib datang dari status sebelumnya yang valid; jangan bypass server action dengan update status langsung ke tabel
+- Backdate tetap berlaku: tidak ada validasi range pada `tanggalSurat`
+
+### Phase 3 â€” Surat Masuk + Disposisi (Minggu 4)
 - [ ] Form input surat masuk (tanggalSurat + tanggalDiterima, keduanya manual)
 - [ ] List & detail surat masuk
 - [ ] Alur disposisi + chain disposisi (parentDisposisiId)
 - [ ] DisposisiInbox + badge notif di sidebar
 - [ ] Email notifikasi via Mailjet
 
-### Phase 4 — QR + File + Fitur Lanjutan (Minggu 5–6)
+### Phase 4 â€” QR + File + Fitur Lanjutan (Minggu 5â€“6)
 - [ ] QR Code generate untuk surat (verifikasi)
+- [ ] Preview QR dan tombol "Preview Halaman Verifikasi" dari modul internal
+- [ ] Route publik verifikasi surat dari hasil scan QR
 - [ ] QR Contact generate untuk pegawai (vCard)
 - [ ] Upload/download file via Cloudinary
 - [ ] Surat Keputusan modul
@@ -864,7 +920,7 @@ revalidatePath("/divisi");
 - [ ] Bulk nomor surat
 - [ ] Export CSV arsip
 
-### Phase 5 — Polish & Deploy (Minggu 7–8)
+### Phase 5 â€” Polish & Deploy (Minggu 7â€“8)
 - [ ] RBAC enforcement di semua endpoint
 - [ ] Audit log lengkap
 - [ ] Isi env var setelah nama app + URL diputuskan
@@ -875,16 +931,16 @@ revalidatePath("/divisi");
 
 ## 11. Catatan Khusus IAI Jakarta
 
-1. **Backdate adalah fitur sah** — jangan pasang validasi "tanggal tidak boleh di masa lalu" pada field tanggal surat di manapun.
-2. **Nama aplikasi dan URL** belum diputuskan — gunakan env var sebagai placeholder, jangan hardcode.
-3. **Email** — provider dan konfigurasi final belum diputuskan, env dikosongkan.
+1. **Backdate adalah fitur sah** â€” jangan pasang validasi "tanggal tidak boleh di masa lalu" pada field tanggal surat di manapun.
+2. **Nama aplikasi dan URL** belum diputuskan â€” gunakan env var sebagai placeholder, jangan hardcode.
+3. **Email** â€” provider dan konfigurasi final belum diputuskan, env dikosongkan.
 4. **Format nomor surat** fleksibel (lihat contoh data existing di Bagian 5.4). Prefix dikonfigurasi per jenis surat di tabel `nomor_surat_counter.prefix`.
 5. **QR Code di surat** berfungsi sebagai tanda verifikasi elektronik visual, bukan tanda tangan digital kriptografi.
-6. **QR Contact pegawai** = vCard (Nama, HP, Email, Jabatan) — diregenerate manual jika data berubah.
+6. **QR Contact pegawai** = vCard (Nama, HP, Email, Jabatan) â€” diregenerate manual jika data berubah.
 7. **Bahasa UI**: Seluruh antarmuka dalam Bahasa Indonesia Formal (baku).
-8. **Tidak ada akses publik** — semua route di-protect auth.
-9. **Pejabat Penandatangan aktif** (dari data existing): *Monalisa — Direktur Eksekutif IAI Wilayah DKI Jakarta*.
-10. **Divisi existing** (dari data terlihat): HRD dan Umum, Divisi Kursus, Panitia Seminar Nasional — tambahkan sesuai data aktual.
+8. **Tidak ada akses publik** â€” semua route di-protect auth, kecuali route verifikasi surat yang memang dirancang terbatas untuk publik pada Phase 4.
+9. **Pejabat Penandatangan aktif** (dari data existing): *Monalisa â€” Direktur Eksekutif IAI Wilayah DKI Jakarta*.
+10. **Divisi existing** (dari data terlihat): HRD dan Umum, Divisi Kursus, Panitia Seminar Nasional â€” tambahkan sesuai data aktual.
 11. **UI Phase 1** harus terasa seperti produk internal yang siap dipakai, bukan scaffold default. Prioritas: shell aplikasi, login, dashboard, empty state, dan konsistensi visual.
 12. **Navigasi modul**: fitur lintas phase boleh tetap terlihat sebagai roadmap, tetapi modul yang belum masuk scope aktif harus dibuat nonaktif atau diberi penanda phase agar tidak menipu ekspektasi user.
 
@@ -912,4 +968,7 @@ revalidatePath("/divisi");
 ---
 
 *Dokumen ini diperbarui berdasarkan observasi langsung sistem SIMPEG IAI existing (screenshot April 2026).*
-*Last updated: April 2026 — v2.1 (diselaraskan dengan codebase Next.js aktual)*
+*Last updated: April 2026 â€” v2.1 (diselaraskan dengan codebase Next.js aktual)*
+
+
+

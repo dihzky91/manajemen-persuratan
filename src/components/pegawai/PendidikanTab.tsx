@@ -1,0 +1,313 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, type FieldValues, type UseFormReturn } from "react-hook-form";
+import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  pendidikanCreateSchema,
+  pendidikanUpdateSchema,
+  type PendidikanCreateInput,
+  type PendidikanUpdateInput,
+} from "@/lib/validators/pegawai.schema";
+import {
+  listPendidikan,
+  createPendidikan,
+  updatePendidikan,
+  deletePendidikan,
+  type PendidikanRow,
+} from "@/server/actions/pegawai";
+
+const JENJANG_OPTIONS = ["SD", "SMP", "SMA/SMK", "D1", "D2", "D3", "D4", "S1", "S2", "S3", "Lainnya"];
+
+type FormState =
+  | { open: false }
+  | { open: true; mode: "create" }
+  | { open: true; mode: "edit"; row: PendidikanRow };
+
+export function PendidikanTab({
+  userId,
+  canEdit,
+}: {
+  userId: string;
+  canEdit: boolean;
+}) {
+  const [rows, setRows] = useState<PendidikanRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [formState, setFormState] = useState<FormState>({ open: false });
+  const [deleteTarget, setDeleteTarget] = useState<PendidikanRow | null>(null);
+  const [isDeleting, startDeleteTransition] = useTransition();
+
+  useEffect(() => {
+    listPendidikan(userId).then((data) => {
+      setRows(data);
+      setIsLoading(false);
+    });
+  }, [userId]);
+
+  function handleSaved(row: PendidikanRow, mode: "create" | "edit") {
+    setRows((prev) =>
+      mode === "create" ? [...prev, row] : prev.map((r) => (r.id === row.id ? row : r)),
+    );
+    setFormState({ open: false });
+  }
+
+  function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    startDeleteTransition(async () => {
+      const res = await deletePendidikan({ id: deleteTarget.id, userId });
+      if (!res.ok) { toast.error("Gagal menghapus data."); return; }
+      toast.success("Riwayat pendidikan dihapus.");
+      setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    });
+  }
+
+  if (isLoading) {
+    return <div className="py-8 text-center text-sm text-muted-foreground">Memuat data pendidikan...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {rows.length > 0 && canEdit ? (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => setFormState({ open: true, mode: "create" })}>
+            <Plus className="h-4 w-4" />
+            Tambah Riwayat
+          </Button>
+        </div>
+      ) : null}
+
+      {rows.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-12 text-center">
+          <p className="text-sm font-medium text-foreground">Belum ada riwayat pendidikan</p>
+          <p className="mt-1 text-sm text-muted-foreground">Tambahkan riwayat pendidikan pegawai ini.</p>
+          {canEdit ? (
+            <Button size="sm" className="mt-4" onClick={() => setFormState({ open: true, mode: "create" })}>
+              <Plus className="h-4 w-4" />
+              Tambah Riwayat
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden">
+          {rows.map((row) => (
+            <div key={row.id} className="flex items-center justify-between gap-4 px-4 py-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-foreground">{row.namaInstitusi ?? "—"}</p>
+                  {row.jenjang ? (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      {row.jenjang}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {row.jurusan ?? "—"} · {row.tahunMasuk ?? "—"} — {row.tahunLulus ?? "—"}
+                </p>
+              </div>
+              {canEdit ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon-sm">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setFormState({ open: true, mode: "edit", row })}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Ubah
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(row)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Hapus
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <PendidikanFormDialog
+        open={formState.open}
+        mode={formState.open ? formState.mode : "create"}
+        initialData={formState.open && formState.mode === "edit" ? formState.row : null}
+        userId={userId}
+        onClose={() => setFormState({ open: false })}
+        onSaved={handleSaved}
+      />
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Riwayat Pendidikan?</DialogTitle>
+            <DialogDescription>
+              Data <span className="font-medium text-foreground">{deleteTarget?.namaInstitusi ?? "ini"}</span> akan dihapus permanen.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>Batal</Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+              {isDeleting ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PendidikanFormDialog({
+  open,
+  mode,
+  initialData,
+  userId,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  mode: "create" | "edit";
+  initialData: PendidikanRow | null;
+  userId: string;
+  onClose: () => void;
+  onSaved: (row: PendidikanRow, mode: "create" | "edit") => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+
+  const createForm = useForm<PendidikanCreateInput>({
+    resolver: zodResolver(pendidikanCreateSchema),
+    values: {
+      userId,
+      jenjang: initialData?.jenjang ?? "",
+      namaInstitusi: initialData?.namaInstitusi ?? "",
+      jurusan: initialData?.jurusan ?? "",
+      tahunMasuk: initialData?.tahunMasuk ?? undefined,
+      tahunLulus: initialData?.tahunLulus ?? undefined,
+    },
+  });
+
+  const editForm = useForm<PendidikanUpdateInput>({
+    resolver: zodResolver(pendidikanUpdateSchema),
+    values: {
+      id: initialData?.id ?? 0,
+      userId,
+      jenjang: initialData?.jenjang ?? "",
+      namaInstitusi: initialData?.namaInstitusi ?? "",
+      jurusan: initialData?.jurusan ?? "",
+      tahunMasuk: initialData?.tahunMasuk ?? undefined,
+      tahunLulus: initialData?.tahunLulus ?? undefined,
+    },
+  });
+
+  const form = (mode === "edit" ? editForm : createForm) as unknown as UseFormReturn<FieldValues>;
+
+  function onSubmit(values: PendidikanCreateInput | PendidikanUpdateInput) {
+    startTransition(async () => {
+      try {
+        if (mode === "create") {
+          const res = await createPendidikan(values);
+          if (res.ok) { toast.success("Riwayat pendidikan ditambahkan."); onSaved(res.data, "create"); }
+        } else {
+          const res = await updatePendidikan(values);
+          if (!res.ok) { toast.error(res.error); return; }
+          toast.success("Riwayat pendidikan diperbarui.");
+          onSaved(res.data, "edit");
+        }
+      } catch {
+        toast.error("Gagal menyimpan data.");
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{mode === "create" ? "Tambah Riwayat Pendidikan" : "Ubah Riwayat Pendidikan"}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form className="grid gap-4 md:grid-cols-2" onSubmit={form.handleSubmit(onSubmit as never)}>
+            <FormField control={form.control as never} name="jenjang" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Jenjang</FormLabel>
+                <FormControl>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    disabled={isPending}
+                  >
+                    <option value="">Pilih jenjang</option>
+                    {JENJANG_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control as never} name="namaInstitusi" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nama Institusi</FormLabel>
+                <FormControl><Input {...field} value={field.value ?? ""} disabled={isPending} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control as never} name="jurusan" render={({ field }) => (
+              <FormItem className="md:col-span-2">
+                <FormLabel>Jurusan / Program Studi</FormLabel>
+                <FormControl><Input {...field} value={field.value ?? ""} disabled={isPending} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control as never} name="tahunMasuk" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tahun Masuk</FormLabel>
+                <FormControl><Input type="number" min={1900} max={2100} {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} disabled={isPending} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control as never} name="tahunLulus" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tahun Lulus</FormLabel>
+                <FormControl><Input type="number" min={1900} max={2100} {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} disabled={isPending} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <DialogFooter className="md:col-span-2">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Batal</Button>
+              <Button type="submit" disabled={isPending}>{isPending ? "Menyimpan..." : "Simpan"}</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

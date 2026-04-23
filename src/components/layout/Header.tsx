@@ -5,11 +5,15 @@ import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getNavigationItem } from "@/components/layout/navigation";
+import {
+  getNavigationItem,
+  getPhaseMeta,
+} from "@/components/layout/navigation";
 
 export function Header({ userName }: { userName?: string | null }) {
   const pathname = usePathname();
   const currentItem = getNavigationItem(pathname);
+  const phaseMeta = getPhaseMeta(pathname);
   const todayLabel = useMemo(
     () =>
       new Intl.DateTimeFormat("id-ID", {
@@ -36,7 +40,7 @@ export function Header({ userName }: { userName?: string | null }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge variant="outline">Phase 1</Badge>
+            <Badge variant="outline">{phaseMeta.badge}</Badge>
             <p className="text-xs text-muted-foreground">{todayLabel}</p>
           </div>
           <h1 className="mt-2 text-lg font-semibold text-foreground">

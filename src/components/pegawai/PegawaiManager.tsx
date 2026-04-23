@@ -42,6 +42,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, formatTanggal } from "@/lib/utils";
 import { BiodataForm } from "@/components/pegawai/BiodataForm";
+import { KelengkapanTab } from "@/components/pegawai/KelengkapanTab";
+import { KeluargaTab } from "@/components/pegawai/KeluargaTab";
+import { PendidikanTab } from "@/components/pegawai/PendidikanTab";
+import { PekerjaanTab } from "@/components/pegawai/PekerjaanTab";
+import { KesehatanTab } from "@/components/pegawai/KesehatanTab";
+import { IntegritasTab } from "@/components/pegawai/IntegritasTab";
 import { PegawaiForm } from "@/components/pegawai/PegawaiForm";
 import { deletePegawai, type PegawaiListRow } from "@/server/actions/pegawai";
 
@@ -80,10 +86,12 @@ export function PegawaiManager({
   initialData,
   divisiOptions,
   canManage,
+  currentUserId,
 }: {
   initialData: PegawaiDetailRow[];
   divisiOptions: Array<{ id: number; nama: string }>;
   canManage: boolean;
+  currentUserId: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(initialData[0]?.id ?? null);
@@ -105,6 +113,9 @@ export function PegawaiManager({
 
   const selected =
     filteredData.find((item) => item.id === selectedId) ?? filteredData[0] ?? null;
+
+  // Admin bisa edit siapa saja; non-admin hanya bisa edit profil sendiri
+  const canEditSelected = canManage || (!!currentUserId && selected?.id === currentUserId);
 
   function handleDeleteConfirm() {
     if (!deleteTarget) return;
@@ -257,20 +268,19 @@ export function PegawaiManager({
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="biodata" className="gap-6">
-                <TabsList variant="line" className="h-auto w-full flex-wrap justify-start gap-2 rounded-none p-0">
-                  {DETAIL_TABS.map((tab) => (
-                    <TabsTrigger key={tab.value} value={tab.value} className="rounded-full border border-border bg-background px-4 py-2 data-[state=active]:border-primary data-[state=active]:bg-primary/5">
-                      <tab.icon className="h-4 w-4" />
-                      {tab.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+                <div className="-mx-6 overflow-x-auto px-6 pb-px">
+                  <TabsList variant="line" className="h-auto w-max min-w-full flex-nowrap justify-start gap-2 rounded-none p-0">
+                    {DETAIL_TABS.map((tab) => (
+                      <TabsTrigger key={tab.value} value={tab.value} className="shrink-0 rounded-full border border-border bg-background px-4 py-2 data-[state=active]:border-primary data-[state=active]:bg-primary/5">
+                        <tab.icon className="h-4 w-4" />
+                        {tab.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
 
                 <TabsContent value="biodata">
                   <div className="space-y-4">
-                    <div className="rounded-2xl border border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">
-                      Tab biodata sudah aktif pada Phase 1. Tab lain ditampilkan sebagai kerangka kerja agar pengembangan 7 tab tetap konsisten di satu modul.
-                    </div>
                     <BiodataForm
                       userId={selected.id}
                       initialData={
@@ -292,16 +302,34 @@ export function PegawaiManager({
                             }
                           : null
                       }
-                      canEdit={canManage}
+                      canEdit={canEditSelected}
                     />
                   </div>
                 </TabsContent>
 
-                {DETAIL_TABS.filter((tab) => tab.value !== "biodata").map((tab) => (
-                  <TabsContent key={tab.value} value={tab.value}>
-                    <TabPlaceholder title={tab.label} />
-                  </TabsContent>
-                ))}
+                <TabsContent value="kelengkapan">
+                  <KelengkapanTab userId={selected.id} canEdit={canEditSelected} />
+                </TabsContent>
+
+                <TabsContent value="keluarga">
+                  <KeluargaTab userId={selected.id} canEdit={canEditSelected} />
+                </TabsContent>
+
+                <TabsContent value="pendidikan">
+                  <PendidikanTab userId={selected.id} canEdit={canEditSelected} />
+                </TabsContent>
+
+                <TabsContent value="pekerjaan">
+                  <PekerjaanTab userId={selected.id} canEdit={canEditSelected} />
+                </TabsContent>
+
+                <TabsContent value="kesehatan">
+                  <KesehatanTab userId={selected.id} canEdit={canEditSelected} />
+                </TabsContent>
+
+                <TabsContent value="integritas">
+                  <IntegritasTab userId={selected.id} canEdit={canEditSelected} />
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>

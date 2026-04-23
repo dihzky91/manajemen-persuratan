@@ -20,6 +20,18 @@ import {
   pegawaiUpdateSchema,
   pegawaiDeleteSchema,
   biodataSchema,
+  keluargaCreateSchema,
+  keluargaUpdateSchema,
+  keluargaDeleteSchema,
+  pendidikanCreateSchema,
+  pendidikanUpdateSchema,
+  pendidikanDeleteSchema,
+  pekerjaanCreateSchema,
+  pekerjaanUpdateSchema,
+  pekerjaanDeleteSchema,
+  kesehatanSchema,
+  integritasSchema,
+  kelengkapanSchema,
 } from "@/lib/validators/pegawai.schema";
 import { requireRole, requireSession } from "./auth";
 
@@ -207,6 +219,263 @@ export async function deletePegawai(data: unknown) {
   revalidatePath("/pegawai");
   return { ok: true as const };
 }
+
+// ─── Keluarga ────────────────────────────────────────────────────────────────
+
+export type KeluargaRow = typeof pegawaiKeluarga.$inferSelect;
+
+export async function listKeluarga(userId: string): Promise<KeluargaRow[]> {
+  await requireSession();
+  return db
+    .select()
+    .from(pegawaiKeluarga)
+    .where(eq(pegawaiKeluarga.userId, userId))
+    .orderBy(asc(pegawaiKeluarga.createdAt));
+}
+
+export async function createKeluarga(data: unknown) {
+  const parsed = keluargaCreateSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const [row] = await db.insert(pegawaiKeluarga).values(parsed).returning();
+  revalidatePath("/pegawai");
+  return { ok: true as const, data: row! };
+}
+
+export async function updateKeluarga(data: unknown) {
+  const parsed = keluargaUpdateSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const [row] = await db
+    .update(pegawaiKeluarga)
+    .set({ hubungan: parsed.hubungan, namaAnggota: parsed.namaAnggota, tempatLahir: parsed.tempatLahir, tanggalLahir: parsed.tanggalLahir, pekerjaan: parsed.pekerjaan })
+    .where(eq(pegawaiKeluarga.id, parsed.id))
+    .returning();
+
+  if (!row) return { ok: false as const, error: "Data tidak ditemukan." };
+  revalidatePath("/pegawai");
+  return { ok: true as const, data: row };
+}
+
+export async function deleteKeluarga(data: unknown) {
+  const parsed = keluargaDeleteSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  await db.delete(pegawaiKeluarga).where(eq(pegawaiKeluarga.id, parsed.id));
+  revalidatePath("/pegawai");
+  return { ok: true as const };
+}
+
+// ─── Pendidikan ──────────────────────────────────────────────────────────────
+
+export type PendidikanRow = typeof pegawaiPendidikan.$inferSelect;
+
+export async function listPendidikan(userId: string): Promise<PendidikanRow[]> {
+  await requireSession();
+  return db
+    .select()
+    .from(pegawaiPendidikan)
+    .where(eq(pegawaiPendidikan.userId, userId))
+    .orderBy(asc(pegawaiPendidikan.tahunMasuk));
+}
+
+export async function createPendidikan(data: unknown) {
+  const parsed = pendidikanCreateSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const [row] = await db.insert(pegawaiPendidikan).values(parsed).returning();
+  revalidatePath("/pegawai");
+  return { ok: true as const, data: row! };
+}
+
+export async function updatePendidikan(data: unknown) {
+  const parsed = pendidikanUpdateSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const [row] = await db
+    .update(pegawaiPendidikan)
+    .set({ jenjang: parsed.jenjang, namaInstitusi: parsed.namaInstitusi, jurusan: parsed.jurusan, tahunMasuk: parsed.tahunMasuk, tahunLulus: parsed.tahunLulus })
+    .where(eq(pegawaiPendidikan.id, parsed.id))
+    .returning();
+
+  if (!row) return { ok: false as const, error: "Data tidak ditemukan." };
+  revalidatePath("/pegawai");
+  return { ok: true as const, data: row };
+}
+
+export async function deletePendidikan(data: unknown) {
+  const parsed = pendidikanDeleteSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  await db.delete(pegawaiPendidikan).where(eq(pegawaiPendidikan.id, parsed.id));
+  revalidatePath("/pegawai");
+  return { ok: true as const };
+}
+
+// ─── Pekerjaan ───────────────────────────────────────────────────────────────
+
+export type PekerjaanRow = typeof pegawaiRiwayatPekerjaan.$inferSelect;
+
+export async function listPekerjaan(userId: string): Promise<PekerjaanRow[]> {
+  await requireSession();
+  return db
+    .select()
+    .from(pegawaiRiwayatPekerjaan)
+    .where(eq(pegawaiRiwayatPekerjaan.userId, userId))
+    .orderBy(asc(pegawaiRiwayatPekerjaan.tanggalMulai));
+}
+
+export async function createPekerjaan(data: unknown) {
+  const parsed = pekerjaanCreateSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const [row] = await db.insert(pegawaiRiwayatPekerjaan).values(parsed).returning();
+  revalidatePath("/pegawai");
+  return { ok: true as const, data: row! };
+}
+
+export async function updatePekerjaan(data: unknown) {
+  const parsed = pekerjaanUpdateSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const [row] = await db
+    .update(pegawaiRiwayatPekerjaan)
+    .set({ namaPerusahaan: parsed.namaPerusahaan, jabatan: parsed.jabatan, tanggalMulai: parsed.tanggalMulai, tanggalSelesai: parsed.tanggalSelesai, keterangan: parsed.keterangan })
+    .where(eq(pegawaiRiwayatPekerjaan.id, parsed.id))
+    .returning();
+
+  if (!row) return { ok: false as const, error: "Data tidak ditemukan." };
+  revalidatePath("/pegawai");
+  return { ok: true as const, data: row };
+}
+
+export async function deletePekerjaan(data: unknown) {
+  const parsed = pekerjaanDeleteSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  await db.delete(pegawaiRiwayatPekerjaan).where(eq(pegawaiRiwayatPekerjaan.id, parsed.id));
+  revalidatePath("/pegawai");
+  return { ok: true as const };
+}
+
+// ─── Kesehatan ───────────────────────────────────────────────────────────────
+
+export type KesehatanRow = typeof pegawaiKesehatan.$inferSelect;
+
+export async function getKesehatan(userId: string): Promise<KesehatanRow | null> {
+  await requireSession();
+  const [row] = await db
+    .select()
+    .from(pegawaiKesehatan)
+    .where(eq(pegawaiKesehatan.userId, userId));
+  return row ?? null;
+}
+
+export async function upsertKesehatan(data: unknown) {
+  const parsed = kesehatanSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const existing = await db.select().from(pegawaiKesehatan).where(eq(pegawaiKesehatan.userId, parsed.userId));
+  if (existing[0]) {
+    const [row] = await db.update(pegawaiKesehatan).set({ ...parsed, updatedAt: new Date() }).where(eq(pegawaiKesehatan.userId, parsed.userId)).returning();
+    revalidatePath("/pegawai");
+    return row!;
+  }
+  const [row] = await db.insert(pegawaiKesehatan).values(parsed).returning();
+  revalidatePath("/pegawai");
+  return row!;
+}
+
+// ─── Integritas ──────────────────────────────────────────────────────────────
+
+export type IntegritasRow = typeof pegawaiPernyataanIntegritas.$inferSelect;
+
+export async function getIntegritas(userId: string): Promise<IntegritasRow | null> {
+  await requireSession();
+  const [row] = await db
+    .select()
+    .from(pegawaiPernyataanIntegritas)
+    .where(eq(pegawaiPernyataanIntegritas.userId, userId));
+  return row ?? null;
+}
+
+export async function upsertIntegritas(data: unknown) {
+  const parsed = integritasSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const existing = await db.select().from(pegawaiPernyataanIntegritas).where(eq(pegawaiPernyataanIntegritas.userId, parsed.userId));
+  if (existing[0]) {
+    const [row] = await db.update(pegawaiPernyataanIntegritas).set({ ...parsed }).where(eq(pegawaiPernyataanIntegritas.userId, parsed.userId)).returning();
+    revalidatePath("/pegawai");
+    return row!;
+  }
+  const [row] = await db.insert(pegawaiPernyataanIntegritas).values(parsed).returning();
+  revalidatePath("/pegawai");
+  return row!;
+}
+
+// ─── Kelengkapan ─────────────────────────────────────────────────────────────
+
+export type KelengkapanRow = typeof pegawaiKelengkapan.$inferSelect;
+
+export async function getKelengkapan(userId: string): Promise<KelengkapanRow | null> {
+  await requireSession();
+  const [row] = await db
+    .select()
+    .from(pegawaiKelengkapan)
+    .where(eq(pegawaiKelengkapan.userId, userId));
+  return row ?? null;
+}
+
+export async function upsertKelengkapan(data: unknown) {
+  const parsed = kelengkapanSchema.parse(data);
+  const session = await requireSession();
+  const role = (session.user as { role?: string }).role;
+  if (role !== "admin" && session.user.id !== parsed.userId) throw new Error("Forbidden");
+
+  const existing = await db
+    .select()
+    .from(pegawaiKelengkapan)
+    .where(eq(pegawaiKelengkapan.userId, parsed.userId));
+
+  if (existing[0]) {
+    const [row] = await db
+      .update(pegawaiKelengkapan)
+      .set({ ...parsed, updatedAt: new Date() })
+      .where(eq(pegawaiKelengkapan.userId, parsed.userId))
+      .returning();
+    revalidatePath("/pegawai");
+    return row!;
+  }
+
+  const [row] = await db.insert(pegawaiKelengkapan).values(parsed).returning();
+  revalidatePath("/pegawai");
+  return row!;
+}
+
+// ─── Reference ───────────────────────────────────────────────────────────────
 
 export async function listPegawaiReference() {
   await requireSession();

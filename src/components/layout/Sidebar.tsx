@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   getNavigationItem,
+  getPhaseMeta,
   navigationSections,
 } from "@/components/layout/navigation";
 
@@ -14,6 +15,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "IAI Jakarta";
   const activeItem = getNavigationItem(pathname);
+  const phaseMeta = getPhaseMeta(pathname);
 
   return (
     <aside className="w-full border-b border-border bg-card lg:min-h-screen lg:w-80 lg:border-r lg:border-b-0">
@@ -34,9 +36,9 @@ export function Sidebar() {
           <p className="text-xs font-semibold tracking-[0.22em] text-muted-foreground uppercase">
             Phase Aktif
           </p>
-          <p className="mt-2 text-sm font-medium text-foreground">Foundation</p>
+          <p className="mt-2 text-sm font-medium text-foreground">{phaseMeta.title}</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Fokus saat ini: shell aplikasi, dashboard, login, Divisi, dan Pegawai.
+            {phaseMeta.description}
           </p>
         </div>
       </div>

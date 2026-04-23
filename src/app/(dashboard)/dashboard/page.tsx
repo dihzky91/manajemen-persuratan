@@ -42,13 +42,13 @@ export default function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Modul Aktif"
-          value="3"
-          hint="Dashboard, Divisi, Pegawai"
+          value="4"
+          hint="Dashboard, Divisi, Pegawai, Surat Keluar"
           icon={FolderKanban}
         />
         <StatCard
           label="Roadmap Tertunda"
-          value="7"
+          value="6"
           hint="Ditandai jelas per phase"
           icon={Clock3}
         />
@@ -100,11 +100,15 @@ export default function DashboardPage() {
         <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm lg:p-8">
           <h2 className="text-lg font-semibold text-foreground">Tahap Berikutnya</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Setelah fondasi stabil, modul surat akan dibuka bertahap sesuai roadmap.
+            Fondasi sudah stabil, dan modul berikutnya dilanjutkan bertahap sesuai roadmap.
           </p>
 
           <div className="mt-6 space-y-3">
-            <PhaseItem phase="Phase 2" label="Surat Keluar dan penomoran" />
+            <PhaseItem
+              phase="Phase 2"
+              label="Surat Keluar dan penomoran"
+              status="Sudah aktif pada shell saat ini."
+            />
             <PhaseItem phase="Phase 3" label="Surat Masuk dan disposisi" />
             <PhaseItem phase="Phase 4" label="QR, file, SK, MOU, pejabat" />
             <PhaseItem phase="Phase 5" label="Polish, RBAC, deploy, dan E2E" />
@@ -115,14 +119,22 @@ export default function DashboardPage() {
   );
 }
 
-function PhaseItem({ phase, label }: { phase: string; label: string }) {
+function PhaseItem({
+  phase,
+  label,
+  status = "Belum dibuka pada shell aktif.",
+}: {
+  phase: string;
+  label: string;
+  status?: string;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-background px-4 py-4">
       <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
         {phase}
       </p>
       <p className="mt-2 text-sm font-medium text-foreground">{label}</p>
-      <p className="mt-1 text-xs text-muted-foreground">Belum dibuka pada shell aktif.</p>
+      <p className="mt-1 text-xs text-muted-foreground">{status}</p>
     </div>
   );
 }

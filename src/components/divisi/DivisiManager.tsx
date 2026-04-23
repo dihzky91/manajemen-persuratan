@@ -8,6 +8,13 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -139,22 +146,33 @@ export function DivisiManager({ initialData, canManage }: DivisiManagerProps) {
 
   return (
     <>
-      {canManage ? (
-        <div className="flex justify-end">
-          <Button onClick={() => setFormState({ open: true, mode: "create" })}>
-            <Plus className="h-4 w-4" />
-            Tambah Divisi
-          </Button>
-        </div>
-      ) : null}
-
-      <DataTable
-        columns={columns}
-        data={initialData}
-        searchColumnId="nama"
-        searchPlaceholder="Cari nama divisi..."
-        emptyMessage="Belum ada divisi. Klik 'Tambah Divisi' untuk memulai."
-      />
+      <Card className="rounded-[28px]">
+        <CardHeader className="border-b border-border">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Daftar Divisi</CardTitle>
+              <CardDescription className="mt-1">
+                Kelola struktur divisi internal dan pantau jumlah pegawai pada setiap unit.
+              </CardDescription>
+            </div>
+            {canManage ? (
+              <Button onClick={() => setFormState({ open: true, mode: "create" })}>
+                <Plus className="h-4 w-4" />
+                Tambah Divisi
+              </Button>
+            ) : null}
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <DataTable
+            columns={columns}
+            data={initialData}
+            searchColumnId="nama"
+            searchPlaceholder="Cari nama divisi..."
+            emptyMessage="Belum ada divisi. Klik 'Tambah Divisi' untuk memulai."
+          />
+        </CardContent>
+      </Card>
 
       <DivisiForm
         open={formState.open}
