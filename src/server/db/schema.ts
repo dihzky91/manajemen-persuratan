@@ -325,6 +325,7 @@ export const suratKeluar = pgTable("surat_keluar", {
   disetujuiOleh: text("disetujui_oleh").references(() => users.id),
   tanggalDisetujui: timestamp("tanggal_disetujui"),
   catatanReviu: text("catatan_reviu"),
+  catatanReviuAt: timestamp("catatan_reviu_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

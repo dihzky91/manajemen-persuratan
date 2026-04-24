@@ -216,12 +216,14 @@ export function PegawaiManager({
                   const isSelected = selected?.id === row.id;
 
                   return (
-                    <button
+                    <div
                       key={row.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedId(row.id)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelectedId(row.id); }}
                       className={cn(
-                        "flex w-full items-start gap-4 px-6 py-5 text-left transition-colors hover:bg-muted/40",
+                        "flex w-full cursor-pointer items-start gap-4 px-6 py-5 text-left transition-colors hover:bg-muted/40",
                         isSelected && "bg-primary/5",
                       )}
                     >
@@ -263,7 +265,7 @@ export function PegawaiManager({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : null}
-                    </button>
+                    </div>
                   );
                 })
               ) : (

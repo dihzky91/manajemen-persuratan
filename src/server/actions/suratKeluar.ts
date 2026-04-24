@@ -2,6 +2,7 @@
 
 import { desc, eq, and, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { PDFDocument } from "pdf-lib";
 import { z } from "zod";
 import { db } from "@/server/db";
 import {
@@ -13,7 +14,12 @@ import {
   nomorSuratCounter,
 } from "@/server/db/schema";
 import { getStorageProvider } from "@/lib/storage";
-import { prepareUploadPayload } from "@/lib/storage/utils";
+import {
+  parseDataUrl,
+  prepareUploadPayload,
+  sanitizeFileName,
+} from "@/lib/storage/utils";
+import { allocateNomorSurat } from "@/lib/nomor-surat";
 import {
   buildVerifikasiSuratPayload,
   generateQRDataURL,
@@ -23,7 +29,6 @@ import {
   suratKeluarUpdateSchema,
 } from "@/lib/validators/suratKeluar.schema";
 import { requireRole, requireSession } from "./auth";
-import { formatBulanRomawi } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +47,7 @@ export type SuratKeluarRow = {
   lampiranUrl: string | null;
   qrCodeUrl: string | null;
   catatanReviu: string | null;
+  catatanReviuAt: Date | null;
   pejabatId: number | null;
   divisiId: number | null;
   divisiNama: string | null;
@@ -64,10 +70,24 @@ export type DivisiOption = {
 };
 
 const idSchema = z.object({ id: z.string().uuid() });
+const bulkAssignNomorSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(100),
+});
 const uploadFileSchema = z.object({
   fileName: z.string().min(1, "Nama file wajib ada."),
   contentType: z.string().min(1).optional(),
   dataUrl: z.string().min(1, "Data file wajib ada."),
+});
+const stampQrPdfSchema = z.object({
+  id: z.string().uuid(),
+  fileName: z.string().min(1, "Nama file wajib ada."),
+  contentType: z.string().min(1).optional(),
+  dataUrl: z.string().min(1, "Data file wajib ada."),
+  placement: z.enum(["bottom-right", "bottom-left", "top-right", "top-left"]),
+});
+const manualNomorSuratSchema = z.object({
+  id: z.string().uuid(),
+  nomorSurat: z.string().min(1, "Nomor surat wajib diisi.").max(200),
 });
 
 async function ensureSuratStatus(
@@ -114,6 +134,7 @@ export async function listSuratKeluar(): Promise<SuratKeluarRow[]> {
       lampiranUrl: suratKeluar.lampiranUrl,
       qrCodeUrl: suratKeluar.qrCodeUrl,
       catatanReviu: suratKeluar.catatanReviu,
+      catatanReviuAt: suratKeluar.catatanReviuAt,
       pejabatId: suratKeluar.pejabatId,
       divisiId: suratKeluar.divisiId,
       divisiNama: divisi.nama,
@@ -269,6 +290,110 @@ export async function uploadSuratKeluarFinal(data: unknown) {
       updatedAt: new Date(),
     })
     .where(eq(suratKeluar.id, parsed.id));
+
+  revalidatePath("/surat-keluar");
+  return { ok: true as const, data: uploaded };
+}
+
+export async function stampQrToSuratKeluarPdf(data: unknown) {
+  const parsed = stampQrPdfSchema.parse(data);
+  const session = await requireRole(["admin", "pejabat"]);
+  const prepared = prepareUploadPayload(parsed);
+
+  if (prepared.contentType !== "application/pdf") {
+    return { ok: false as const, error: "Fitur ini hanya mendukung file PDF." };
+  }
+
+  const [existing] = await db
+    .select({
+      status: suratKeluar.status,
+      qrCodeUrl: suratKeluar.qrCodeUrl,
+      nomorSurat: suratKeluar.nomorSurat,
+    })
+    .from(suratKeluar)
+    .where(eq(suratKeluar.id, parsed.id));
+
+  if (!existing) {
+    return { ok: false as const, error: "Surat tidak ditemukan." };
+  }
+
+  if (existing.status !== "pengarsipan" && existing.status !== "selesai") {
+    return {
+      ok: false as const,
+      error: "QR hanya bisa dibubuhkan saat pengarsipan atau setelah selesai.",
+    };
+  }
+
+  if (!existing.qrCodeUrl) {
+    return {
+      ok: false as const,
+      error: "Generate QR verifikasi terlebih dahulu.",
+    };
+  }
+
+  const qrParsed = parseDataUrl(existing.qrCodeUrl);
+  const pdfDoc = await PDFDocument.load(prepared.body);
+  const qrImage = await pdfDoc.embedPng(qrParsed.body);
+  const pages = pdfDoc.getPages();
+  const targetPage = pages[pages.length - 1];
+
+  if (!targetPage) {
+    return {
+      ok: false as const,
+      error: "PDF tidak memiliki halaman yang dapat diproses.",
+    };
+  }
+
+  const qrSize = 92;
+  const margin = 36;
+  const { width, height } = targetPage.getSize();
+  const positionMap = {
+    "bottom-right": { x: width - qrSize - margin, y: margin },
+    "bottom-left": { x: margin, y: margin },
+    "top-right": { x: width - qrSize - margin, y: height - qrSize - margin },
+    "top-left": { x: margin, y: height - qrSize - margin },
+  } as const;
+  const position = positionMap[parsed.placement];
+
+  targetPage.drawImage(qrImage, {
+    x: position.x,
+    y: position.y,
+    width: qrSize,
+    height: qrSize,
+  });
+
+  const stampedBytes = await pdfDoc.save();
+  const safeInputName = sanitizeFileName(parsed.fileName);
+  const stampedName = safeInputName.toLowerCase().endsWith(".pdf")
+    ? safeInputName.replace(/\.pdf$/i, "-qr.pdf")
+    : `${safeInputName}-qr.pdf`;
+
+  const storage = getStorageProvider();
+  const uploaded = await storage.upload({
+    body: Buffer.from(stampedBytes),
+    fileName: stampedName,
+    contentType: "application/pdf",
+    folder: "surat-keluar/final",
+  });
+
+  await db
+    .update(suratKeluar)
+    .set({
+      fileFinalUrl: uploaded.url,
+      updatedAt: new Date(),
+    })
+    .where(eq(suratKeluar.id, parsed.id));
+
+  await db.insert(auditLog).values({
+    userId: session.user.id as string,
+    aksi: "STAMP_QR_PDF_SURAT_KELUAR",
+    entitasType: "surat_keluar",
+    entitasId: parsed.id,
+    detail: {
+      placement: parsed.placement,
+      fileName: stampedName,
+    },
+  });
 
   revalidatePath("/surat-keluar");
   return { ok: true as const, data: uploaded };
@@ -461,6 +586,7 @@ export async function tolakSurat(data: { id: string; catatanReviu: string }) {
     .set({
       status: "draft",
       catatanReviu: parsed.catatanReviu,
+      catatanReviuAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(suratKeluar.id, parsed.id));
@@ -623,6 +749,8 @@ export async function batalkanSurat(data: { id: string }) {
     "draft",
     "permohonan_persetujuan",
     "reviu",
+    "pengarsipan",
+    "selesai",
   ]);
   if (!guard.ok) return guard;
 
@@ -636,7 +764,7 @@ export async function batalkanSurat(data: { id: string }) {
     aksi: "BATALKAN_SURAT_KELUAR",
     entitasType: "surat_keluar",
     entitasId: id,
-    detail: null,
+    detail: { mode: "tandai_tidak_berlaku" },
   });
 
   revalidatePath("/surat-keluar");
@@ -679,27 +807,12 @@ export async function assignNomorSuratKeluar(data: { id: string }) {
   const tahun = tanggal.getFullYear();
   const jenisSurat = surat.jenisSurat;
 
-  const counterResult = await db.execute(sql`
-    INSERT INTO nomor_surat_counter (tahun, bulan, jenis_surat, counter, prefix, updated_at)
-    VALUES (${tahun}, ${bulan}, ${jenisSurat}, 1, ${"IAI-DKIJKT"}, NOW())
-    ON CONFLICT (tahun, bulan, jenis_surat)
-    DO UPDATE SET
-      counter = nomor_surat_counter.counter + 1,
-      updated_at = NOW()
-    RETURNING counter, prefix
-  `);
-
-  const counterRow = (
-    counterResult.rows as Array<{ counter: number; prefix: string | null }>
-  )[0];
-
-  if (!counterRow) {
-    return { ok: false as const, error: "Gagal menggenerate nomor surat." };
-  }
-
-  const bulanRomawi = formatBulanRomawi(bulan);
-  const prefix = counterRow.prefix ?? "IAI-DKIJKT";
-  const nomorSurat = `${counterRow.counter}/${prefix}/${bulanRomawi}/${tahun}`;
+  const result = await allocateNomorSurat({
+    tahun,
+    bulan,
+    jenisSurat,
+  });
+  const nomorSurat = result.nomorList[0];
 
   const updated = await db
     .update(suratKeluar)
@@ -724,4 +837,206 @@ export async function assignNomorSuratKeluar(data: { id: string }) {
 
   revalidatePath("/surat-keluar");
   return { ok: true as const, nomorSurat };
+}
+
+export async function setManualNomorSuratKeluar(data: unknown) {
+  const parsed = manualNomorSuratSchema.parse(data);
+  const session = await requireRole(["admin", "pejabat"]);
+  const nomorSurat = parsed.nomorSurat.trim();
+
+  const guard = await ensureSuratStatus(parsed.id, ["pengarsipan"]);
+  if (!guard.ok) return guard;
+
+  const [duplicate] = await db
+    .select({ id: suratKeluar.id })
+    .from(suratKeluar)
+    .where(
+      and(
+        eq(suratKeluar.nomorSurat, nomorSurat),
+        sql`${suratKeluar.id} <> ${parsed.id}`,
+      ),
+    )
+    .limit(1);
+
+  if (duplicate) {
+    return {
+      ok: false as const,
+      error: "Nomor surat tersebut sudah digunakan oleh surat lain.",
+    };
+  }
+
+  const [updated] = await db
+    .update(suratKeluar)
+    .set({
+      nomorSurat,
+      qrCodeUrl: null,
+      fileFinalUrl: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(suratKeluar.id, parsed.id))
+    .returning({ id: suratKeluar.id });
+
+  if (!updated) {
+    return { ok: false as const, error: "Surat tidak ditemukan." };
+  }
+
+  await db.insert(auditLog).values({
+    userId: session.user.id as string,
+    aksi: "SET_MANUAL_NOMOR_SURAT_KELUAR",
+    entitasType: "surat_keluar",
+    entitasId: parsed.id,
+    detail: {
+      nomorSurat,
+      resetQrCode: true,
+      resetFileFinal: true,
+    },
+  });
+
+  revalidatePath("/surat-keluar");
+  return { ok: true as const, nomorSurat };
+}
+
+export async function checkNomorSuratKeluarAvailability(data: unknown) {
+  const parsed = manualNomorSuratSchema.parse(data);
+  await requireRole(["admin", "pejabat"]);
+  const nomorSurat = parsed.nomorSurat.trim();
+
+  if (!nomorSurat) {
+    return {
+      ok: true as const,
+      available: false,
+      message: "Nomor surat wajib diisi.",
+    };
+  }
+
+  const [duplicate] = await db
+    .select({ id: suratKeluar.id })
+    .from(suratKeluar)
+    .where(
+      and(
+        eq(suratKeluar.nomorSurat, nomorSurat),
+        sql`${suratKeluar.id} <> ${parsed.id}`,
+      ),
+    )
+    .limit(1);
+
+  if (duplicate) {
+    return {
+      ok: true as const,
+      available: false,
+      message: "Nomor surat ini sudah digunakan oleh surat lain.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    available: true,
+    message: "Nomor surat ini masih tersedia.",
+  };
+}
+
+export async function bulkAssignNomorSuratKeluar(data: { ids: string[] }) {
+  const { ids } = bulkAssignNomorSchema.parse(data);
+  const session = await requireRole(["admin", "pejabat"]);
+
+  const rows = await db
+    .select({
+      id: suratKeluar.id,
+      nomorSurat: suratKeluar.nomorSurat,
+      tanggalSurat: suratKeluar.tanggalSurat,
+      jenisSurat: suratKeluar.jenisSurat,
+      status: suratKeluar.status,
+      perihal: suratKeluar.perihal,
+      createdAt: suratKeluar.createdAt,
+    })
+    .from(suratKeluar)
+    .where(sql`${suratKeluar.id} = ANY(${ids})`);
+
+  if (rows.length !== ids.length) {
+    return {
+      ok: false as const,
+      error: "Sebagian surat tidak ditemukan. Muat ulang data lalu coba lagi.",
+    };
+  }
+
+  const invalidRows = rows.filter(
+    (row) => row.nomorSurat || row.status !== "pengarsipan",
+  );
+  if (invalidRows.length > 0) {
+    return {
+      ok: false as const,
+      error:
+        invalidRows.length === 1
+          ? `Surat "${invalidRows[0]?.perihal}" tidak valid untuk generate nomor massal.`
+          : `${invalidRows.length} surat tidak valid untuk generate nomor massal. Pastikan semua masih di status Pengarsipan dan belum punya nomor.`,
+    };
+  }
+
+  const orderedRows = [...rows].sort((a, b) => {
+    const tanggalCompare =
+      new Date(a.tanggalSurat).getTime() - new Date(b.tanggalSurat).getTime();
+    if (tanggalCompare !== 0) return tanggalCompare;
+
+    const createdCompare =
+      (a.createdAt ? new Date(a.createdAt).getTime() : 0) -
+      (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    if (createdCompare !== 0) return createdCompare;
+
+    return a.id.localeCompare(b.id);
+  });
+
+  const assigned = await db.transaction(async (tx) => {
+    const results: Array<{ id: string; nomorSurat: string; perihal: string }> = [];
+
+    for (const row of orderedRows) {
+      const tanggal = new Date(row.tanggalSurat);
+      const result = await allocateNomorSurat(
+        {
+          tahun: tanggal.getFullYear(),
+          bulan: tanggal.getMonth() + 1,
+          jenisSurat: row.jenisSurat,
+        },
+        tx,
+      );
+      const nomorSurat = result.nomorList[0];
+
+      if (!nomorSurat) {
+        throw new Error("Gagal menggenerate nomor surat massal.");
+      }
+
+      const updated = await tx
+        .update(suratKeluar)
+        .set({ nomorSurat, updatedAt: new Date() })
+        .where(and(eq(suratKeluar.id, row.id), sql`${suratKeluar.nomorSurat} IS NULL`))
+        .returning({ id: suratKeluar.id });
+
+      if (!updated[0]) {
+        throw new Error("Sebagian surat berubah saat proses bulk berjalan. Coba lagi.");
+      }
+
+      results.push({
+        id: row.id,
+        nomorSurat,
+        perihal: row.perihal,
+      });
+    }
+
+    return results;
+  });
+
+  await db.insert(auditLog).values({
+    userId: session.user.id as string,
+    aksi: "BULK_ASSIGN_NOMOR_SURAT_KELUAR",
+    entitasType: "surat_keluar",
+    entitasId: assigned.map((item) => item.id).join(","),
+    detail: {
+      jumlah: assigned.length,
+      ids: assigned.map((item) => item.id),
+      nomorAwal: assigned[0]?.nomorSurat,
+      nomorAkhir: assigned[assigned.length - 1]?.nomorSurat,
+    },
+  });
+
+  revalidatePath("/surat-keluar");
+  return { ok: true as const, assigned };
 }

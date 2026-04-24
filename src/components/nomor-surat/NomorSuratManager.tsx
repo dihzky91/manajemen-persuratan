@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Copy, Hash, Pencil, RotateCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, Files, Hash, Pencil, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,12 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
+  generateBulkNomorSurat,
   generateNomorSurat,
-  jenisSuratValues,
   type NomorSuratCounterRow,
   updateNomorSuratCounterPrefix,
 } from "@/server/actions/nomor";
+import { jenisSuratValues } from "@/lib/jenis-surat";
 import {
   formatBulanRomawi,
   getCurrentMonthInJakarta,
@@ -63,6 +66,7 @@ export function NomorSuratManager({
   const [jenisSurat, setJenisSurat] = useState<string>("undangan");
   const [bulan, setBulan] = useState(currentMonthValue());
   const [tahun, setTahun] = useState(currentYearValue());
+  const [jumlahBulk, setJumlahBulk] = useState("10");
   const [prefixOverride, setPrefixOverride] = useState("");
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -72,7 +76,15 @@ export function NomorSuratManager({
     prefix: string;
     counter: number;
   } | null>(null);
+  const [lastBulkGenerated, setLastBulkGenerated] = useState<{
+    nomorList: string[];
+    prefix: string;
+    startCounter: number;
+    endCounter: number;
+  } | null>(null);
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isBulkPending, startBulkTransition] = useTransition();
   const [isSavePending, startSaveTransition] = useTransition();
 
   const canGenerate = role === "admin" || role === "pejabat";
@@ -113,10 +125,46 @@ export function NomorSuratManager({
           prefix: result.prefix,
           counter: result.counter,
         });
+        setLastBulkGenerated(null);
+        router.refresh();
         toast.success("Nomor surat berhasil digenerate.");
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Gagal menggenerate nomor surat.",
+        );
+      }
+    });
+  }
+
+  function handleGenerateBulk() {
+    startBulkTransition(async () => {
+      try {
+        const result = await generateBulkNomorSurat({
+          jenisSurat,
+          bulan: Number(bulan),
+          tahun: Number(tahun),
+          jumlah: Number(jumlahBulk),
+          prefixOverride: prefixOverride || undefined,
+        });
+
+        setLastGenerated({
+          nomor: result.nomorList[result.nomorList.length - 1]!,
+          prefix: result.prefix,
+          counter: result.endCounter,
+        });
+        setLastBulkGenerated({
+          nomorList: result.nomorList,
+          prefix: result.prefix,
+          startCounter: result.startCounter,
+          endCounter: result.endCounter,
+        });
+        router.refresh();
+        toast.success(`Bulk ${result.jumlah} nomor surat berhasil digenerate.`);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Gagal menggenerate bulk nomor surat.",
         );
       }
     });
@@ -142,6 +190,7 @@ export function NomorSuratManager({
       toast.success("Prefix nomor surat diperbarui.");
       setEditingId(null);
       setEditingPrefix("");
+      router.refresh();
     });
   }
 
@@ -151,6 +200,17 @@ export function NomorSuratManager({
       toast.success("Nomor surat berhasil disalin.");
     } catch {
       toast.error("Gagal menyalin nomor surat.");
+    }
+  }
+
+  async function handleCopyBulk() {
+    if (!lastBulkGenerated?.nomorList.length) return;
+
+    try {
+      await navigator.clipboard.writeText(lastBulkGenerated.nomorList.join("\n"));
+      toast.success("Daftar bulk nomor surat berhasil disalin.");
+    } catch {
+      toast.error("Gagal menyalin daftar bulk nomor surat.");
     }
   }
 
@@ -235,12 +295,33 @@ export function NomorSuratManager({
                   onChange={(event) => setTahun(event.target.value)}
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Jumlah Bulk</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={jumlahBulk}
+                  onChange={(event) => setJumlahBulk(event.target.value)}
+                />
+              </div>
             </div>
 
-            <Button onClick={handleGenerate} disabled={!canGenerate || isPending}>
-              <Hash className="h-4 w-4" />
-              {isPending ? "Menggenerate..." : "Generate Nomor Surat"}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleGenerate} disabled={!canGenerate || isPending || isBulkPending}>
+                <Hash className="h-4 w-4" />
+                {isPending ? "Menggenerate..." : "Generate Nomor Surat"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleGenerateBulk}
+                disabled={!canGenerate || isPending || isBulkPending}
+              >
+                <Files className="h-4 w-4" />
+                {isBulkPending ? "Menggenerate Bulk..." : "Generate Bulk"}
+              </Button>
+            </div>
 
             {!canGenerate ? (
               <p className="text-sm text-muted-foreground">
@@ -271,6 +352,38 @@ export function NomorSuratManager({
                     Salin Nomor
                   </Button>
                 </div>
+              </div>
+            ) : null}
+
+            {lastBulkGenerated ? (
+              <div className="rounded-3xl border border-border bg-muted/25 p-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+                      Hasil Bulk Terakhir
+                    </p>
+                    <p className="mt-3 text-sm text-foreground">
+                      Counter {lastBulkGenerated.startCounter} sampai {lastBulkGenerated.endCounter}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant="outline">
+                        Total: {lastBulkGenerated.nomorList.length}
+                      </Badge>
+                      <Badge variant="outline">
+                        Prefix: {lastBulkGenerated.prefix}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={handleCopyBulk}>
+                    <Copy className="h-4 w-4" />
+                    Salin Semua
+                  </Button>
+                </div>
+                <Textarea
+                  readOnly
+                  value={lastBulkGenerated.nomorList.join("\n")}
+                  className="mt-4 min-h-48 font-mono text-sm"
+                />
               </div>
             ) : null}
           </CardContent>

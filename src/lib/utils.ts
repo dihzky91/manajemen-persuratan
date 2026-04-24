@@ -100,3 +100,19 @@ export function formatTanggalLengkapJakarta(
     timeZone: APP_TIME_ZONE,
   }).format(d);
 }
+
+export function formatTanggalWaktuJakarta(
+  iso: string | Date | null | undefined,
+): string {
+  if (!iso) return "-";
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: APP_TIME_ZONE,
+  }).format(d);
+}

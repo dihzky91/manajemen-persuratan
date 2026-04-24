@@ -2,7 +2,7 @@ import { z } from "zod";
 import { optionalFileUrlSchema } from "@/lib/validators/fileUrl";
 
 export const pejabatCreateSchema = z.object({
-  userId: z.string().uuid().optional(),
+  userId: z.string().min(1).optional(),
   namaJabatan: z.string().min(1, "Nama jabatan wajib diisi."),
   wilayah: z.string().optional(),
   ttdUrl: optionalFileUrlSchema,

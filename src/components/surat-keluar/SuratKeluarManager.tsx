@@ -1,8 +1,18 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Plus, Pencil, Trash2, Eye, Hash, Download } from "lucide-react";
+import {
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Trash2,
+  Eye,
+  Hash,
+  Download,
+  Files,
+} from "lucide-react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -35,13 +45,16 @@ import {
   STATUS_CONFIG,
   JENIS_SURAT_LABEL,
 } from "./SuratKeluarStepper";
-import { deleteSuratKeluar } from "@/server/actions/suratKeluar";
+import {
+  bulkAssignNomorSuratKeluar,
+  deleteSuratKeluar,
+} from "@/server/actions/suratKeluar";
 import type {
   SuratKeluarRow,
   PejabatOption,
   DivisiOption,
 } from "@/server/actions/suratKeluar";
-import { cn, formatTanggalPendek } from "@/lib/utils";
+import { cn, formatTanggalPendek, formatTanggalWaktuJakarta } from "@/lib/utils";
 import { exportRowsToCsv } from "@/lib/csv";
 
 interface SuratKeluarManagerProps {
@@ -124,14 +137,35 @@ export function SuratKeluarManager({
   divisiList,
   role,
 }: SuratKeluarManagerProps) {
+  const router = useRouter();
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [detailState, setDetailState] = useState<DetailState>({ open: false });
   const [deleteTarget, setDeleteTarget] = useState<SuratKeluarRow | null>(null);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [isBulkAssigning, startBulkAssignTransition] = useTransition();
 
   const canCreate = role === "admin" || role === "pejabat" || role === "staff";
   const canDelete = role === "admin";
   const canGenerate = role === "admin" || role === "pejabat";
+  const bulkAssignableRows = useMemo(
+    () =>
+      initialData
+        .filter((row) => row.status === "pengarsipan" && !row.nomorSurat)
+        .sort((a, b) => {
+          const tanggalCompare =
+            new Date(a.tanggalSurat).getTime() - new Date(b.tanggalSurat).getTime();
+          if (tanggalCompare !== 0) return tanggalCompare;
+
+          const createdCompare =
+            (a.createdAt ? new Date(a.createdAt).getTime() : 0) -
+            (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+          if (createdCompare !== 0) return createdCompare;
+
+          return a.id.localeCompare(b.id);
+        }),
+    [initialData],
+  );
 
   const columns = useMemo<ColumnDef<SuratKeluarRow>[]>(() => {
     return [
@@ -260,7 +294,16 @@ export function SuratKeluarManager({
         accessorKey: "catatanReviu",
         cell: ({ row }) => (
           <div className="max-w-[220px]">
-            <OptionalText value={row.original.catatanReviu} />
+            {row.original.catatanReviu ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                <p className="whitespace-pre-wrap">{row.original.catatanReviu}</p>
+                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+                  {formatTanggalWaktuJakarta(row.original.catatanReviuAt)}
+                </p>
+              </div>
+            ) : (
+              <OptionalText value={row.original.catatanReviu} />
+            )}
           </div>
         ),
       },
@@ -381,6 +424,31 @@ export function SuratKeluarManager({
     toast.success("CSV surat keluar berhasil diexport.");
   }
 
+  function handleBulkAssignNomor() {
+    if (!bulkAssignableRows.length) return;
+
+    startBulkAssignTransition(async () => {
+      const result = await bulkAssignNomorSuratKeluar({
+        ids: bulkAssignableRows.map((row) => row.id),
+      });
+
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+
+      const nomorAwal = result.assigned[0]?.nomorSurat;
+      const nomorAkhir = result.assigned[result.assigned.length - 1]?.nomorSurat;
+      toast.success(
+        result.assigned.length === 1
+          ? `Nomor surat ${nomorAwal} berhasil digenerate.`
+          : `${result.assigned.length} nomor surat berhasil digenerate${nomorAwal && nomorAkhir ? ` (${nomorAwal} s.d. ${nomorAkhir})` : "."}`,
+      );
+      setBulkAssignOpen(false);
+      router.refresh();
+    });
+  }
+
   return (
     <>
       <Card className="rounded-[28px]">
@@ -399,6 +467,12 @@ export function SuratKeluarManager({
                   <Download className="h-4 w-4" />
                   Export CSV
                 </Button>
+                {canGenerate && bulkAssignableRows.length ? (
+                  <Button variant="outline" onClick={() => setBulkAssignOpen(true)}>
+                    <Files className="h-4 w-4" />
+                    Generate Nomor Massal ({bulkAssignableRows.length})
+                  </Button>
+                ) : null}
                 <Button
                   onClick={() => setFormState({ open: true, mode: "create" })}
                 >
@@ -489,6 +563,58 @@ export function SuratKeluarManager({
               disabled={isDeleting}
             >
               {isDeleting ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={bulkAssignOpen}
+        onOpenChange={(open) => {
+          if (!isBulkAssigning) setBulkAssignOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Generate Nomor Surat Massal?</DialogTitle>
+            <DialogDescription>
+              Sistem akan memproses {bulkAssignableRows.length} surat yang masih
+              berstatus Pengarsipan dan belum memiliki nomor surat. Urutan
+              generate mengikuti tanggal surat tertua lebih dulu.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 space-y-2 overflow-y-auto rounded-2xl border border-border bg-muted/20 p-3">
+            {bulkAssignableRows.map((row, index) => (
+              <div
+                key={row.id}
+                className="flex items-start justify-between gap-3 rounded-xl border border-border bg-background px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {index + 1}. {row.perihal}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {row.tujuan} · {formatTanggalPendek(row.tanggalSurat)} ·{" "}
+                    {JENIS_SURAT_LABEL[row.jenisSurat] ?? row.jenisSurat}
+                  </p>
+                </div>
+                <Badge variant="outline" className="shrink-0">
+                  Pengarsipan
+                </Badge>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkAssignOpen(false)}
+              disabled={isBulkAssigning}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleBulkAssignNomor} disabled={isBulkAssigning}>
+              <Hash className="h-4 w-4" />
+              {isBulkAssigning ? "Memproses..." : "Generate Sekarang"}
             </Button>
           </DialogFooter>
         </DialogContent>

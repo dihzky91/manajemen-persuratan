@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -14,6 +14,8 @@ import {
   Copy,
   QrCode,
   ExternalLink,
+  Download,
+  ScanQrCode,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,7 +29,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { cn, formatTanggal } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn, formatTanggal, formatTanggalWaktuJakarta } from "@/lib/utils";
 import {
   ajukanPersetujuan,
   mulaiReviu,
@@ -36,7 +45,10 @@ import {
   selesaikanSurat,
   batalkanSurat,
   assignNomorSuratKeluar,
+  checkNomorSuratKeluarAvailability,
+  setManualNomorSuratKeluar,
   generateQrSuratKeluar,
+  stampQrToSuratKeluarPdf,
   uploadSuratKeluarFinal,
 } from "@/server/actions/suratKeluar";
 import type { SuratKeluarRow } from "@/server/actions/suratKeluar";
@@ -55,6 +67,32 @@ const STEPS = [
 
 function stepIndex(status: string): number {
   return STEPS.findIndex((s) => s.key === status);
+}
+
+function hasRomanMonthSegment(value: string) {
+  return /\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\//i.test(value);
+}
+
+function getNomorFormatHint(value: string, tanggalSurat: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const year = tanggalSurat.slice(0, 4);
+  const warnings: string[] = [];
+
+  if (!trimmed.includes("/")) {
+    warnings.push("Gunakan pemisah '/' agar konsisten dengan format nomor surat.");
+  }
+
+  if (!hasRomanMonthSegment(trimmed)) {
+    warnings.push("Segmen bulan Romawi belum terdeteksi.");
+  }
+
+  if (year && !trimmed.includes(year)) {
+    warnings.push(`Tahun surat ${year} belum tercantum di nomor.`);
+  }
+
+  return warnings.join(" ");
 }
 
 export const JENIS_SURAT_LABEL: Record<string, string> = {
@@ -123,8 +161,20 @@ export function SuratKeluarStepper({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showTolakForm, setShowTolakForm] = useState(false);
+  const [showQrPreview, setShowQrPreview] = useState(false);
   const [catatanReviu, setCatatanReviu] = useState("");
   const [finalFile, setFinalFile] = useState<File | null>(null);
+  const [manualNomorSurat, setManualNomorSurat] = useState(row.nomorSurat ?? "");
+  const [nomorAvailability, setNomorAvailability] = useState<{
+    state: "idle" | "checking" | "available" | "duplicate";
+    message: string;
+  }>({
+    state: "idle",
+    message: "",
+  });
+  const [qrPlacement, setQrPlacement] = useState<
+    "bottom-right" | "bottom-left" | "top-right" | "top-left"
+  >("bottom-right");
 
   const status = row.status ?? "draft";
   const isAdmin = role === "admin";
@@ -152,6 +202,56 @@ export function SuratKeluarStepper({
     },
   ];
   const isArchiveChecklistComplete = archiveChecklist.every((item) => item.done);
+  const nomorFormatHint = useMemo(
+    () => getNomorFormatHint(manualNomorSurat, row.tanggalSurat),
+    [manualNomorSurat, row.tanggalSurat],
+  );
+
+  useEffect(() => {
+    setManualNomorSurat(row.nomorSurat ?? "");
+    setNomorAvailability({ state: "idle", message: "" });
+  }, [row.id, row.nomorSurat]);
+
+  useEffect(() => {
+    const trimmed = manualNomorSurat.trim();
+    const currentNomor = row.nomorSurat?.trim() ?? "";
+
+    if (!trimmed || trimmed === currentNomor) {
+      setNomorAvailability({ state: "idle", message: "" });
+      return;
+    }
+
+    setNomorAvailability({ state: "checking", message: "Memeriksa nomor surat..." });
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const result = await checkNomorSuratKeluarAvailability({
+          id: row.id,
+          nomorSurat: trimmed,
+        });
+
+        if (!result.ok) {
+          setNomorAvailability({
+            state: "duplicate",
+            message: "Gagal memeriksa nomor surat.",
+          });
+          return;
+        }
+
+        setNomorAvailability({
+          state: result.available ? "available" : "duplicate",
+          message: result.message,
+        });
+      } catch {
+        setNomorAvailability({
+          state: "duplicate",
+          message: "Gagal memeriksa nomor surat.",
+        });
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timeout);
+  }, [manualNomorSurat, row.id, row.nomorSurat]);
 
   function runAction(action: () => Promise<{ ok: boolean; error?: string }>) {
     startTransition(async () => {
@@ -184,6 +284,37 @@ export function SuratKeluarStepper({
 
   function handleGenerateNomor() {
     runAction(() => assignNomorSuratKeluar({ id: row.id }));
+  }
+
+  function handleSaveManualNomor() {
+    if (!manualNomorSurat.trim()) {
+      toast.error("Nomor surat manual wajib diisi.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const res = await setManualNomorSuratKeluar({
+          id: row.id,
+          nomorSurat: manualNomorSurat,
+        });
+
+        if (!res.ok) {
+          toast.error(res.error ?? "Gagal menyimpan nomor surat manual.");
+          return;
+        }
+
+        toast.success(
+          "Nomor surat manual disimpan. QR verifikasi dan file final perlu diperbarui.",
+        );
+        setFinalFile(null);
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Gagal menyimpan nomor surat manual.",
+        );
+      }
+    });
   }
 
   function handleGenerateQr() {
@@ -242,9 +373,77 @@ export function SuratKeluarStepper({
     }
   }
 
+  function handlePreviewVerificationPage() {
+    window.open(verificationUrl, "_blank", "noopener,noreferrer");
+  }
+
+  function isPdfFile(file: File | null) {
+    if (!file) return false;
+    return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  }
+
+  function handleDownloadQr() {
+    if (!row.qrCodeUrl) {
+      toast.error("QR verifikasi belum tersedia.");
+      return;
+    }
+
+    const link = document.createElement("a");
+    const fileStem = (row.nomorSurat ?? row.id).replace(/[^a-zA-Z0-9-_]+/g, "-");
+    link.href = row.qrCodeUrl;
+    link.download = `qr-verifikasi-${fileStem}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function handleStampQrPdf() {
+    if (!finalFile) {
+      toast.error("Pilih file PDF terlebih dahulu.");
+      return;
+    }
+
+    if (!isPdfFile(finalFile)) {
+      toast.error("Fitur ini hanya mendukung file PDF.");
+      return;
+    }
+
+    if (!row.qrCodeUrl) {
+      toast.error("Generate QR verifikasi terlebih dahulu.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const dataUrl = await fileToDataUrl(finalFile);
+        const res = await stampQrToSuratKeluarPdf({
+          id: row.id,
+          fileName: finalFile.name,
+          contentType: finalFile.type || "application/pdf",
+          dataUrl,
+          placement: qrPlacement,
+        });
+
+        if (!res.ok) {
+          toast.error(res.error ?? "Gagal membubuhkan QR ke PDF.");
+          return;
+        }
+
+        toast.success("QR berhasil dibubuhkan ke PDF dan file final diperbarui.");
+        setFinalFile(null);
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Gagal membubuhkan QR ke PDF.",
+        );
+      }
+    });
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detail Surat Keluar</DialogTitle>
           <DialogDescription>{row.perihal}</DialogDescription>
@@ -403,7 +602,7 @@ export function SuratKeluarStepper({
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
             <XCircle className="h-4 w-4 shrink-0" />
-            <span className="font-medium">Surat ini telah dibatalkan.</span>
+            <span className="font-medium">Surat ini ditandai tidak berlaku.</span>
           </div>
         )}
 
@@ -445,7 +644,7 @@ export function SuratKeluarStepper({
                   onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
                   disabled={isPending}
                 >
-                  Batalkan Surat
+                  Tandai Tidak Berlaku
                 </Button>
               ) : null}
             </div>
@@ -474,7 +673,7 @@ export function SuratKeluarStepper({
                   onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
                   disabled={isPending}
                 >
-                  Batalkan Surat
+                  Tandai Tidak Berlaku
                 </Button>
               ) : null}
             </div>
@@ -505,9 +704,18 @@ export function SuratKeluarStepper({
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                          Alasan revisi wajib diisi
+                        </p>
+                        <p className="text-xs text-amber-800 dark:text-amber-200">
+                          Catatan ini akan dikirim ke pembuat surat dan surat akan
+                          kembali ke status Draft untuk diperbaiki.
+                        </p>
+                      </div>
                       <Textarea
-                        placeholder="Tuliskan catatan revisi yang diperlukan..."
+                        placeholder="Contoh: perihal perlu diperjelas, lampiran belum lengkap, format penandatangan belum sesuai."
                         rows={3}
                         value={catatanReviu}
                         onChange={(e) => setCatatanReviu(e.target.value)}
@@ -547,63 +755,147 @@ export function SuratKeluarStepper({
             <div className="space-y-3">
               {isPejabat ? (
                 <div className="space-y-2">
-                  {row.nomorSurat ? (
-                    <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
-                      <Hash className="h-4 w-4 text-primary" />
-                      <span className="font-mono text-sm font-semibold">
-                        {row.nomorSurat}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="ml-auto text-xs text-green-600"
-                      >
-                        Nomor Tergenerate
-                      </Badge>
+                  <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                        1
+                      </div>
+                      <p className="text-sm font-medium text-foreground">Nomor Surat</p>
                     </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleGenerateNomor}
-                      disabled={isPending}
-                    >
-                      <Hash className="mr-1.5 h-3.5 w-3.5" />
-                      Generate Nomor Surat
-                    </Button>
-                  )}
-
-                  <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Upload File Final
-                    </p>
-                    <Input
-                      type="file"
-                      accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
-                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                        setFinalFile(event.target.files?.[0] ?? null)
-                      }
-                    />
-                    {finalFile ? (
-                      <p className="text-xs text-foreground">
-                        File dipilih: {finalFile.name}
+                    {row.nomorSurat ? (
+                      <>
+                      <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
+                        <Hash className="h-4 w-4 text-primary" />
+                        <span className="font-mono text-sm font-semibold">
+                          {row.nomorSurat}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="ml-auto text-xs text-green-600"
+                        >
+                          Nomor Aktif
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Ubah ke Nomor Manual
+                        </p>
+                        <Input
+                          value={manualNomorSurat}
+                          onChange={(event) => setManualNomorSurat(event.target.value)}
+                          placeholder="Isi manual nomor surat untuk backdate/koreksi"
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSaveManualNomor}
+                            disabled={
+                              isPending ||
+                              !manualNomorSurat.trim() ||
+                              nomorAvailability.state === "duplicate" ||
+                              nomorAvailability.state === "checking"
+                            }
+                          >
+                            Gunakan Nomor Manual
+                          </Button>
+                        </div>
+                        {nomorAvailability.state !== "idle" ? (
+                          <p
+                            className={cn(
+                              "text-xs",
+                              nomorAvailability.state === "available"
+                                ? "text-green-700 dark:text-green-300"
+                                : nomorAvailability.state === "checking"
+                                  ? "text-muted-foreground"
+                                  : "text-red-700 dark:text-red-300",
+                            )}
+                          >
+                            {nomorAvailability.message}
+                          </p>
+                        ) : null}
+                        {nomorFormatHint ? (
+                          <p className="text-xs text-amber-700 dark:text-amber-300">
+                            {nomorFormatHint}
+                          </p>
+                        ) : null}
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          Menyimpan nomor manual akan mereset QR verifikasi dan file
+                          final agar tidak mismatch dengan nomor sebelumnya.
+                        </p>
+                      </div>
+                      </>
+                    ) : (
+                      <>
+                      <p className="text-xs text-muted-foreground">
+                        Pilih salah satu: generate otomatis dari counter sistem atau isi
+                        manual untuk kebutuhan backdate/koreksi.
                       </p>
-                    ) : null}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleUploadFinal}
-                      disabled={isPending || !finalFile}
-                    >
-                      Upload File Final
-                    </Button>
+                      <Input
+                        value={manualNomorSurat}
+                        onChange={(event) => setManualNomorSurat(event.target.value)}
+                        placeholder="Isi manual nomor surat jika tidak ingin generate otomatis"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleGenerateNomor}
+                          disabled={isPending}
+                        >
+                          <Hash className="mr-1.5 h-3.5 w-3.5" />
+                          Generate Otomatis
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSaveManualNomor}
+                          disabled={
+                            isPending ||
+                            !manualNomorSurat.trim() ||
+                            nomorAvailability.state === "duplicate" ||
+                            nomorAvailability.state === "checking"
+                          }
+                        >
+                          Gunakan Nomor Manual
+                        </Button>
+                      </div>
+                      {nomorAvailability.state !== "idle" ? (
+                        <p
+                          className={cn(
+                            "text-xs",
+                            nomorAvailability.state === "available"
+                              ? "text-green-700 dark:text-green-300"
+                              : nomorAvailability.state === "checking"
+                                ? "text-muted-foreground"
+                                : "text-red-700 dark:text-red-300",
+                          )}
+                        >
+                          {nomorAvailability.message}
+                        </p>
+                      ) : null}
+                      {nomorFormatHint ? (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          {nomorFormatHint}
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        Gunakan input manual untuk kasus backdate, koreksi, atau
+                        penyesuaian nomor surat existing.
+                      </p>
+                      </>
+                    )}
                   </div>
 
                   <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                        2
+                      </div>
+                      <p className="text-sm font-medium text-foreground">QR Verifikasi</p>
+                    </div>
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          QR Verifikasi
-                        </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           QR akan mengarah ke halaman verifikasi publik surat.
                         </p>
@@ -647,6 +939,95 @@ export function SuratKeluarStepper({
                         <Copy className="mr-1.5 h-3.5 w-3.5" />
                         Salin Link Verifikasi
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowQrPreview(true)}
+                        disabled={!row.qrCodeUrl}
+                      >
+                        <ScanQrCode className="mr-1.5 h-3.5 w-3.5" />
+                        Preview QR
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadQr}
+                        disabled={!row.qrCodeUrl}
+                      >
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        Download QR PNG
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                        3
+                      </div>
+                      <p className="text-sm font-medium text-foreground">File Final</p>
+                    </div>
+                    <Input
+                      type="file"
+                      accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setFinalFile(event.target.files?.[0] ?? null)
+                      }
+                    />
+                    {finalFile ? (
+                      <p className="text-xs text-foreground">
+                        File dipilih: {finalFile.name}
+                      </p>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleUploadFinal}
+                        disabled={isPending || !finalFile}
+                      >
+                        Upload File Final
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleStampQrPdf}
+                        disabled={isPending || !finalFile || !isPdfFile(finalFile) || !row.qrCodeUrl}
+                      >
+                        Tempel QR ke PDF & Upload
+                      </Button>
+                    </div>
+                    <div className="space-y-2 rounded-md border bg-background/80 p-3">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Posisi QR pada PDF
+                      </p>
+                      <Select
+                        value={qrPlacement}
+                        onValueChange={(value) =>
+                          setQrPlacement(
+                            value as "bottom-right" | "bottom-left" | "top-right" | "top-left",
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bottom-right">Kanan bawah</SelectItem>
+                          <SelectItem value="bottom-left">Kiri bawah</SelectItem>
+                          <SelectItem value="top-right">Kanan atas</SelectItem>
+                          <SelectItem value="top-left">Kiri atas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        QR ditempel pada halaman terakhir PDF. Gunakan opsi ini jika
+                        ingin hasil akhir langsung siap upload tanpa edit manual.
+                      </p>
+                      {finalFile && !isPdfFile(finalFile) ? (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          File yang dipilih bukan PDF, jadi hanya bisa diupload biasa.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -682,32 +1063,146 @@ export function SuratKeluarStepper({
                     <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                     Selesaikan Pengarsipan
                   </Button>
+                  {isAdmin ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
+                      disabled={isPending}
+                    >
+                      Tandai Tidak Berlaku
+                    </Button>
+                  ) : null}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Proses pengarsipan sedang berlangsung.
-                </p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Proses pengarsipan sedang berlangsung.
+                  </p>
+                  {isAdmin ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
+                      disabled={isPending}
+                    >
+                      Tandai Tidak Berlaku
+                    </Button>
+                  ) : null}
+                </div>
               )}
             </div>
           )}
 
           {status === "selesai" && (
-            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="font-medium">
-                Surat telah selesai diarsipkan.
-              </span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="font-medium">
+                  Surat telah selesai diarsipkan.
+                </span>
+              </div>
+              <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Verifikasi Publik
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePreviewVerificationPage}
+                  >
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    Preview Halaman Verifikasi
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopyVerificationLink}
+                  >
+                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    Salin Link Verifikasi
+                  </Button>
+                </div>
+                <p className="break-all text-xs text-muted-foreground">
+                  {verificationUrl}
+                </p>
+              </div>
+              {isAdmin ? (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
+                  disabled={isPending}
+                >
+                  Tandai Tidak Berlaku
+                </Button>
+              ) : null}
             </div>
           )}
 
           {status === "dibatalkan" && (
             <p className="text-sm text-muted-foreground">
-              Surat ini telah dibatalkan dan tidak dapat diproses lebih lanjut.
+              Surat ini ditandai tidak berlaku dan tidak dapat diproses lebih lanjut.
             </p>
           )}
+
+          {row.catatanReviu && status !== "reviu" ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              <p className="font-medium">Catatan Revisi</p>
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                Dicatat pada {formatTanggalWaktuJakarta(row.catatanReviuAt)}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap">{row.catatanReviu}</p>
+            </div>
+          ) : null}
         </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showQrPreview} onOpenChange={setShowQrPreview}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Preview QR Verifikasi</DialogTitle>
+            <DialogDescription>
+              Gunakan QR ini untuk ditempel ke dokumen final sebelum diunggah.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-muted/20 p-6">
+            {row.qrCodeUrl ? (
+              <img
+                src={row.qrCodeUrl}
+                alt="QR verifikasi surat"
+                className="h-72 w-72 rounded-xl border bg-white p-3 shadow-sm"
+              />
+            ) : (
+              <div className="flex h-72 w-72 items-center justify-center rounded-xl border border-dashed text-muted-foreground">
+                QR belum tersedia
+              </div>
+            )}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDownloadQr}
+                disabled={!row.qrCodeUrl}
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                Download QR PNG
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCopyVerificationLink}
+              >
+                <Copy className="mr-1.5 h-3.5 w-3.5" />
+                Salin Link Verifikasi
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

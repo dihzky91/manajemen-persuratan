@@ -516,21 +516,31 @@ Server Actions / Route Handler
 ```
 â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
 â”‚   Step 1     â”‚         Step 2           â”‚    Step 3      â”‚   Step 4 â€” Pengarsipan (status: "pengarsipan")
-  a. Generate Nomor Surat
-     - Klik "Generate No. Surat Keluar"
-     - generateNomorSurat() â†’ atomic counter (DB transaction)
-     - nomorSurat terisi, ditampilkan sebagai badge bernomor di list
+  a. Nomor Surat
+     - Mendukung 2 jalur:
+       - "Generate Otomatis" â†’ atomic counter dari sistem
+       - "Gunakan Nomor Manual" â†’ untuk backdate / koreksi arsip
+     - Nomor manual wajib unik terhadap surat keluar lain
+     - UI menampilkan warning realtime jika nomor sudah dipakai atau formatnya tampak tidak lazim
+     - Jika nomor manual mengganti nomor yang sudah ada, QR verifikasi dan file final harus di-reset agar tidak mismatch
   b. Generate QR Code
      - QR berisi data verifikasi surat (URL atau data ringkas surat)
-     - Disimpan ke qrCodeUrl, bisa di-copy sebagai gambar
-     - Di modul internal, tampilkan tombol "Preview Halaman Verifikasi" dan "Salin Link Verifikasi"
+     - Disimpan ke qrCodeUrl
+     - Di modul internal, tampilkan tombol:
+       - "Preview Halaman Verifikasi"
+       - "Salin Link Verifikasi"
+       - "Preview QR"
+       - "Download QR PNG"
   c. Upload Dokumen Final
-     - User download draft, tambahkan nomor + QR secara manual ke PDF
-     - Re-upload PDF final â†’ disimpan ke fileFinalUrl
+     - User tetap bisa download draft, tambahkan nomor + QR secara manual ke PDF, lalu upload kembali file final
+     - Untuk file PDF, tersedia aksi "Tempel QR ke PDF & Upload" langsung dari sistem
+     - File final disimpan ke fileFinalUrl
   d. Checklist Pengarsipan
      - nomorSurat sudah terisi
      - qrCodeUrl sudah terisi
      - fileFinalUrl sudah terisi
+  e. Catatan Revisi
+     - Jika surat pernah ditolak / diminta revisi, tampilkan catatanReviu beserta tanggal dan waktu pencatatannya
 
 Step 5 â€” Selesai (status: "selesai")
   - Konfirmasi pengarsipan selesai
@@ -565,7 +575,7 @@ untuk kebutuhan administrasi yang sah â€” misalnya surat menyusul,
 koreksi arsip, atau dokumen yang dibuat setelah kejadian.
 ```
 
-### 5.4 Logika Nomor Surat Otomatis
+### 5.4 Logika Nomor Surat Otomatis & Manual
 
 ```
 Format dari data nyata sistem existing:
@@ -594,6 +604,12 @@ Server Action: generateNomorSurat({ jenisSurat, bulan, tahun })
 State di tabel surat_keluar:
   nomorSurat = NULL  â†’ tampil tombol "Generate No. Surat Keluar"
   nomorSurat = "..." â†’ tampil sebagai badge/teks nomor
+
+Nomor manual:
+  - Diizinkan untuk kebutuhan backdate, koreksi arsip, atau nomor yang sudah ditetapkan di luar sistem
+  - Wajib unik terhadap surat_keluar lain
+  - Jika user mengganti nomor secara manual setelah QR / file final sudah ada,
+    sistem harus meminta regenerasi QR dan upload ulang file final agar konsisten
 ```
 
 ---
@@ -695,6 +711,9 @@ Setiap step card menampilkan aksi relevan (tombol, upload, info)
 Ketentuan implementasi:
   - Phase 2: stepper internal wajib aktif untuk tracking progress surat keluar
   - Step "Pengarsipan" adalah pusat kontrol finalisasi surat
+  - Di step "Pengarsipan", tampilkan pilihan nomor surat:
+      - Generate Otomatis
+      - Gunakan Nomor Manual
   - Di step "Pengarsipan", tampilkan checklist internal:
       - Nomor surat sudah dibuat
       - QR verifikasi sudah dibuat
@@ -703,13 +722,17 @@ Ketentuan implementasi:
       - preview QR kecil
       - tombol "Preview Halaman Verifikasi"
       - tombol "Salin Link Verifikasi"
+      - tombol "Download QR PNG"
+  - Jika file final berupa PDF, sediakan aksi "Tempel QR ke PDF & Upload"
+    sebagai shortcut operasional tanpa edit manual di luar sistem
+  - Jika surat memiliki catatan revisi, tampilkan catatan beserta tanggal dan jam pencatatan
   - Tombol "Selesai" sebaiknya disabled jika checklist pengarsipan belum lengkap
 ```
 
 ### 7.2.1 Halaman Verifikasi Publik Surat
 
 ```
-Route publik verifikasi surat direncanakan pada Phase 4.
+Route publik verifikasi surat sudah aktif.
 
 Tujuan:
   - Menjadi landing page saat QR surat di-scan
@@ -717,7 +740,8 @@ Tujuan:
 
 Contoh route:
   - /verifikasi/surat-keluar/[id]
-  - atau route publik serupa yang stabil dan dapat di-embed ke QR
+  - /verifikasi/surat-keputusan/[id]
+  - /verifikasi/surat-mou/[id]
 
 Data minimum yang ditampilkan:
   - Nomor surat
@@ -735,6 +759,7 @@ Ketentuan penting:
   - Halaman publik verifikasi hanya untuk membaca status validitas surat, bukan untuk mengakses dashboard internal
   - Jangan tampilkan data sensitif di luar kebutuhan verifikasi
   - URL final harus berbasis env `NEXT_PUBLIC_APP_URL`, jangan hardcode domain
+  - Desain halaman publik harus formal, sederhana, dan mudah dibaca; hindari layout yang terlalu menyerupai dashboard internal
 ```
 
 ### 7.3 PegawaiTabs (7 Tab)
@@ -876,6 +901,7 @@ Catatan status April 2026: Phase 1 telah diverifikasi selesai berdasarkan implem
 - [x] List surat keluar (TanStack Table dengan semua kolom)
 - [x] Stepper 5 tahap + transisi status
 - [x] Generate nomor surat otomatis (atomic DB transaction)
+- [x] Input nomor surat manual untuk backdate / koreksi
 - [x] NomorSuratBadge: kondisi null vs terisi
 - [x] Progress tracker internal berbasis stepper untuk memantau status surat
 
@@ -884,13 +910,13 @@ Catatan scope:
 - Preview QR, preview halaman verifikasi publik, dan route publik verifikasi belum wajib selesai di phase ini
 - Penyempurnaan UX kecil pada stepper/pengarsipan boleh dilakukan lebih awal selama tidak mengubah pembagian tanggung jawab antar phase
 
-Catatan status April 2026: Phase 2 selesai dan aktif. Sudah diaudit ulang, guard transisi status diperketat di server action, generator nomor surat dirapikan agar aman saat race pada periode baru, dan lolos `npm run typecheck`.
+Catatan status April 2026: Phase 2 selesai dan aktif. Sudah diaudit ulang, guard transisi status diperketat di server action, generator nomor surat dirapikan agar aman saat race pada periode baru, jalur nomor manual ditambahkan untuk backdate / koreksi, dan lolos `npm run typecheck`.
 
 **File yang dihasilkan Phase 2:**
 - `src/server/actions/suratKeluar.ts` — server actions lengkap: CRUD, 6 transisi status (`ajukanPersetujuan`, `mulaiReviu`, `setujuiSurat`, `tolakSurat`, `selesaikanSurat`, `batalkanSurat`), guard validasi state per transisi, `assignNomorSuratKeluar` berbasis atomic upsert transaction, `listPejabatAktif`, `listDivisiOptions`
 - `src/components/surat-keluar/SuratKeluarForm.tsx` — dialog form RHF + Zod, create/edit, field operasional inti termasuk URL draft, select pejabat, dan divisi
-- `src/components/surat-keluar/SuratKeluarStepper.tsx` — stepper 5 tahap visual, action buttons per status + role, tolak dengan textarea inline, detail surat menampilkan draft/pembuat/alamat/isi singkat
-- `src/components/surat-keluar/SuratKeluarManager.tsx` — tabel surat keluar dengan kolom operasional lebih lengkap, NomorSuratCell, StatusBadge, dropdown aksi per baris, konfirmasi hapus
+- `src/components/surat-keluar/SuratKeluarStepper.tsx` — stepper 5 tahap visual, action buttons per status + role, nomor otomatis/manual, QR preview/download, tempel QR ke PDF, tolak dengan textarea inline, detail surat menampilkan draft/pembuat/alamat/isi singkat
+- `src/components/surat-keluar/SuratKeluarManager.tsx` — tabel surat keluar dengan kolom operasional lebih lengkap, NomorSuratCell, StatusBadge, dropdown aksi per baris, highlight catatan reviu + timestamp
 - `src/app/(dashboard)/surat-keluar/page.tsx` â€” Server Component, fetch parallel 4 query, wire ke Manager
 - `src/components/layout/navigation.ts` â€” Surat Keluar dipindah ke section "Persuratan" dengan `active: true`
 
@@ -898,9 +924,11 @@ Catatan status April 2026: Phase 2 selesai dan aktif. Sudah diaudit ulang, guard
 - `suratKeluar.status` di Drizzle inferred sebagai `string | null` (tidak ada `.notNull()` di schema) — selalu fallback `status ?? "draft"` di client
 - Radix UI `<SelectItem>` tidak mengizinkan `value=""` — gunakan `"__none__"` sebagai sentinel untuk field optional (pejabatId, divisiId), konversi ke `undefined` saat submit
 - `assignNomorSuratKeluar` dan `generateNomorSurat` memakai pola `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` untuk increment counter yang lebih aman pada request paralel pertama di periode baru
+- `setManualNomorSuratKeluar` wajib menjaga keunikan nomor surat; UI boleh pre-check duplicate, tetapi validasi final tetap harus di server
 - `selesaikanSurat` mensyaratkan `nomorSurat` sudah terisi (enforced di UI, tombol disabled jika null)
 - Transisi workflow utama sekarang wajib datang dari status sebelumnya yang valid; jangan bypass server action dengan update status langsung ke tabel
 - Backdate tetap berlaku: tidak ada validasi range pada `tanggalSurat`
+- `tolakSurat` menyimpan `catatanReviu` dan `catatanReviuAt` agar alasan revisi dapat dilacak waktu pencatatannya
 
 ### Phase 3 â€” Surat Masuk + Disposisi (Minggu 4)
 - [x] Form input surat masuk (tanggalSurat + tanggalDiterima, keduanya manual)
@@ -914,6 +942,8 @@ Catatan status April 2026: Phase 3 selesai dan aktif. Modul surat masuk, halaman
 ### Phase 4 â€” QR + File + Fitur Lanjutan (Minggu 5â€“6)
 - [x] QR Code generate untuk surat keluar (verifikasi)
 - [x] Preview QR dan tombol "Preview Halaman Verifikasi" dari modul internal surat keluar
+- [x] Download QR PNG dari modul internal surat keluar
+- [x] Tempel QR ke PDF & upload file final langsung dari modul internal surat keluar
 - [x] Route publik verifikasi surat keluar dari hasil scan QR
 - [x] QR Contact generate untuk pegawai (vCard)
 - [ ] Upload/download file via Cloudinary
@@ -921,10 +951,10 @@ Catatan status April 2026: Phase 3 selesai dan aktif. Modul surat masuk, halaman
 - [x] Surat MOU modul
 - [x] Nomor Surat modul operasional dasar
 - [x] Pejabat modul operasional dasar
-- [ ] Bulk nomor surat
-- [ ] Export CSV arsip
+- [x] Bulk nomor surat
+- [x] Export CSV arsip
 
-Catatan status April 2026: Phase 4 telah aktif secara luas. Scope yang sudah berjalan mencakup QR verifikasi surat keluar, checklist pengarsipan yang mensyaratkan nomor surat + QR + file final, route publik verifikasi `/verifikasi/surat-keluar/[id]`, QR Contact pegawai, modul `Pejabat`, modul `Nomor Surat`, modul `Surat Keputusan`, modul `Surat MOU`, serta route verifikasi publik untuk SK dan MOU. Integrasi Cloudinary, bulk nomor, dan export CSV masih dilanjutkan bertahap.
+Catatan status April 2026: Phase 4 telah aktif secara luas. Scope yang sudah berjalan mencakup QR verifikasi surat keluar, preview QR, download QR PNG, aksi `Tempel QR ke PDF & Upload`, checklist pengarsipan yang mensyaratkan nomor surat + QR + file final, route publik verifikasi `/verifikasi/surat-keluar/[id]`, QR Contact pegawai, modul `Pejabat`, modul `Nomor Surat`, modul `Surat Keputusan`, modul `Surat MOU`, bulk nomor surat, export CSV arsip, serta route verifikasi publik untuk SK dan MOU. Storage lokal sudah diverifikasi manual; integrasi Cloudinary masih menunggu verifikasi end-to-end final.
 
 ### Phase 5 â€” Polish & Deploy (Minggu 7â€“8)
 - [ ] RBAC enforcement di semua endpoint

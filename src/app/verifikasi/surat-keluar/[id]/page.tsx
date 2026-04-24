@@ -19,6 +19,9 @@ function getVerificationStatus(status: string | null, qrCodeUrl: string | null) 
       label: "Tidak valid",
       tone: "destructive" as const,
       description: "Surat ini sudah dibatalkan di sistem.",
+      accent: "from-red-500/18 via-red-500/8 to-transparent",
+      panelClass:
+        "border-red-200 bg-red-50 text-red-900 shadow-red-100/60",
     };
   }
 
@@ -27,6 +30,9 @@ function getVerificationStatus(status: string | null, qrCodeUrl: string | null) 
       label: "Belum terverifikasi",
       tone: "secondary" as const,
       description: "QR verifikasi untuk surat ini belum tersedia.",
+      accent: "from-slate-500/16 via-slate-500/8 to-transparent",
+      panelClass:
+        "border-slate-200 bg-slate-50 text-slate-900 shadow-slate-100/60",
     };
   }
 
@@ -35,6 +41,9 @@ function getVerificationStatus(status: string | null, qrCodeUrl: string | null) 
       label: "Valid",
       tone: "default" as const,
       description: "Surat tercatat resmi di sistem manajemen surat.",
+      accent: "from-emerald-500/18 via-emerald-500/8 to-transparent",
+      panelClass:
+        "border-emerald-200 bg-emerald-50 text-emerald-950 shadow-emerald-100/60",
     };
   }
 
@@ -42,6 +51,9 @@ function getVerificationStatus(status: string | null, qrCodeUrl: string | null) 
     label: "Dalam proses",
     tone: "outline" as const,
     description: "Surat masih berada dalam alur internal dan belum final.",
+    accent: "from-amber-500/18 via-amber-500/8 to-transparent",
+    panelClass:
+      "border-amber-200 bg-amber-50 text-amber-950 shadow-amber-100/60",
   };
 }
 
@@ -56,45 +68,62 @@ export default async function VerificationSuratKeluarPage({ params }: PageProps)
   const verification = getVerificationStatus(surat.status, surat.qrCodeUrl);
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f5ef_0%,#ffffff_100%)] px-4 py-10 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-3xl rounded-[32px] border border-border bg-card shadow-sm">
-        <section className="border-b border-border bg-linear-to-r from-primary/10 via-primary/5 to-transparent px-6 py-8 sm:px-8">
-          <Badge variant={verification.tone}>{verification.label}</Badge>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight">
-            Verifikasi Surat Keluar
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-4 py-10 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl">
+        <div className="text-center">
+          <BrandMark />
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+            Verifikasi Surat Elektronik
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+        </div>
+
+        <section className="mt-8 rounded-[28px] border border-border bg-white p-6 shadow-[0_16px_40px_-24px_rgba(15,23,42,0.18)] sm:p-8">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
+                Status Verifikasi
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-950">
+                {verification.label}
+              </p>
+            </div>
+            <Badge variant={verification.tone}>{verification.label}</Badge>
+          </div>
+
+          <p className="mt-4 text-sm leading-7 text-slate-600">
             {verification.description}
           </p>
+
+          <div className="mt-8 space-y-4 rounded-[24px] border border-border bg-slate-50 px-5 py-5">
+            <DetailRow label="Nomor Surat" value={surat.nomorSurat ?? "-"} mono />
+            <DetailRow label="Tanggal Surat" value={formatTanggal(surat.tanggalSurat)} />
+            <DetailRow label="Perihal" value={surat.perihal} />
+            <DetailRow label="Ditujukan Kepada" value={surat.tujuan} />
+            <DetailRow label="Penandatangan" value={surat.pejabatNama ?? "-"} />
+            <DetailRow label="Status Sistem" value={humanizeStatus(surat.status)} />
+          </div>
+
+          <div className="mt-6">
+            {surat.fileFinalUrl ? (
+              <Link
+                href={surat.fileFinalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+              >
+                Buka Dokumen Final
+              </Link>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+                Dokumen final belum tersedia.
+              </div>
+            )}
+          </div>
         </section>
 
-        <section className="grid gap-4 px-6 py-8 sm:grid-cols-2 sm:px-8">
-          <InfoItem label="Nomor Surat" value={surat.nomorSurat ?? "-"} mono />
-          <InfoItem
-            label="Tanggal Surat"
-            value={formatTanggal(surat.tanggalSurat)}
-          />
-          <InfoItem label="Perihal" value={surat.perihal} />
-          <InfoItem label="Tujuan" value={surat.tujuan} />
-          <InfoItem
-            label="Pejabat Penandatangan"
-            value={surat.pejabatNama ?? "-"}
-          />
-          <InfoItem label="Status Sistem" value={surat.status ?? "-"} />
-        </section>
-
-        {surat.fileFinalUrl ? (
-          <section className="px-6 pb-8 sm:px-8">
-            <Link
-              href={surat.fileFinalUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-primary transition hover:bg-muted"
-            >
-              Buka Dokumen Final
-            </Link>
-          </section>
-        ) : null}
+        <footer className="mt-8 text-center text-xs tracking-[0.2em] text-muted-foreground uppercase">
+          Sistem Verifikasi Persuratan IAI Wilayah DKI Jakarta
+        </footer>
       </div>
     </main>
   );
@@ -104,13 +133,15 @@ function InfoItem({
   label,
   value,
   mono = false,
+  className,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-background px-4 py-4">
+    <div className={`rounded-2xl border border-border bg-background px-4 py-4 ${className ?? ""}`}>
       <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
         {label}
       </p>
@@ -119,4 +150,52 @@ function InfoItem({
       </p>
     </div>
   );
+}
+
+function BrandMark() {
+  return (
+    <div className="mx-auto flex h-18 w-18 items-center justify-center rounded-[26px] border border-slate-200 bg-white shadow-sm">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary/30 bg-primary/8 text-lg font-semibold text-primary">
+        IAI
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0 sm:grid sm:grid-cols-[170px_1fr] sm:gap-4">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className={`mt-1 text-base text-slate-950 sm:mt-0 ${mono ? "font-mono font-semibold" : "font-medium"}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function humanizeStatus(status: string | null) {
+  switch (status) {
+    case "pengarsipan":
+      return "Pengarsipan";
+    case "selesai":
+      return "Selesai";
+    case "dibatalkan":
+      return "Tidak Berlaku";
+    case "reviu":
+      return "Proses Reviu";
+    case "permohonan_persetujuan":
+      return "Menunggu Persetujuan";
+    case "draft":
+      return "Draft";
+    default:
+      return status ?? "-";
+  }
 }

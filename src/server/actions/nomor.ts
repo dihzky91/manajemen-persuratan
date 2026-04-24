@@ -1,19 +1,22 @@
 "use server";
 
 import { z } from "zod";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/server/db";
-import { nomorSuratCounter, auditLog, jenisSuratEnum } from "@/server/db/schema";
-import { formatBulanRomawi } from "@/lib/utils";
+import { nomorSuratCounter, auditLog } from "@/server/db/schema";
+import { jenisSuratValues } from "@/lib/jenis-surat";
+import { allocateNomorSurat } from "@/lib/nomor-surat";
 import { requireRole, requireSession } from "./auth";
-
-export const jenisSuratValues = jenisSuratEnum.enumValues;
 
 const generateNomorSchema = z.object({
   jenisSurat: z.enum(jenisSuratValues),
   bulan: z.number().int().min(1).max(12),
   tahun: z.number().int().min(2020).max(2100),
   prefixOverride: z.string().max(80).optional(),
+});
+
+const generateBulkNomorSchema = generateNomorSchema.extend({
+  jumlah: z.number().int().min(1).max(100),
 });
 
 const updatePrefixSchema = z.object({
@@ -59,37 +62,58 @@ export async function generateNomorSurat(input: unknown) {
   const data = generateNomorSchema.parse(input);
   const session = await requireRole(["admin", "pejabat"]);
 
-  const result = await db.transaction(async (tx) => {
-    const prefixCandidate = data.prefixOverride ?? "IAI-DKIJKT";
-    const upsert = await tx.execute(sql`
-      INSERT INTO nomor_surat_counter (tahun, bulan, jenis_surat, counter, prefix, updated_at)
-      VALUES (${data.tahun}, ${data.bulan}, ${data.jenisSurat}, 1, ${prefixCandidate}, NOW())
-      ON CONFLICT (tahun, bulan, jenis_surat)
-      DO UPDATE SET
-        counter = nomor_surat_counter.counter + 1,
-        prefix = COALESCE(${data.prefixOverride ?? null}, nomor_surat_counter.prefix, ${"IAI-DKIJKT"}),
-        updated_at = NOW()
-      RETURNING counter, prefix
-    `);
-
-    const row = (upsert.rows as { counter: number; prefix: string | null }[])[0];
-    if (!row) throw new Error("Gagal menggenerate nomor surat");
-
-    const counter = row.counter;
-    const prefix = row.prefix ?? "IAI-DKIJKT";
-
-    const bulanRomawi = formatBulanRomawi(data.bulan);
-    const nomor = `${counter}/${prefix}/${bulanRomawi}/${data.tahun}`;
-
-    return { nomor, counter, prefix, bulanRomawi, tahun: data.tahun };
+  const result = await allocateNomorSurat({
+    tahun: data.tahun,
+    bulan: data.bulan,
+    jenisSurat: data.jenisSurat,
+    prefixOverride: data.prefixOverride,
   });
+  const nomor = result.nomorList[0];
+  if (!nomor) {
+    throw new Error("Gagal menggenerate nomor surat");
+  }
 
   await db.insert(auditLog).values({
     userId: session.user.id as string,
     aksi: "GENERATE_NOMOR_SURAT",
     entitasType: "nomor_surat_counter",
     entitasId: `${data.tahun}-${data.bulan}-${data.jenisSurat}`,
-    detail: { nomor: result.nomor },
+    detail: { nomor },
+  });
+
+  return {
+    nomor,
+    counter: result.endCounter,
+    prefix: result.prefix,
+    bulanRomawi: result.bulanRomawi,
+    tahun: result.tahun,
+  };
+}
+
+export async function generateBulkNomorSurat(input: unknown) {
+  const data = generateBulkNomorSchema.parse(input);
+  const session = await requireRole(["admin", "pejabat"]);
+
+  const result = await allocateNomorSurat({
+    tahun: data.tahun,
+    bulan: data.bulan,
+    jenisSurat: data.jenisSurat,
+    jumlah: data.jumlah,
+    prefixOverride: data.prefixOverride,
+  });
+
+  await db.insert(auditLog).values({
+    userId: session.user.id as string,
+    aksi: "GENERATE_BULK_NOMOR_SURAT",
+    entitasType: "nomor_surat_counter",
+    entitasId: `${data.tahun}-${data.bulan}-${data.jenisSurat}`,
+    detail: {
+      jumlah: result.jumlah,
+      startCounter: result.startCounter,
+      endCounter: result.endCounter,
+      nomorAwal: result.nomorList[0],
+      nomorAkhir: result.nomorList[result.nomorList.length - 1],
+    },
   });
 
   return result;
