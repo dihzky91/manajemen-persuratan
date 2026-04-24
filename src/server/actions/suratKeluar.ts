@@ -15,6 +15,10 @@ import {
 import { getStorageProvider } from "@/lib/storage";
 import { prepareUploadPayload } from "@/lib/storage/utils";
 import {
+  buildVerifikasiSuratPayload,
+  generateQRDataURL,
+} from "@/lib/qr/generateQR";
+import {
   suratKeluarCreateSchema,
   suratKeluarUpdateSchema,
 } from "@/lib/validators/suratKeluar.schema";
@@ -36,12 +40,14 @@ export type SuratKeluarRow = {
   fileDraftUrl: string | null;
   fileFinalUrl: string | null;
   lampiranUrl: string | null;
+  qrCodeUrl: string | null;
   catatanReviu: string | null;
   pejabatId: number | null;
   divisiId: number | null;
   divisiNama: string | null;
   dibuatOleh: string | null;
   dibuatOlehNama: string | null;
+  pejabatNama: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -106,18 +112,21 @@ export async function listSuratKeluar(): Promise<SuratKeluarRow[]> {
       fileDraftUrl: suratKeluar.fileDraftUrl,
       fileFinalUrl: suratKeluar.fileFinalUrl,
       lampiranUrl: suratKeluar.lampiranUrl,
+      qrCodeUrl: suratKeluar.qrCodeUrl,
       catatanReviu: suratKeluar.catatanReviu,
       pejabatId: suratKeluar.pejabatId,
       divisiId: suratKeluar.divisiId,
       divisiNama: divisi.nama,
       dibuatOleh: suratKeluar.dibuatOleh,
       dibuatOlehNama: users.namaLengkap,
+      pejabatNama: pejabatPenandatangan.namaJabatan,
       createdAt: suratKeluar.createdAt,
       updatedAt: suratKeluar.updatedAt,
     })
     .from(suratKeluar)
     .leftJoin(divisi, eq(suratKeluar.divisiId, divisi.id))
     .leftJoin(users, eq(suratKeluar.dibuatOleh, users.id))
+    .leftJoin(pejabatPenandatangan, eq(suratKeluar.pejabatId, pejabatPenandatangan.id))
     .orderBy(desc(suratKeluar.createdAt))
     .limit(100);
 }
@@ -476,7 +485,11 @@ export async function selesaikanSurat(data: { id: string }) {
   if (!guard.ok) return guard;
 
   const [existing] = await db
-    .select({ nomorSurat: suratKeluar.nomorSurat })
+    .select({
+      nomorSurat: suratKeluar.nomorSurat,
+      qrCodeUrl: suratKeluar.qrCodeUrl,
+      fileFinalUrl: suratKeluar.fileFinalUrl,
+    })
     .from(suratKeluar)
     .where(eq(suratKeluar.id, id));
 
@@ -484,6 +497,20 @@ export async function selesaikanSurat(data: { id: string }) {
     return {
       ok: false as const,
       error: "Nomor surat harus digenerate sebelum pengarsipan diselesaikan.",
+    };
+  }
+
+  if (!existing.qrCodeUrl) {
+    return {
+      ok: false as const,
+      error: "QR verifikasi harus digenerate sebelum pengarsipan diselesaikan.",
+    };
+  }
+
+  if (!existing.fileFinalUrl) {
+    return {
+      ok: false as const,
+      error: "File final harus diunggah sebelum pengarsipan diselesaikan.",
     };
   }
 
@@ -502,6 +529,90 @@ export async function selesaikanSurat(data: { id: string }) {
 
   revalidatePath("/surat-keluar");
   return { ok: true as const };
+}
+
+export async function generateQrSuratKeluar(data: { id: string }) {
+  const { id } = idSchema.parse(data);
+  const session = await requireRole(["admin", "pejabat"]);
+
+  const [surat] = await db
+    .select({
+      id: suratKeluar.id,
+      nomorSurat: suratKeluar.nomorSurat,
+      status: suratKeluar.status,
+    })
+    .from(suratKeluar)
+    .where(eq(suratKeluar.id, id));
+
+  if (!surat) {
+    return { ok: false as const, error: "Surat tidak ditemukan." };
+  }
+
+  if (surat.status !== "pengarsipan" && surat.status !== "selesai") {
+    return {
+      ok: false as const,
+      error: "QR verifikasi hanya bisa digenerate saat pengarsipan atau setelah selesai.",
+    };
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const verificationUrl = buildVerifikasiSuratPayload({
+    appUrl,
+    jenis: "surat-keluar",
+    id: surat.id,
+    nomor: surat.nomorSurat,
+  });
+  const qrCodeUrl = await generateQRDataURL(verificationUrl, { size: 512 });
+
+  await db
+    .update(suratKeluar)
+    .set({ qrCodeUrl, updatedAt: new Date() })
+    .where(eq(suratKeluar.id, id));
+
+  await db.insert(auditLog).values({
+    userId: session.user.id as string,
+    aksi: "GENERATE_QR_SURAT_KELUAR",
+    entitasType: "surat_keluar",
+    entitasId: id,
+    detail: { verificationUrl },
+  });
+
+  revalidatePath("/surat-keluar");
+  return { ok: true as const, qrCodeUrl, verificationUrl };
+}
+
+export type SuratKeluarVerificationRow = {
+  id: string;
+  nomorSurat: string | null;
+  perihal: string;
+  tujuan: string;
+  tanggalSurat: string;
+  status: string | null;
+  qrCodeUrl: string | null;
+  pejabatNama: string | null;
+  fileFinalUrl: string | null;
+};
+
+export async function getSuratKeluarVerificationById(
+  id: string,
+): Promise<SuratKeluarVerificationRow | null> {
+  const [row] = await db
+    .select({
+      id: suratKeluar.id,
+      nomorSurat: suratKeluar.nomorSurat,
+      perihal: suratKeluar.perihal,
+      tujuan: suratKeluar.tujuan,
+      tanggalSurat: suratKeluar.tanggalSurat,
+      status: suratKeluar.status,
+      qrCodeUrl: suratKeluar.qrCodeUrl,
+      pejabatNama: pejabatPenandatangan.namaJabatan,
+      fileFinalUrl: suratKeluar.fileFinalUrl,
+    })
+    .from(suratKeluar)
+    .leftJoin(pejabatPenandatangan, eq(suratKeluar.pejabatId, pejabatPenandatangan.id))
+    .where(eq(suratKeluar.id, id));
+
+  return row ?? null;
 }
 
 export async function batalkanSurat(data: { id: string }) {

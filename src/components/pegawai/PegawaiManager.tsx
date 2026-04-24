@@ -1,13 +1,16 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Briefcase,
+  Copy,
   FileBadge2,
   HeartPulse,
   MoreHorizontal,
   Pencil,
   Plus,
+  QrCode,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -50,6 +53,7 @@ import { KesehatanTab } from "@/components/pegawai/KesehatanTab";
 import { IntegritasTab } from "@/components/pegawai/IntegritasTab";
 import { PegawaiForm } from "@/components/pegawai/PegawaiForm";
 import { deletePegawai, type PegawaiListRow } from "@/server/actions/pegawai";
+import { generateQRContact } from "@/server/actions/qr";
 
 const DETAIL_TABS = [
   { value: "biodata", label: "Biodata", icon: UserRound },
@@ -93,11 +97,13 @@ export function PegawaiManager({
   canManage: boolean;
   currentUserId: string | null;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(initialData[0]?.id ?? null);
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [deleteTarget, setDeleteTarget] = useState<PegawaiDetailRow | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [isQrPending, startQrTransition] = useTransition();
 
   const filteredData = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -131,6 +137,29 @@ export function PegawaiManager({
       setDeleteTarget(null);
       setSelectedId(null);
     });
+  }
+
+  function handleGenerateQrContact(userId: string) {
+    startQrTransition(async () => {
+      try {
+        await generateQRContact({ userId });
+        toast.success("QR Contact berhasil dibuat.");
+        router.refresh();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Gagal membuat QR Contact.",
+        );
+      }
+    });
+  }
+
+  async function handleCopyQrLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link QR Contact berhasil disalin.");
+    } catch {
+      toast.error("Gagal menyalin link QR Contact.");
+    }
   }
 
   return (
@@ -281,6 +310,81 @@ export function PegawaiManager({
 
                 <TabsContent value="biodata">
                   <div className="space-y-4">
+                    <Card className="rounded-[24px] border border-border bg-muted/20 shadow-none">
+                      <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="max-w-xl">
+                          <div className="flex items-center gap-2">
+                            <QrCode className="h-4 w-4 text-primary" />
+                            <p className="text-sm font-semibold text-foreground">
+                              QR Contact Pegawai
+                            </p>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                            QR Contact berisi vCard Nama, No. HP, Email, dan Jabatan.
+                            Jika ada perubahan pada data tersebut, silakan generate
+                            ulang agar kode QR tetap akurat.
+                          </p>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleGenerateQrContact(selected.id)}
+                              disabled={!canEditSelected || isQrPending}
+                            >
+                              <QrCode className="h-4 w-4" />
+                              {selected.qrContactUrl
+                                ? "Generate Ulang QR Contact"
+                                : "Generate QR Contact"}
+                            </Button>
+                            {selected.qrContactUrl ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    window.open(
+                                      selected.qrContactUrl!,
+                                      "_blank",
+                                      "noopener,noreferrer",
+                                    )
+                                  }
+                                >
+                                  Buka QR Contact
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleCopyQrLink(selected.qrContactUrl!)
+                                  }
+                                >
+                                  <Copy className="h-4 w-4" />
+                                  Salin Link QR
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="flex min-h-32 min-w-32 items-center justify-center rounded-2xl border bg-background p-3">
+                          {selected.qrContactUrl ? (
+                            <img
+                              src={selected.qrContactUrl}
+                              alt={`QR Contact ${selected.namaLengkap}`}
+                              className="h-28 w-28 rounded-md bg-white p-1"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center gap-2 text-center text-xs text-muted-foreground">
+                              <QrCode className="h-5 w-5" />
+                              <span>QR Contact belum dibuat</span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
                     <BiodataForm
                       userId={selected.id}
                       initialData={

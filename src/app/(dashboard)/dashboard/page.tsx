@@ -15,12 +15,12 @@ export default function DashboardPage() {
         <div className="bg-linear-to-r from-primary/10 via-primary/5 to-transparent px-6 py-8 lg:px-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <Badge variant="outline">Phase 3 Active</Badge>
+              <Badge variant="outline">Phase 4 Started</Badge>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground lg:text-4xl">
-                Operasional persuratan kini mencakup surat keluar, surat masuk, dan disposisi.
+                Operasional persuratan kini memasuki Phase 4 dengan rangkaian modul lanjutan yang sudah aktif.
               </h1>
               <p className="mt-3 text-sm leading-6 text-muted-foreground lg:text-base">
-                Fondasi aplikasi sudah stabil. Workflow aktif sekarang mencakup pencatatan surat masuk, disposisi berantai, inbox pengguna, dan notifikasi terkait di samping modul phase sebelumnya.
+                Fondasi aplikasi tetap stabil di atas modul Phase 1 sampai Phase 3. Scope aktif Phase 4 sekarang mencakup QR verifikasi surat keluar, halaman verifikasi publik, QR Contact pegawai, modul pejabat penandatangan, modul nomor surat, Surat Keputusan, dan Surat MOU.
               </p>
             </div>
 
@@ -42,13 +42,13 @@ export default function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Modul Aktif"
-          value="6"
-          hint="Dashboard, Divisi, Pegawai, Surat Keluar, Surat Masuk, Disposisi"
+          value="10"
+          hint="Dashboard, Divisi, Pegawai, Surat Keluar, Surat Masuk, Disposisi, Pejabat, Nomor Surat, Surat Keputusan, Surat MOU"
           icon={FolderKanban}
         />
         <StatCard
           label="Roadmap Tertunda"
-          value="4"
+          value="0"
           hint="Ditandai jelas per phase"
           icon={Clock3}
         />
@@ -74,7 +74,7 @@ export default function DashboardPage() {
                 Fokus Implementasi Saat Ini
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Phase 1 sampai Phase 3 sudah aktif dan terhubung dalam satu alur kerja operasional.
+                Phase 1 sampai Phase 3 tetap aktif, dan gelombang pertama Phase 4 sudah mulai berjalan.
               </p>
             </div>
             <Badge>Aktif</Badge>
@@ -86,6 +86,7 @@ export default function DashboardPage() {
               "Surat keluar tetap aktif dengan workflow 5 tahap dan penomoran otomatis.",
               "Surat masuk kini mendukung list, detail, edit, dan tindak lanjut operasional.",
               "Disposisi sudah aktif dengan chain, inbox pengguna, badge sidebar, dan notifikasi email.",
+              "Phase 4 kini aktif lewat QR verifikasi surat keluar, route verifikasi publik, QR Contact pegawai, modul pejabat, modul nomor surat, Surat Keputusan, dan Surat MOU.",
             ].map((item) => (
               <div
                 key={item}
@@ -100,7 +101,7 @@ export default function DashboardPage() {
         <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm lg:p-8">
           <h2 className="text-lg font-semibold text-foreground">Tahap Berikutnya</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Fondasi sudah stabil, dan modul berikutnya dilanjutkan bertahap sesuai roadmap.
+            Gelombang pertama Phase 4 sudah aktif. Modul lanjutan lain tetap dibuka bertahap sesuai roadmap.
           </p>
 
           <div className="mt-6 space-y-3">
@@ -114,7 +115,11 @@ export default function DashboardPage() {
               label="Surat Masuk dan disposisi"
               status="Sudah aktif pada shell saat ini."
             />
-            <PhaseItem phase="Phase 4" label="QR, file, SK, MOU, pejabat" />
+            <PhaseItem
+              phase="Phase 4"
+              label="QR, file, SK, MOU, pejabat"
+              status="Sudah aktif lewat QR surat keluar, verifikasi publik, QR Contact pegawai, modul pejabat, nomor surat, Surat Keputusan, dan Surat MOU."
+            />
             <PhaseItem phase="Phase 5" label="Polish, RBAC, deploy, dan E2E" />
           </div>
         </div>

@@ -1,25 +1,25 @@
 import type { Metadata } from "next";
 import { PageWrapper } from "@/components/layout/PageWrapper";
-import { RoadmapPlaceholder } from "@/components/layout/RoadmapPlaceholder";
+import { SuratKeputusanManager } from "@/components/surat-keputusan/SuratKeputusanManager";
+import { getSession } from "@/server/actions/auth";
+import { listPejabatAktif } from "@/server/actions/suratKeluar";
+import { listSuratKeputusan } from "@/server/actions/suratKeputusan";
 
 export const metadata: Metadata = {
   title: "Surat Keputusan | Manajemen Surat IAI Jakarta",
 };
 
-export default function Page() {
+export default async function Page() {
+  const [session, data, pejabatList] = await Promise.all([
+    getSession(),
+    listSuratKeputusan(),
+    listPejabatAktif(),
+  ]);
+  const role = (session?.user as { role?: string } | undefined)?.role ?? null;
+
   return (
     <PageWrapper title="Surat Keputusan" description="Daftar Surat Keputusan (SK).">
-      <RoadmapPlaceholder
-        phase="Phase 4"
-        title="Surat Keputusan menunggu fase lanjutan"
-        description="Modul SK akan diaktifkan bersama fitur file, QR, dan kapabilitas lanjutan lain. Pada tahap ini halaman tetap tampil untuk menunjukkan arah produk tanpa membuka interaksi yang belum siap."
-        scope={[
-          "Daftar dan detail SK",
-          "Integrasi file lampiran",
-          "QR verifikasi surat",
-          "Atribut status dokumen",
-        ]}
-      />
+      <SuratKeputusanManager initialData={data} pejabatList={pejabatList} role={role} />
     </PageWrapper>
   );
 }

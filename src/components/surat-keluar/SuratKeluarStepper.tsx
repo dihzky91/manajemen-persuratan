@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ChangeEvent } from "react";
+import { useMemo, useState, useTransition, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -11,6 +11,9 @@ import {
   XCircle,
   Hash,
   AlertCircle,
+  Copy,
+  QrCode,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -33,6 +36,7 @@ import {
   selesaikanSurat,
   batalkanSurat,
   assignNomorSuratKeluar,
+  generateQrSuratKeluar,
   uploadSuratKeluarFinal,
 } from "@/server/actions/suratKeluar";
 import type { SuratKeluarRow } from "@/server/actions/suratKeluar";
@@ -127,6 +131,27 @@ export function SuratKeluarStepper({
   const isPejabat = role === "pejabat" || role === "admin";
   const currentStep = stepIndex(status);
   const isCancelled = status === "dibatalkan";
+  const verificationUrl = useMemo(() => {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/verifikasi/surat-keluar/${row.id}`;
+    }
+    return `/verifikasi/surat-keluar/${row.id}`;
+  }, [row.id]);
+  const archiveChecklist = [
+    {
+      label: "Nomor surat sudah dibuat",
+      done: Boolean(row.nomorSurat),
+    },
+    {
+      label: "QR verifikasi sudah dibuat",
+      done: Boolean(row.qrCodeUrl),
+    },
+    {
+      label: "Dokumen final sudah diunggah",
+      done: Boolean(row.fileFinalUrl),
+    },
+  ];
+  const isArchiveChecklistComplete = archiveChecklist.every((item) => item.done);
 
   function runAction(action: () => Promise<{ ok: boolean; error?: string }>) {
     startTransition(async () => {
@@ -161,6 +186,23 @@ export function SuratKeluarStepper({
     runAction(() => assignNomorSuratKeluar({ id: row.id }));
   }
 
+  function handleGenerateQr() {
+    startTransition(async () => {
+      try {
+        const res = await generateQrSuratKeluar({ id: row.id });
+        if (!res.ok) {
+          toast.error(res.error ?? "Generate QR verifikasi gagal.");
+          return;
+        }
+
+        toast.success("QR verifikasi surat berhasil dibuat.");
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Generate QR verifikasi gagal.");
+      }
+    });
+  }
+
   function handleUploadFinal() {
     if (!finalFile) {
       toast.error("Pilih file final terlebih dahulu.");
@@ -189,6 +231,15 @@ export function SuratKeluarStepper({
         toast.error(e instanceof Error ? e.message : "Upload file final gagal.");
       }
     });
+  }
+
+  async function handleCopyVerificationLink() {
+    try {
+      await navigator.clipboard.writeText(verificationUrl);
+      toast.success("Link verifikasi berhasil disalin.");
+    } catch {
+      toast.error("Gagal menyalin link verifikasi.");
+    }
   }
 
   return (
@@ -547,14 +598,84 @@ export function SuratKeluarStepper({
                     </Button>
                   </div>
 
+                  <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          QR Verifikasi
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          QR akan mengarah ke halaman verifikasi publik surat.
+                        </p>
+                      </div>
+                      {row.qrCodeUrl ? (
+                        <img
+                          src={row.qrCodeUrl}
+                          alt="QR verifikasi surat"
+                          className="h-20 w-20 rounded-md border bg-white p-1"
+                        />
+                      ) : (
+                        <div className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed text-muted-foreground">
+                          <QrCode className="h-5 w-5" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleGenerateQr}
+                        disabled={isPending}
+                      >
+                        <QrCode className="mr-1.5 h-3.5 w-3.5" />
+                        {row.qrCodeUrl ? "Generate Ulang QR" : "Generate QR"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(verificationUrl, "_blank", "noopener,noreferrer")}
+                      >
+                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                        Preview Halaman Verifikasi
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCopyVerificationLink}
+                      >
+                        <Copy className="mr-1.5 h-3.5 w-3.5" />
+                        Salin Link Verifikasi
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Checklist Pengarsipan
+                    </p>
+                    <div className="space-y-1.5 text-sm">
+                      {archiveChecklist.map((item) => (
+                        <div key={item.label} className="flex items-center gap-2">
+                          {item.done ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 text-amber-600" />
+                          )}
+                          <span>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <Button
                     size="sm"
                     onClick={() => runAction(() => selesaikanSurat({ id: row.id }))}
-                    disabled={isPending || !row.nomorSurat}
+                    disabled={isPending || !isArchiveChecklistComplete}
                     className="bg-green-600 hover:bg-green-700"
                     title={
-                      !row.nomorSurat
-                        ? "Generate nomor surat terlebih dahulu"
+                      !isArchiveChecklistComplete
+                        ? "Lengkapi checklist pengarsipan terlebih dahulu"
                         : undefined
                     }
                   >
