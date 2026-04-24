@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import path from "node:path";
 import { deleteFile, uploadFile } from "@/lib/cloudinary";
 import type {
@@ -5,7 +6,11 @@ import type {
   StorageUploadInput,
   StorageUploadResult,
 } from "@/lib/storage/types";
-import { buildStorageKey, sanitizeFileName } from "@/lib/storage/utils";
+import {
+  buildStorageKey,
+  prependStoragePrefix,
+  sanitizeFileName,
+} from "@/lib/storage/utils";
 
 function getDataUrl(body: Buffer | Uint8Array | string, contentType?: string) {
   if (typeof body === "string" && body.startsWith("data:")) {
@@ -26,15 +31,19 @@ export class CloudinaryStorageProvider implements StorageProvider {
     const baseName = extension
       ? safeFileName.slice(0, -extension.length)
       : safeFileName;
+    const scopedFolder = prependStoragePrefix(
+      env.STORAGE_ENV_PREFIX,
+      input.folder ?? "manajemen-surat",
+    );
     const key = buildStorageKey(
       [
-        input.folder ?? "manajemen-surat",
+        scopedFolder,
         input.publicId ?? `${Date.now()}-${baseName}`,
       ].filter(Boolean),
     );
 
     const uploaded = await uploadFile(getDataUrl(input.body, input.contentType), {
-      folder: input.folder ?? "manajemen-surat",
+      folder: scopedFolder,
       publicId: input.publicId ?? `${Date.now()}-${baseName}`,
       resourceType: "auto",
     });

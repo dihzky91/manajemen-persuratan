@@ -32,6 +32,10 @@ export function buildStorageKey(parts: string[]) {
     .join("/");
 }
 
+export function prependStoragePrefix(prefix: string, folder?: string) {
+  return buildStorageKey([prefix, folder ?? ""]);
+}
+
 export function ensureBuffer(body: Buffer | Uint8Array | string): Buffer {
   if (Buffer.isBuffer(body)) return body;
   if (typeof body === "string") return Buffer.from(body, "base64");

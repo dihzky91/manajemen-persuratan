@@ -24,6 +24,9 @@ export const env = {
   BETTER_AUTH_SECRET: readEnv("BETTER_AUTH_SECRET"),
   BETTER_AUTH_URL: readEnv("BETTER_AUTH_URL"),
   STORAGE_PROVIDER: readEnv("STORAGE_PROVIDER") || "local",
+  STORAGE_ENV_PREFIX:
+    readEnvOptional("STORAGE_ENV_PREFIX") ||
+    (process.env.NODE_ENV === "production" ? "prod" : "dev"),
   STORAGE_LOCAL_DIR: readEnv("STORAGE_LOCAL_DIR") || "./public/uploads",
   STORAGE_PUBLIC_BASE_URL: readEnv("STORAGE_PUBLIC_BASE_URL") || "/uploads",
   STORAGE_MAX_FILE_MB: Number(readEnvOptional("STORAGE_MAX_FILE_MB") || "10"),

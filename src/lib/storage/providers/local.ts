@@ -9,6 +9,7 @@ import type {
 import {
   buildStorageKey,
   ensureBuffer,
+  prependStoragePrefix,
   sanitizeFileName,
   sanitizePathSegment,
 } from "@/lib/storage/utils";
@@ -25,7 +26,10 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async upload(input: StorageUploadInput): Promise<StorageUploadResult> {
-    const safeFolder = input.folder ? sanitizePathSegment(input.folder) : "";
+    const safeFolder = prependStoragePrefix(
+      env.STORAGE_ENV_PREFIX,
+      input.folder ? sanitizePathSegment(input.folder) : "",
+    );
     const safeFileName = sanitizeFileName(input.fileName);
     const key = buildStorageKey(
       [safeFolder, `${Date.now()}-${safeFileName}`].filter(Boolean),

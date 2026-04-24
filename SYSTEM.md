@@ -922,6 +922,8 @@ Catatan status April 2026: Phase 3 selesai dan aktif. Modul surat masuk, halaman
 - [ ] Bulk nomor surat
 - [ ] Export CSV arsip
 
+Catatan status April 2026: fondasi storage multi-provider sudah aktif. Mode `local` telah diverifikasi end-to-end untuk `surat masuk` serta `surat keluar` (draft, lampiran, generate nomor surat, upload file final, dan penyelesaian pengarsipan). Validator file, batas ukuran, whitelist MIME, dan namespace environment storage sudah terpasang. Jalur `cloudinary` belum diuji manual penuh, QR/public verification belum dimulai, dan provider `hosted` masih placeholder.
+
 ### Phase 5 â€” Polish & Deploy (Minggu 7â€“8)
 - [ ] RBAC enforcement di semua endpoint
 - [ ] Audit log lengkap
