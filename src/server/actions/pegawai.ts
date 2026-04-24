@@ -41,6 +41,7 @@ export type PegawaiListRow = {
   email: string;
   emailPribadi: string | null;
   noHp: string | null;
+  qrContactUrl: string | null;
   role: "admin" | "staff" | "pejabat" | "viewer" | null;
   divisiId: number | null;
   divisiNama: string | null;
@@ -63,6 +64,7 @@ export async function listPegawai(): Promise<PegawaiListRow[]> {
       email: users.email,
       emailPribadi: users.emailPribadi,
       noHp: users.noHp,
+      qrContactUrl: users.qrContactUrl,
       role: users.role,
       divisiId: users.divisiId,
       divisiNama: divisi.nama,
@@ -91,6 +93,7 @@ export async function getPegawaiById(id: string) {
       email: users.email,
       emailPribadi: users.emailPribadi,
       noHp: users.noHp,
+      qrContactUrl: users.qrContactUrl,
       role: users.role,
       divisiId: users.divisiId,
       divisiNama: divisi.nama,

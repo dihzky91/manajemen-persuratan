@@ -1,25 +1,25 @@
 import type { Metadata } from "next";
 import { PageWrapper } from "@/components/layout/PageWrapper";
-import { RoadmapPlaceholder } from "@/components/layout/RoadmapPlaceholder";
+import { SuratMouManager } from "@/components/surat-mou/SuratMouManager";
+import { getSession } from "@/server/actions/auth";
+import { listPejabatAktif } from "@/server/actions/suratKeluar";
+import { listSuratMou } from "@/server/actions/suratMou";
 
 export const metadata: Metadata = {
   title: "Surat MOU | Manajemen Surat IAI Jakarta",
 };
 
-export default function Page() {
+export default async function Page() {
+  const [session, data, pejabatList] = await Promise.all([
+    getSession(),
+    listSuratMou(),
+    listPejabatAktif(),
+  ]);
+  const role = (session?.user as { role?: string } | undefined)?.role ?? null;
+
   return (
     <PageWrapper title="Surat MOU" description="Daftar Memorandum of Understanding.">
-      <RoadmapPlaceholder
-        phase="Phase 4"
-        title="Modul MOU belum dibuka"
-        description="Fitur MOU akan dibangun ketika fondasi dokumen lanjutan siap, termasuk penyimpanan file dan dukungan verifikasi berbasis QR."
-        scope={[
-          "Daftar MOU aktif",
-          "Detail dokumen dan metadata",
-          "Lampiran file",
-          "Verifikasi QR visual",
-        ]}
-      />
+      <SuratMouManager initialData={data} pejabatList={pejabatList} role={role} />
     </PageWrapper>
   );
 }

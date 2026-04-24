@@ -6,7 +6,7 @@ export function sanitizePathSegment(value: string): string {
     .replace(/\\/g, "/")
     .replace(/^\//, "")
     .replace(/\.\./g, "")
-    .replace(/[^a-zA-Z0-9/_-]+/g, "-")
+    .replace(/[^a-zA-Z0-9/._-]+/g, "-")
     .replace(/\/{2,}/g, "/")
     .replace(/^-+|-+$/g, "");
 }

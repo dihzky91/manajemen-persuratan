@@ -912,15 +912,19 @@ Catatan status April 2026: Phase 2 selesai dan aktif. Sudah diaudit ulang, guard
 Catatan status April 2026: Phase 3 selesai dan aktif. Modul surat masuk, halaman detail, chain disposisi, inbox pengguna, badge unread di sidebar, dan integrasi email Mailjet sudah terpasang serta lolos `npm run typecheck`.
 
 ### Phase 4 â€” QR + File + Fitur Lanjutan (Minggu 5â€“6)
-- [ ] QR Code generate untuk surat (verifikasi)
-- [ ] Preview QR dan tombol "Preview Halaman Verifikasi" dari modul internal
-- [ ] Route publik verifikasi surat dari hasil scan QR
-- [ ] QR Contact generate untuk pegawai (vCard)
+- [x] QR Code generate untuk surat keluar (verifikasi)
+- [x] Preview QR dan tombol "Preview Halaman Verifikasi" dari modul internal surat keluar
+- [x] Route publik verifikasi surat keluar dari hasil scan QR
+- [x] QR Contact generate untuk pegawai (vCard)
 - [ ] Upload/download file via Cloudinary
-- [ ] Surat Keputusan modul
-- [ ] Surat MOU modul
+- [x] Surat Keputusan modul
+- [x] Surat MOU modul
+- [x] Nomor Surat modul operasional dasar
+- [x] Pejabat modul operasional dasar
 - [ ] Bulk nomor surat
 - [ ] Export CSV arsip
+
+Catatan status April 2026: Phase 4 telah aktif secara luas. Scope yang sudah berjalan mencakup QR verifikasi surat keluar, checklist pengarsipan yang mensyaratkan nomor surat + QR + file final, route publik verifikasi `/verifikasi/surat-keluar/[id]`, QR Contact pegawai, modul `Pejabat`, modul `Nomor Surat`, modul `Surat Keputusan`, modul `Surat MOU`, serta route verifikasi publik untuk SK dan MOU. Integrasi Cloudinary, bulk nomor, dan export CSV masih dilanjutkan bertahap.
 
 ### Phase 5 â€” Polish & Deploy (Minggu 7â€“8)
 - [ ] RBAC enforcement di semua endpoint

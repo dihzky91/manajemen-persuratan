@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Plus, Pencil, Trash2, Eye, Hash } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Trash2, Eye, Hash, Download } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ import type {
   DivisiOption,
 } from "@/server/actions/suratKeluar";
 import { cn, formatTanggalPendek } from "@/lib/utils";
+import { exportRowsToCsv } from "@/lib/csv";
 
 interface SuratKeluarManagerProps {
   initialData: SuratKeluarRow[];
@@ -355,6 +356,31 @@ export function SuratKeluarManager({
     });
   }
 
+  function handleExportCsv() {
+    exportRowsToCsv(
+      initialData.map((row) => ({
+        nomor_surat: row.nomorSurat ?? "",
+        perihal: row.perihal,
+        tujuan: row.tujuan,
+        tujuan_alamat: row.tujuanAlamat ?? "",
+        tanggal_surat: row.tanggalSurat,
+        jenis_surat: JENIS_SURAT_LABEL[row.jenisSurat] ?? row.jenisSurat,
+        isi_singkat: row.isiSingkat ?? "",
+        status: STATUS_CONFIG[row.status ?? "draft"]?.label ?? (row.status ?? "draft"),
+        divisi: row.divisiNama ?? "",
+        pembuat: row.dibuatOlehNama ?? "",
+        pejabat: row.pejabatNama ?? "",
+        file_draft: row.fileDraftUrl ?? "",
+        file_final: row.fileFinalUrl ?? "",
+        lampiran: row.lampiranUrl ?? "",
+        qr_verifikasi: row.qrCodeUrl ?? "",
+        catatan_reviu: row.catatanReviu ?? "",
+      })),
+      "arsip-surat-keluar.csv",
+    );
+    toast.success("CSV surat keluar berhasil diexport.");
+  }
+
   return (
     <>
       <Card className="rounded-[28px]">
@@ -368,13 +394,24 @@ export function SuratKeluarManager({
               </CardDescription>
             </div>
             {canCreate ? (
-              <Button
-                onClick={() => setFormState({ open: true, mode: "create" })}
-              >
-                <Plus className="h-4 w-4" />
-                Buat Surat Keluar
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={handleExportCsv}>
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </Button>
+                <Button
+                  onClick={() => setFormState({ open: true, mode: "create" })}
+                >
+                  <Plus className="h-4 w-4" />
+                  Buat Surat Keluar
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={handleExportCsv}>
+                <Download className="h-4 w-4" />
+                Export CSV
               </Button>
-            ) : null}
+            )}
           </div>
         </CardHeader>
         <CardContent className="pt-6">

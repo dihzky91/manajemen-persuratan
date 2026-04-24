@@ -40,6 +40,7 @@ import {
 } from "@/server/actions/suratKeluar";
 import type { SuratKeluarRow, PejabatOption, DivisiOption } from "@/server/actions/suratKeluar";
 import { optionalFileUrlSchema } from "@/lib/validators/fileUrl";
+import { getTodayIsoInJakarta } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ interface SuratKeluarFormProps {
 }
 
 function todayISO() {
-  return new Date().toISOString().split("T")[0]!;
+  return getTodayIsoInJakarta();
 }
 
 export function SuratKeluarForm({
@@ -161,71 +162,77 @@ export function SuratKeluarForm({
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
-      let uploadedDraftUrl = values.fileDraftUrl || undefined;
-      let uploadedLampiranUrl = values.lampiranUrl || undefined;
+      try {
+        let uploadedDraftUrl = values.fileDraftUrl || undefined;
+        let uploadedLampiranUrl = values.lampiranUrl || undefined;
 
-      if (selectedFile) {
-        const dataUrl = await fileToDataUrl(selectedFile);
-        const uploadResult = await uploadSuratKeluarDraft({
-          fileName: selectedFile.name,
-          contentType: selectedFile.type || "application/octet-stream",
-          dataUrl,
-        });
+        if (selectedFile) {
+          const dataUrl = await fileToDataUrl(selectedFile);
+          const uploadResult = await uploadSuratKeluarDraft({
+            fileName: selectedFile.name,
+            contentType: selectedFile.type || "application/octet-stream",
+            dataUrl,
+          });
 
-        if (!uploadResult.ok) {
-          toast.error("Upload draft surat gagal.");
-          return;
+          if (!uploadResult.ok) {
+            toast.error("Upload draft surat gagal.");
+            return;
+          }
+
+          uploadedDraftUrl = uploadResult.data.url;
         }
 
-        uploadedDraftUrl = uploadResult.data.url;
-      }
+        if (selectedLampiran) {
+          const dataUrl = await fileToDataUrl(selectedLampiran);
+          const uploadResult = await uploadSuratKeluarLampiran({
+            fileName: selectedLampiran.name,
+            contentType: selectedLampiran.type || "application/octet-stream",
+            dataUrl,
+          });
 
-      if (selectedLampiran) {
-        const dataUrl = await fileToDataUrl(selectedLampiran);
-        const uploadResult = await uploadSuratKeluarLampiran({
-          fileName: selectedLampiran.name,
-          contentType: selectedLampiran.type || "application/octet-stream",
-          dataUrl,
-        });
+          if (!uploadResult.ok) {
+            toast.error("Upload lampiran surat gagal.");
+            return;
+          }
 
-        if (!uploadResult.ok) {
-          toast.error("Upload lampiran surat gagal.");
-          return;
+          uploadedLampiranUrl = uploadResult.data.url;
         }
 
-        uploadedLampiranUrl = uploadResult.data.url;
+        const payload = {
+          ...values,
+          pejabatId:
+            values.pejabatId && values.pejabatId !== "__none__"
+              ? parseInt(values.pejabatId)
+              : undefined,
+          divisiId:
+            values.divisiId && values.divisiId !== "__none__"
+              ? parseInt(values.divisiId)
+              : undefined,
+          tujuanAlamat: values.tujuanAlamat || undefined,
+          isiSingkat: values.isiSingkat || undefined,
+          lampiranUrl: uploadedLampiranUrl,
+          fileDraftUrl: uploadedDraftUrl,
+        };
+
+        const res =
+          mode === "edit" && initialData
+            ? await updateSuratKeluar({ ...payload, id: initialData.id })
+            : await createSuratKeluar(payload);
+
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success(
+          mode === "edit" ? "Surat keluar diperbarui." : "Surat keluar dibuat.",
+        );
+        router.refresh();
+        onOpenChange(false);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Upload surat keluar gagal.",
+        );
       }
-
-      const payload = {
-        ...values,
-        pejabatId:
-          values.pejabatId && values.pejabatId !== "__none__"
-            ? parseInt(values.pejabatId)
-            : undefined,
-        divisiId:
-          values.divisiId && values.divisiId !== "__none__"
-            ? parseInt(values.divisiId)
-            : undefined,
-        tujuanAlamat: values.tujuanAlamat || undefined,
-        isiSingkat: values.isiSingkat || undefined,
-        lampiranUrl: uploadedLampiranUrl,
-        fileDraftUrl: uploadedDraftUrl,
-      };
-
-      const res =
-        mode === "edit" && initialData
-          ? await updateSuratKeluar({ ...payload, id: initialData.id })
-          : await createSuratKeluar(payload);
-
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success(
-        mode === "edit" ? "Surat keluar diperbarui." : "Surat keluar dibuat.",
-      );
-      router.refresh();
-      onOpenChange(false);
     });
   }
 

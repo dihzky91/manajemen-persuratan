@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Eye, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
   type SuratMasukRow,
 } from "@/server/actions/suratMasuk";
 import { formatTanggalPendek } from "@/lib/utils";
+import { exportRowsToCsv } from "@/lib/csv";
 import { SuratMasukDetailWorkspace, JENIS_SURAT_LABEL, StatusBadge } from "./SuratMasukDetailWorkspace";
 import { SuratMasukForm } from "./SuratMasukForm";
 import type {
@@ -242,6 +243,28 @@ export function SuratMasukManager({
     });
   }
 
+  function handleExportCsv() {
+    exportRowsToCsv(
+      initialData.map((row) => ({
+        nomor_agenda: row.nomorAgenda ?? "",
+        nomor_surat_asal: row.nomorSuratAsal ?? "",
+        perihal: row.perihal,
+        pengirim: row.pengirim,
+        pengirim_alamat: row.pengirimAlamat ?? "",
+        tanggal_surat: row.tanggalSurat,
+        tanggal_diterima: row.tanggalDiterima,
+        jenis_surat: JENIS_SURAT_LABEL[row.jenisSurat] ?? row.jenisSurat,
+        status: row.status ?? "",
+        isi_singkat: row.isiSingkat ?? "",
+        file_url: row.fileUrl ?? "",
+        dicatat_oleh: row.dicatatOlehNama ?? "",
+        jumlah_disposisi: timelineBySuratId[row.id]?.length ?? 0,
+      })),
+      "arsip-surat-masuk.csv",
+    );
+    toast.success("CSV surat masuk berhasil diexport.");
+  }
+
   const processedCount = initialData.filter((item) => item.status === "diproses").length;
   const archivedCount = initialData.filter((item) => item.status === "diarsip").length;
 
@@ -284,11 +307,22 @@ export function SuratMasukManager({
                 </CardDescription>
               </div>
               {canManage ? (
-                <Button onClick={() => setFormState({ open: true, mode: "create" })}>
-                  <Plus className="h-4 w-4" />
-                  Input Surat Masuk
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={handleExportCsv}>
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </Button>
+                  <Button onClick={() => setFormState({ open: true, mode: "create" })}>
+                    <Plus className="h-4 w-4" />
+                    Input Surat Masuk
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="outline" onClick={handleExportCsv}>
+                  <Download className="h-4 w-4" />
+                  Export CSV
                 </Button>
-              ) : null}
+              )}
             </div>
           </CardHeader>
           <CardContent className="pt-6">

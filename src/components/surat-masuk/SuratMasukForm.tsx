@@ -39,6 +39,7 @@ import {
   type SuratMasukRow,
 } from "@/server/actions/suratMasuk";
 import { optionalFileUrlSchema } from "@/lib/validators/fileUrl";
+import { getTodayIsoInJakarta } from "@/lib/utils";
 
 const JENIS_SURAT = [
   { value: "undangan", label: "Undangan" },
@@ -78,7 +79,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 function todayISO() {
-  return new Date().toISOString().split("T")[0]!;
+  return getTodayIsoInJakarta();
 }
 
 interface SuratMasukFormProps {
@@ -151,53 +152,59 @@ export function SuratMasukForm({
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
-      let uploadedFileUrl = values.fileUrl || undefined;
+      try {
+        let uploadedFileUrl = values.fileUrl || undefined;
 
-      if (selectedFile) {
-        const dataUrl = await fileToDataUrl(selectedFile);
-        const uploadResult = await uploadSuratMasukFile({
-          fileName: selectedFile.name,
-          contentType: selectedFile.type || "application/octet-stream",
-          dataUrl,
-        });
+        if (selectedFile) {
+          const dataUrl = await fileToDataUrl(selectedFile);
+          const uploadResult = await uploadSuratMasukFile({
+            fileName: selectedFile.name,
+            contentType: selectedFile.type || "application/octet-stream",
+            dataUrl,
+          });
 
-        if (!uploadResult.ok) {
-          toast.error("Upload file surat masuk gagal.");
+          if (!uploadResult.ok) {
+            toast.error("Upload file surat masuk gagal.");
+            return;
+          }
+
+          uploadedFileUrl = uploadResult.data.url;
+        }
+
+        const payload = {
+          ...values,
+          nomorAgenda: values.nomorAgenda || undefined,
+          nomorSuratAsal: values.nomorSuratAsal || undefined,
+          pengirimAlamat: values.pengirimAlamat || undefined,
+          isiSingkat: values.isiSingkat || undefined,
+          fileUrl: uploadedFileUrl,
+        };
+
+        const result =
+          mode === "edit" && initialData
+            ? await updateSuratMasuk({ ...payload, id: initialData.id })
+            : await createSuratMasuk(payload);
+
+        if (!result.ok) {
+          toast.error(result.error);
           return;
         }
 
-        uploadedFileUrl = uploadResult.data.url;
+        toast.success(
+          mode === "edit" ? "Surat masuk diperbarui." : "Surat masuk dicatat.",
+        );
+        onSuccess?.(
+          mode === "edit" && initialData
+            ? { ...initialData, ...result.data }
+            : (result.data as SuratMasukRow),
+        );
+        router.refresh();
+        onOpenChange(false);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Upload file surat masuk gagal.",
+        );
       }
-
-      const payload = {
-        ...values,
-        nomorAgenda: values.nomorAgenda || undefined,
-        nomorSuratAsal: values.nomorSuratAsal || undefined,
-        pengirimAlamat: values.pengirimAlamat || undefined,
-        isiSingkat: values.isiSingkat || undefined,
-        fileUrl: uploadedFileUrl,
-      };
-
-      const result =
-        mode === "edit" && initialData
-          ? await updateSuratMasuk({ ...payload, id: initialData.id })
-          : await createSuratMasuk(payload);
-
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-
-      toast.success(
-        mode === "edit" ? "Surat masuk diperbarui." : "Surat masuk dicatat.",
-      );
-      onSuccess?.(
-        mode === "edit" && initialData
-          ? { ...initialData, ...result.data }
-          : (result.data as SuratMasukRow),
-      );
-      router.refresh();
-      onOpenChange(false);
     });
   }
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatTanggalLengkapJakarta } from "@/lib/utils";
 import {
   getNavigationItem,
   getPhaseMeta,
@@ -15,13 +16,7 @@ export function Header({ userName }: { userName?: string | null }) {
   const currentItem = getNavigationItem(pathname);
   const phaseMeta = getPhaseMeta(pathname);
   const todayLabel = useMemo(
-    () =>
-      new Intl.DateTimeFormat("id-ID", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      }).format(new Date()),
+    () => formatTanggalLengkapJakarta(new Date()),
     [],
   );
 

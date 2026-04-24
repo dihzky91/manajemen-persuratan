@@ -19,7 +19,12 @@ import {
   updateStatusDisposisi,
   type DisposisiTimelineRow,
 } from "@/server/actions/disposisi";
-import { cn, formatTanggal, formatTanggalPendek } from "@/lib/utils";
+import {
+  cn,
+  formatTanggal,
+  formatTanggalPendek,
+  getTodayIsoInJakarta,
+} from "@/lib/utils";
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   belum_dibaca: {
@@ -74,7 +79,7 @@ export function DisposisiInbox({
     setLocalItems(items);
   }, [items]);
 
-  const todayKey = new Date().toISOString().split("T")[0]!;
+  const todayKey = getTodayIsoInJakarta();
   const filteredItems = useMemo(() => {
     switch (activeFilter) {
       case "belum_dibaca":
