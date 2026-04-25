@@ -158,8 +158,19 @@ export function PegawaiForm({
       }
 
       try {
-        await createPegawai(payload);
-        toast.success("Pegawai berhasil ditambahkan.");
+        const result = await createPegawai(payload);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+
+        if (result.inviteSent) {
+          toast.success("Pegawai dibuat. Email aktivasi telah dikirim.");
+        } else {
+          toast.warning(
+            "Pegawai dibuat, namun email aktivasi gagal terkirim. Periksa konfigurasi email atau kirim ulang.",
+          );
+        }
         onOpenChange(false);
       } catch (error) {
         const message =

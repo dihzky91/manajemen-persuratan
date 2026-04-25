@@ -46,6 +46,62 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
     });
 }
 
+// Template: undangan aktivasi akun untuk pegawai baru (set kata sandi pertama).
+export function buildInviteEmail(args: {
+  namaLengkap: string;
+  resetUrl: string;
+  inviterName?: string | null;
+}): Pick<EmailPayload, "subject" | "htmlBody" | "textBody"> {
+  const subject = "Undangan Aktivasi Akun — Manajemen Surat IAI Jakarta";
+  const inviterLine = args.inviterName
+    ? `<p>Akun Anda dibuat oleh <strong>${args.inviterName}</strong>.</p>`
+    : "";
+  const htmlBody = `
+    <p>Yth. ${args.namaLengkap},</p>
+    <p>Selamat datang di Sistem Manajemen Surat IAI Wilayah DKI Jakarta.</p>
+    ${inviterLine}
+    <p>Silakan klik tombol di bawah untuk membuat kata sandi dan mengaktifkan akun Anda. Tautan ini berlaku terbatas (default 1 jam).</p>
+    <p><a href="${args.resetUrl}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;border-radius:6px;text-decoration:none">Aktivasi Akun</a></p>
+    <p>Jika tombol tidak berfungsi, salin URL berikut: <br/><a href="${args.resetUrl}">${args.resetUrl}</a></p>
+    <p>Jika Anda tidak meminta akses ini, abaikan email ini.</p>
+    <p>— Sistem Manajemen Surat IAI Wilayah DKI Jakarta</p>
+  `;
+  const textBody = [
+    `Yth. ${args.namaLengkap},`,
+    `Selamat datang di Sistem Manajemen Surat IAI Wilayah DKI Jakarta.`,
+    args.inviterName ? `Akun Anda dibuat oleh ${args.inviterName}.` : "",
+    `Aktivasi akun: ${args.resetUrl}`,
+    `Jika Anda tidak meminta akses, abaikan email ini.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return { subject, htmlBody, textBody };
+}
+
+// Template: permintaan reset kata sandi (untuk user existing).
+export function buildResetPasswordEmail(args: {
+  namaLengkap: string;
+  resetUrl: string;
+}): Pick<EmailPayload, "subject" | "htmlBody" | "textBody"> {
+  const subject = "Reset Kata Sandi — Manajemen Surat IAI Jakarta";
+  const htmlBody = `
+    <p>Yth. ${args.namaLengkap},</p>
+    <p>Kami menerima permintaan reset kata sandi untuk akun Anda.</p>
+    <p>Klik tombol di bawah untuk mengatur kata sandi baru. Tautan ini berlaku terbatas (default 1 jam).</p>
+    <p><a href="${args.resetUrl}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;border-radius:6px;text-decoration:none">Reset Kata Sandi</a></p>
+    <p>Jika tombol tidak berfungsi, salin URL berikut: <br/><a href="${args.resetUrl}">${args.resetUrl}</a></p>
+    <p>Jika Anda tidak meminta reset, abaikan email ini — kata sandi Anda tetap aman.</p>
+    <p>— Sistem Manajemen Surat IAI Wilayah DKI Jakarta</p>
+  `;
+  const textBody = [
+    `Yth. ${args.namaLengkap},`,
+    `Kami menerima permintaan reset kata sandi untuk akun Anda.`,
+    `Reset: ${args.resetUrl}`,
+    `Jika Anda tidak meminta reset, abaikan email ini.`,
+  ].join("\n");
+  return { subject, htmlBody, textBody };
+}
+
 // Template: notifikasi disposisi baru ke penerima.
 export function buildDisposisiEmail(args: {
   penerimaNama: string;

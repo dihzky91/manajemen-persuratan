@@ -5,6 +5,11 @@ const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD");
 
+// users.id adalah text. Better Auth v1.x men-generate nanoid (~32 char).
+// createPegawai memakai crypto.randomUUID. Jadi pola string-nya bisa
+// bercampur — pakai .min(1) saja agar kompatibel dengan kedua format.
+const userId = z.string().min(1);
+
 export const pegawaiCreateSchema = z.object({
   namaLengkap: z.string().min(1),
   email: z.string().email(),
@@ -19,16 +24,16 @@ export const pegawaiCreateSchema = z.object({
 });
 
 export const pegawaiUpdateSchema = pegawaiCreateSchema.extend({
-  id: z.string().uuid(),
+  id: userId,
   isActive: z.boolean().optional(),
 });
 
 export const pegawaiDeleteSchema = z.object({
-  id: z.string().uuid(),
+  id: userId,
 });
 
 export const biodataSchema = z.object({
-  userId: z.string().uuid(),
+  userId,
   noKtp: z.string().optional(),
   gender: z.enum(genderEnum.enumValues).optional(),
   statusPernikahan: z.enum(statusPernikahanEnum.enumValues).optional(),
@@ -44,7 +49,7 @@ export const biodataSchema = z.object({
 // ─── Keluarga ────────────────────────────────────────────────────────────────
 
 export const keluargaCreateSchema = z.object({
-  userId: z.string().uuid(),
+  userId,
   hubungan: z.string().optional(),
   namaAnggota: z.string().min(1, "Nama anggota wajib diisi"),
   tempatLahir: z.string().optional(),
@@ -58,13 +63,13 @@ export const keluargaUpdateSchema = keluargaCreateSchema.extend({
 
 export const keluargaDeleteSchema = z.object({
   id: z.number().int().positive(),
-  userId: z.string().uuid(),
+  userId,
 });
 
 // ─── Pendidikan ──────────────────────────────────────────────────────────────
 
 export const pendidikanCreateSchema = z.object({
-  userId: z.string().uuid(),
+  userId,
   jenjang: z.string().optional(),
   namaInstitusi: z.string().optional(),
   jurusan: z.string().optional(),
@@ -78,13 +83,13 @@ export const pendidikanUpdateSchema = pendidikanCreateSchema.extend({
 
 export const pendidikanDeleteSchema = z.object({
   id: z.number().int().positive(),
-  userId: z.string().uuid(),
+  userId,
 });
 
 // ─── Pekerjaan ───────────────────────────────────────────────────────────────
 
 export const pekerjaanCreateSchema = z.object({
-  userId: z.string().uuid(),
+  userId,
   namaPerusahaan: z.string().optional(),
   jabatan: z.string().optional(),
   tanggalMulai: isoDate.optional(),
@@ -98,13 +103,13 @@ export const pekerjaanUpdateSchema = pekerjaanCreateSchema.extend({
 
 export const pekerjaanDeleteSchema = z.object({
   id: z.number().int().positive(),
-  userId: z.string().uuid(),
+  userId,
 });
 
 // ─── Kesehatan ───────────────────────────────────────────────────────────────
 
 export const kesehatanSchema = z.object({
-  userId: z.string().uuid(),
+  userId,
   golonganDarah: z.string().optional(),
   tinggiBadan: z.coerce.number().int().min(0).max(300).optional(),
   beratBadan: z.coerce.number().int().min(0).max(500).optional(),
@@ -116,7 +121,7 @@ export const kesehatanSchema = z.object({
 // ─── Kelengkapan ─────────────────────────────────────────────────────────────
 
 export const kelengkapanSchema = z.object({
-  userId: z.string().uuid(),
+  userId,
   fotoUrl: z.string().optional(),
   ktpUrl: z.string().optional(),
   npwpUrl: z.string().optional(),
@@ -128,7 +133,7 @@ export const kelengkapanSchema = z.object({
 // ─── Integritas ──────────────────────────────────────────────────────────────
 
 export const integritasSchema = z.object({
-  userId: z.string().uuid(),
+  userId,
   tanggalPernyataan: isoDate.optional(),
   statusTandaTangan: z.boolean().optional(),
   catatan: z.string().optional(),

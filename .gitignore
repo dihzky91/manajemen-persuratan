@@ -19,5 +19,9 @@ dist
 # Testing
 coverage
 
+# Local upload storage (di-serve via /api/files dengan auth).
+# Default STORAGE_LOCAL_DIR=./storage/uploads di luar ./public.
+storage/
+
 # TypeScript incremental build cache
 *.tsbuildinfo

@@ -1,2 +1,2 @@
 ALTER TABLE "surat_keluar"
-ADD COLUMN "catatan_reviu_at" timestamp;
+ADD COLUMN IF NOT EXISTS "catatan_reviu_at" timestamp;

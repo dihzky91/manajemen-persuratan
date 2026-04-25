@@ -17,7 +17,7 @@ Semua modul ditujukan untuk penggunaan **internal organisasi**, dengan pengecual
 
 ## Status
 
-Proyek saat ini sudah masuk **Phase 4**.
+Proyek saat ini sudah berada pada tahap **operasional aktif**. Modul utama sudah tersedia; pekerjaan tersisa berfokus pada validasi storage, polish, deploy, dan hardening akhir.
 
 Yang sudah aktif:
 
@@ -34,11 +34,13 @@ Yang sudah aktif:
 - modul surat keputusan
 - modul surat MOU
 - export CSV arsip
+- bulk nomor surat
 
 Yang belum selesai:
 
 - integrasi Cloudinary
-- bulk nomor surat
+- validasi end-to-end seluruh skenario upload file
+- polish, RBAC menyeluruh, deploy, dan uji E2E final
 
 Dokumen arsitektur lengkap tersedia di [SYSTEM.md](./SYSTEM.md).
 

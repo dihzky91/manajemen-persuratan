@@ -428,6 +428,19 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ─── SYSTEM SETTINGS ─────────────────────────────────────────────────────────
+// Singleton row — aplikasi hanya punya satu baris konfigurasi identitas sistem.
+
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  namaSistem: varchar("nama_sistem", { length: 200 }).notNull().default("IAI Jakarta"),
+  singkatan: varchar("singkatan", { length: 20 }),
+  logoUrl: text("logo_url"),
+  faviconUrl: text("favicon_url"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: text("updated_by").references(() => users.id),
+});
+
 // ─── TYPE EXPORTS ────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -443,3 +456,4 @@ export type SuratKeputusan = typeof suratKeputusan.$inferSelect;
 export type SuratMou = typeof suratMou.$inferSelect;
 export type NomorSuratCounter = typeof nomorSuratCounter.$inferSelect;
 export type AuditLog = typeof auditLog.$inferSelect;
+export type SystemSettings = typeof systemSettings.$inferSelect;

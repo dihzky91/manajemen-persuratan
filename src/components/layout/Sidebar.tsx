@@ -7,22 +7,48 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   getNavigationItem,
-  getPhaseMeta,
   navigationSections,
+  type NavRole,
 } from "@/components/layout/navigation";
 
-export function Sidebar({ unreadDisposisiCount = 0 }: { unreadDisposisiCount?: number }) {
+interface SidebarProps {
+  unreadDisposisiCount?: number;
+  systemIdentity?: { namaSistem: string; logoUrl: string | null };
+  userRole?: NavRole | null;
+}
+
+export function Sidebar({ unreadDisposisiCount = 0, systemIdentity, userRole }: SidebarProps) {
   const pathname = usePathname();
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || "IAI Jakarta";
+  const appName = systemIdentity?.namaSistem ?? process.env.NEXT_PUBLIC_APP_NAME ?? "IAI Jakarta";
   const activeItem = getNavigationItem(pathname);
-  const phaseMeta = getPhaseMeta(pathname);
+
+  // Filter section + item berdasarkan role
+  const visibleSections = navigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) =>
+          !item.allowedRoles ||
+          (userRole && item.allowedRoles.includes(userRole)),
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside className="w-full border-b border-border bg-card lg:min-h-screen lg:w-80 lg:border-r lg:border-b-0">
       <div className="border-b border-border px-5 py-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-            <Landmark className="h-5 w-5" />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-sm">
+            {systemIdentity?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={systemIdentity.logoUrl}
+                alt={appName}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <Landmark className="h-5 w-5" />
+            )}
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-foreground">{appName}</p>
@@ -31,23 +57,13 @@ export function Sidebar({ unreadDisposisiCount = 0 }: { unreadDisposisiCount?: n
             </p>
           </div>
         </div>
-
-        <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3">
-          <p className="text-xs font-semibold tracking-[0.22em] text-muted-foreground uppercase">
-            Phase Aktif
-          </p>
-          <p className="mt-2 text-sm font-medium text-foreground">{phaseMeta.title}</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {phaseMeta.description}
-          </p>
-        </div>
       </div>
 
       <nav className="overflow-x-auto px-3 py-4 lg:flex-1 lg:overflow-y-auto lg:overflow-x-hidden">
         <div className="flex gap-4 lg:block lg:space-y-6">
-          {navigationSections.map((section) => (
+          {visibleSections.map((section) => (
             <section key={section.title} className="min-w-64 lg:min-w-0">
-              <p className="px-3 text-[11px] font-semibold tracking-[0.22em] text-muted-foreground uppercase">
+              <p className="px-3 text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                 {section.title}
               </p>
               <ul className="mt-2 space-y-1">
@@ -60,8 +76,8 @@ export function Sidebar({ unreadDisposisiCount = 0 }: { unreadDisposisiCount?: n
                         <div className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-sm text-muted-foreground opacity-90">
                           <item.icon className="h-4 w-4" />
                           <span className="flex-1">{item.label}</span>
-                          <Badge variant="outline" className="rounded-full text-[10px]">
-                            {item.phase}
+                          <Badge variant="outline" className="rounded-full text-xs">
+                            {item.statusLabel ?? "Nonaktif"}
                           </Badge>
                           <LockKeyhole className="h-3.5 w-3.5" />
                         </div>

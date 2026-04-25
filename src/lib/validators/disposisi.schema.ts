@@ -6,7 +6,7 @@ const isoDate = z
 
 export const disposisiCreateSchema = z.object({
   suratMasukId: z.string().uuid(),
-  kepadaUserId: z.string().uuid(),
+  kepadaUserId: z.string().min(1),
   catatan: z.string().optional(),
   instruksi: z.string().optional(),
   batasWaktu: isoDate.optional(),

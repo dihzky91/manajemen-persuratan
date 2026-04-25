@@ -180,20 +180,17 @@ export async function createDisposisi(data: unknown) {
 
   await markSuratMasukDiproses([parsed.suratMasukId]);
 
-  const [penerima] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, parsed.kepadaUserId));
-  const [surat] = await db
-    .select()
-    .from(suratMasuk)
-    .where(eq(suratMasuk.id, parsed.suratMasukId));
+  const [[penerima], [surat], [pengirim]] = await Promise.all([
+    db.select().from(users).where(eq(users.id, parsed.kepadaUserId)),
+    db.select().from(suratMasuk).where(eq(suratMasuk.id, parsed.suratMasukId)),
+    db.select({ namaLengkap: users.namaLengkap }).from(users).where(eq(users.id, session.user.id as string)),
+  ]);
 
   if (penerima && surat) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
     const email = buildDisposisiEmail({
       penerimaNama: penerima.namaLengkap,
-      pengirimNama: session.user.name ?? "Pengirim",
+      pengirimNama: pengirim?.namaLengkap ?? "Pengirim",
       perihalSurat: surat.perihal,
       instruksi: parsed.instruksi ?? null,
       batasWaktu: parsed.batasWaktu ?? null,
@@ -239,6 +236,14 @@ export async function updateStatusDisposisi(data: unknown) {
   if (!row) {
     return { ok: false as const, error: "Disposisi tidak ditemukan." };
   }
+
+  await db.insert(auditLog).values({
+    userId: session.user.id as string,
+    aksi: "UPDATE_STATUS_DISPOSISI",
+    entitasType: "disposisi",
+    entitasId: parsed.id,
+    detail: { status: parsed.status },
+  });
 
   revalidatePath("/surat-masuk");
   revalidatePath("/disposisi");

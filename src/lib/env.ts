@@ -27,8 +27,9 @@ export const env = {
   STORAGE_ENV_PREFIX:
     readEnvOptional("STORAGE_ENV_PREFIX") ||
     (process.env.NODE_ENV === "production" ? "prod" : "dev"),
-  STORAGE_LOCAL_DIR: readEnv("STORAGE_LOCAL_DIR") || "./public/uploads",
-  STORAGE_PUBLIC_BASE_URL: readEnv("STORAGE_PUBLIC_BASE_URL") || "/uploads",
+  // Jangan pakai folder di bawah ./public — file harus di-serve lewat Route Handler beretentikasi.
+  STORAGE_LOCAL_DIR: readEnv("STORAGE_LOCAL_DIR") || "./storage/uploads",
+  STORAGE_PUBLIC_BASE_URL: readEnv("STORAGE_PUBLIC_BASE_URL") || "/api/files",
   STORAGE_MAX_FILE_MB: Number(readEnvOptional("STORAGE_MAX_FILE_MB") || "10"),
   STORAGE_ALLOWED_MIME_TYPES:
     readEnvOptional("STORAGE_ALLOWED_MIME_TYPES") ||

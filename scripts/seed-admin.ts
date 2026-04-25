@@ -2,10 +2,42 @@
  * Seed script: buat akun admin pertama.
  * Jalankan: npx dotenv-cli -e .env.local -- npx tsx scripts/seed-admin.ts
  */
-import { auth } from "../src/server/auth";
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../src/server/db";
-import { users } from "../src/server/db/schema";
+import {
+  users,
+  session as sessionTable,
+  account as accountTable,
+  verification as verificationTable,
+} from "../src/server/db/schema";
 import { eq } from "drizzle-orm";
+
+// Parallel auth instance khusus seed: signup TIDAK di-disable agar admin pertama
+// bisa dibuat. Auth instance yang dipakai aplikasi (src/server/auth.ts) tetap
+// punya `disableSignUp: true`.
+const seedAuth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user: users,
+      session: sessionTable,
+      account: accountTable,
+      verification: verificationTable,
+    },
+    usePlural: false,
+  }),
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: process.env.BETTER_AUTH_URL,
+  generateId: () => crypto.randomUUID(),
+  emailAndPassword: {
+    enabled: true,
+    autoSignIn: false,
+  },
+  user: {
+    fields: { name: "namaLengkap" },
+  },
+});
 
 const ADMIN_EMAIL = "admin@iaijakarta.or.id";
 const ADMIN_PASSWORD = "141Jakarta";
@@ -15,7 +47,7 @@ async function main() {
   console.log("🌱 Membuat akun admin...");
 
   try {
-    const result = await auth.api.signUpEmail({
+    const result = await seedAuth.api.signUpEmail({
       body: {
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import {
   users,
+  account,
   pegawaiBiodata,
   pegawaiKeluarga,
   pegawaiKelengkapan,
@@ -15,6 +16,8 @@ import {
   divisi,
   auditLog,
 } from "@/server/db/schema";
+import { auth } from "@/server/auth";
+import { env } from "@/lib/env";
 import {
   pegawaiCreateSchema,
   pegawaiUpdateSchema,
@@ -115,21 +118,77 @@ export async function getPegawaiById(id: string) {
   return { user: user ?? null, biodata: biodata ?? null };
 }
 
+// Sentinel placeholder untuk kolom account.password sebelum user mengaktivasi.
+// Sengaja BUKAN format hash valid sehingga semua percobaan sign-in akan gagal
+// sampai user men-set kata sandi via email aktivasi.
+const PENDING_INVITE_PASSWORD = "PENDING_INVITE";
+
 export async function createPegawai(data: unknown) {
   const parsed = pegawaiCreateSchema.parse(data);
   const session = await requireRole(["admin"]);
-  const [row] = await db.insert(users).values({ id: crypto.randomUUID(), ...parsed }).returning();
+
+  // Pastikan email belum dipakai (selain unique constraint DB).
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, parsed.email))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return {
+      ok: false as const,
+      error: "Email tersebut sudah dipakai oleh pegawai lain.",
+    };
+  }
+
+  // 1. Buat user row (data domain pegawai + identity Better Auth).
+  const userId = crypto.randomUUID();
+  const [row] = await db
+    .insert(users)
+    .values({ id: userId, ...parsed })
+    .returning();
+
+  // 2. Buat account row dengan password placeholder. User wajib reset via email
+  //    sebelum bisa login. Ini memungkinkan auth.api.requestPasswordReset
+  //    menemukan akun credential terkait email tsb.
+  await db.insert(account).values({
+    id: crypto.randomUUID(),
+    accountId: userId,
+    providerId: "credential",
+    userId,
+    password: PENDING_INVITE_PASSWORD,
+  });
+
+  // 3. Trigger email aktivasi via Better Auth → callback sendResetPassword di auth.ts.
+  //    Tanda `?invite=1` membantu callback memilih template "undangan" alih-alih "reset".
+  let inviteSent = true;
+  try {
+    await auth.api.requestPasswordReset({
+      body: {
+        email: parsed.email,
+        redirectTo: `${env.BETTER_AUTH_URL}/reset-password?invite=1`,
+      },
+    });
+  } catch (err) {
+    inviteSent = false;
+    console.error("[createPegawai] Gagal kirim invite email:", err);
+    // Tidak rollback — admin bisa retry kirim ulang dari menu (TODO: resendInvite).
+  }
 
   await db.insert(auditLog).values({
     userId: session.user.id as string,
     aksi: "CREATE_PEGAWAI",
     entitasType: "users",
     entitasId: row!.id,
-    detail: { email: parsed.email, namaLengkap: parsed.namaLengkap },
+    detail: {
+      email: parsed.email,
+      namaLengkap: parsed.namaLengkap,
+      inviteSent,
+    },
   });
 
   revalidatePath("/pegawai");
-  return row!;
+  return { ok: true as const, data: row!, inviteSent };
 }
 
 export async function updatePegawai(data: unknown) {

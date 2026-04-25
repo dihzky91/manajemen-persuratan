@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import { getSystemSettings } from "@/server/actions/systemSettings";
 import "@/styles/globals.css";
 
-export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_APP_NAME ?? "Manajemen Surat IAI Jakarta",
-  description: "Sistem Manajemen Surat & Kepegawaian IAI Wilayah DKI Jakarta",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSystemSettings();
+  return {
+    title: settings.namaSistem,
+    description: "Sistem Manajemen Surat & Kepegawaian IAI Wilayah DKI Jakarta",
+    ...(settings.faviconUrl && {
+      icons: { icon: settings.faviconUrl },
+    }),
+  };
+}
 
 export default function RootLayout({
   children,

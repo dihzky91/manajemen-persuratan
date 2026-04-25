@@ -65,8 +65,10 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
 
 export function DisposisiInbox({
   items,
+  canCreateDisposisi = false,
 }: {
   items: DisposisiTimelineRow[];
+  canCreateDisposisi?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();

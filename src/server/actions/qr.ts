@@ -11,7 +11,7 @@ import {
 } from "@/lib/qr/generateQR";
 import { requireRole, requireSession } from "./auth";
 
-const qrContactSchema = z.object({ userId: z.string().uuid() });
+const qrContactSchema = z.object({ userId: z.string().min(1) });
 
 // Generate QR vCard untuk pegawai.
 export async function generateQRContact(input: unknown) {

@@ -7,26 +7,24 @@ import {
   LayoutDashboard,
   Mail,
   Send,
+  Settings,
+  ShieldCheck,
   UserCog,
   Users,
   type LucideIcon,
 } from "lucide-react";
+
+export type NavRole = "admin" | "staff" | "pejabat" | "viewer";
 
 export interface NavigationItem {
   href: string;
   label: string;
   icon: LucideIcon;
   active: boolean;
-  phase?: string;
+  statusLabel?: string;
+  /** Jika diset, hanya role yang terdaftar di sini yang akan melihat item ini. */
+  allowedRoles?: NavRole[];
 }
-
-export interface PhaseMeta {
-  badge: string;
-  title: string;
-  description: string;
-}
-
-type PhaseKey = "Phase 1" | "Phase 2" | "Phase 3" | "Phase 4" | "Phase 5";
 
 export interface NavigationSection {
   title: string;
@@ -42,7 +40,6 @@ export const navigationSections: NavigationSection[] = [
         label: "Dashboard",
         icon: LayoutDashboard,
         active: true,
-        phase: "Phase 1",
       },
     ],
   },
@@ -54,14 +51,14 @@ export const navigationSections: NavigationSection[] = [
         label: "Pegawai",
         icon: Users,
         active: true,
-        phase: "Phase 1",
+        allowedRoles: ["admin"],
       },
       {
         href: "/divisi",
         label: "Divisi",
         icon: Building2,
         active: true,
-        phase: "Phase 1",
+        allowedRoles: ["admin"],
       },
     ],
   },
@@ -73,54 +70,66 @@ export const navigationSections: NavigationSection[] = [
         label: "Surat Keluar",
         icon: Send,
         active: true,
-        phase: "Phase 2",
+        // semua role yang login bisa lihat arsip
       },
       {
         href: "/surat-masuk",
         label: "Surat Masuk",
         icon: Inbox,
         active: true,
-        phase: "Phase 3",
       },
       {
         href: "/disposisi",
         label: "Disposisi",
         icon: Mail,
         active: true,
-        phase: "Phase 3",
       },
     ],
   },
   {
-    title: "Roadmap",
+    title: "Administrasi",
     items: [
       {
         href: "/surat-keputusan",
         label: "Surat Keputusan",
         icon: FileText,
         active: true,
-        phase: "Phase 4",
+        allowedRoles: ["admin", "pejabat"],
       },
       {
         href: "/surat-mou",
         label: "Surat MOU",
         icon: FileSignature,
         active: true,
-        phase: "Phase 4",
+        allowedRoles: ["admin", "pejabat"],
       },
       {
         href: "/nomor-surat",
         label: "Nomor Surat",
         icon: Hash,
         active: true,
-        phase: "Phase 4",
+        allowedRoles: ["admin", "pejabat"],
       },
       {
         href: "/pejabat",
         label: "Pejabat",
         icon: UserCog,
         active: true,
-        phase: "Phase 4",
+        allowedRoles: ["admin"],
+      },
+      {
+        href: "/pengaturan",
+        label: "Pengaturan",
+        icon: Settings,
+        active: true,
+        allowedRoles: ["admin"],
+      },
+      {
+        href: "/audit-log",
+        label: "Audit Log",
+        icon: ShieldCheck,
+        active: true,
+        allowedRoles: ["admin"],
       },
     ],
   },
@@ -132,43 +141,4 @@ export function getNavigationItem(pathname: string) {
   return navigationItems.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
-}
-
-const phaseMetaMap: Record<PhaseKey, PhaseMeta> = {
-  "Phase 1": {
-    badge: "Phase 1",
-    title: "Foundation",
-    description:
-      "Fokus saat ini: shell aplikasi, dashboard, login, Divisi, dan Pegawai.",
-  },
-  "Phase 2": {
-    badge: "Phase 2",
-    title: "Core Surat Keluar",
-    description:
-      "Fokus saat ini: surat keluar, workflow 5 tahap, dan penomoran surat otomatis.",
-  },
-  "Phase 3": {
-    badge: "Phase 3",
-    title: "Surat Masuk dan Disposisi",
-    description:
-      "Fokus saat ini: surat masuk, chain disposisi, inbox pengguna, dan notifikasi terkait.",
-  },
-  "Phase 4": {
-    badge: "Phase 4",
-    title: "QR dan Fitur Lanjutan",
-    description:
-      "Sudah aktif lewat QR surat keluar, verifikasi publik, QR Contact, modul pejabat, nomor surat, Surat Keputusan, dan Surat MOU.",
-  },
-  "Phase 5": {
-    badge: "Phase 5",
-    title: "Polish dan Deploy",
-    description:
-      "Menunggu tahap akhir untuk RBAC menyeluruh, audit log, deploy, dan uji E2E.",
-  },
-};
-
-export function getPhaseMeta(pathname: string): PhaseMeta {
-  const item = getNavigationItem(pathname);
-  const phase = (item?.phase as PhaseKey | undefined) ?? "Phase 1";
-  return phaseMetaMap[phase];
 }

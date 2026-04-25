@@ -9,6 +9,11 @@ import {
   account as accountTable,
   verification as verificationTable,
 } from "./db/schema";
+import {
+  buildInviteEmail,
+  buildResetPasswordEmail,
+  sendEmail,
+} from "@/lib/email/mailjet";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -25,12 +30,39 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
 
-  // Paksa Better Auth pakai UUID — schema kita pakai kolom uuid bukan text
-  generateId: "uuid",
+  generateId: () => crypto.randomUUID(),
 
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
+    disableSignUp: true,
+    minPasswordLength: 8,
+    // Better Auth memanggil callback ini setelah requestPasswordReset.
+    // Dipakai untuk dua skenario:
+    //  - Undangan aktivasi akun pegawai baru (createPegawai)
+    //  - Reset kata sandi user existing (lupa password)
+    sendResetPassword: async ({ user, url }) => {
+      // Better Auth meneruskan querystring callbackURL via param `url`.
+      // Kita arahkan link ke halaman /reset-password agar UX konsisten.
+      const isInvite = url.includes("invite=1");
+      const template = isInvite
+        ? buildInviteEmail({
+            namaLengkap: user.name ?? user.email,
+            resetUrl: url,
+          })
+        : buildResetPasswordEmail({
+            namaLengkap: user.name ?? user.email,
+            resetUrl: url,
+          });
+
+      await sendEmail({
+        to: user.email,
+        toName: user.name ?? undefined,
+        subject: template.subject,
+        htmlBody: template.htmlBody,
+        textBody: template.textBody,
+      });
+    },
   },
 
   session: {

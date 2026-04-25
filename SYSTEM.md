@@ -957,11 +957,13 @@ Catatan status April 2026: Phase 3 selesai dan aktif. Modul surat masuk, halaman
 Catatan status April 2026: Phase 4 telah aktif secara luas. Scope yang sudah berjalan mencakup QR verifikasi surat keluar, preview QR, download QR PNG, aksi `Tempel QR ke PDF & Upload`, checklist pengarsipan yang mensyaratkan nomor surat + QR + file final, route publik verifikasi `/verifikasi/surat-keluar/[id]`, QR Contact pegawai, modul `Pejabat`, modul `Nomor Surat`, modul `Surat Keputusan`, modul `Surat MOU`, bulk nomor surat, export CSV arsip, serta route verifikasi publik untuk SK dan MOU. Storage lokal sudah diverifikasi manual; integrasi Cloudinary masih menunggu verifikasi end-to-end final.
 
 ### Phase 5 â€” Polish & Deploy (Minggu 7â€“8)
-- [ ] RBAC enforcement di semua endpoint
-- [ ] Audit log lengkap
-- [ ] Isi env var setelah nama app + URL diputuskan
+- [x] RBAC enforcement di semua endpoint
+- [x] Audit log lengkap (termasuk updateStatusDisposisi + halaman UI /audit-log)
+- [x] Isi env var — BETTER_AUTH_SECRET sudah diisi nilai kriptografis; nama app + URL sudah diisi untuk dev
 - [ ] Deploy (Vercel atau server IAI)
 - [ ] Testing manual E2E semua alur utama
+
+Catatan status April 2026: RBAC sudah diterapkan di semua server action mutasi via requireRole(). Audit log sekarang mencakup semua modul termasuk updateStatusDisposisi. Halaman UI /audit-log tersedia khusus admin. BETTER_AUTH_SECRET sudah diganti dari placeholder ke nilai kriptografis acak yang benar. Deployment dan testing E2E masih pending.
 
 ---
 

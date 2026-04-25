@@ -10,7 +10,7 @@
   --surface-strong: hsl(216 48% 96%);
 
   --muted: hsl(210 40% 96.1%);
-  --muted-foreground: hsl(215.4 16.3% 46.9%);
+  --muted-foreground: hsl(215.4 16.3% 40%);
 
   --card: hsl(0 0% 100%);
   --card-foreground: hsl(222.2 47.4% 11.2%);
@@ -30,10 +30,10 @@
   --accent: hsl(210 40% 96.1%);
   --accent-foreground: hsl(222.2 47.4% 11.2%);
 
-  --destructive: hsl(0 84.2% 60.2%);
+  --destructive: hsl(0 72.2% 50.6%);
   --destructive-foreground: hsl(210 40% 98%);
 
-  --success: hsl(142.1 70.6% 45.3%);
+  --success: hsl(142.1 71.8% 29.2%);
   --success-foreground: hsl(210 40% 98%);
 
   --warning: hsl(38 92% 50%);
@@ -100,6 +100,8 @@
       linear-gradient(180deg, var(--surface) 0%, var(--background) 24%, var(--background) 100%);
     color: var(--foreground);
     font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
   html {

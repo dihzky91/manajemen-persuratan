@@ -136,6 +136,7 @@ export function PegawaiManager({
       toast.success(`Pegawai "${deleteTarget.namaLengkap}" dihapus.`);
       setDeleteTarget(null);
       setSelectedId(null);
+      router.refresh();
     });
   }
 
@@ -495,7 +496,7 @@ function TabPlaceholder({ title }: { title: string }) {
     <div className="rounded-3xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
       <p className="text-base font-medium text-foreground">Tab {title} sedang disiapkan</p>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Kerangka modul sudah tersedia pada Phase 1 agar struktur 7 tab pegawai tetap konsisten. Form dan daftar rinci pada tab ini dapat dilanjutkan tanpa mengubah layout utama.
+        Kerangka modul sudah tersedia agar struktur 7 tab pegawai tetap konsisten. Form dan daftar rinci pada tab ini dapat dilanjutkan tanpa mengubah layout utama.
       </p>
     </div>
   );
