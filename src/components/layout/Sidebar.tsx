@@ -20,6 +20,7 @@ interface SidebarProps {
 export function Sidebar({ unreadDisposisiCount = 0, systemIdentity, userRole }: SidebarProps) {
   const pathname = usePathname();
   const appName = systemIdentity?.namaSistem ?? process.env.NEXT_PUBLIC_APP_NAME ?? "IAI Jakarta";
+  const logoUrl = systemIdentity?.logoUrl ?? "/iai-logo.png";
   const activeItem = getNavigationItem(pathname);
 
   // Filter section + item berdasarkan role
@@ -39,10 +40,10 @@ export function Sidebar({ unreadDisposisiCount = 0, systemIdentity, userRole }: 
       <div className="border-b border-border px-5 py-5">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-sm">
-            {systemIdentity?.logoUrl ? (
+            {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={systemIdentity.logoUrl}
+                src={logoUrl}
                 alt={appName}
                 className="h-full w-full object-contain"
               />

@@ -10,6 +10,8 @@ import {
   varchar,
   jsonb,
   uniqueIndex,
+  index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // ─── ENUMS ───────────────────────────────────────────────────────────────────
@@ -68,6 +70,14 @@ export const jenisPegawaiEnum = pgEnum("jenis_pegawai", [
   "Kontrak",
   "Magang",
   "Paruh Waktu",
+]);
+
+export const kategoriKegiatanEnum = pgEnum("kategori_kegiatan", [
+  "Workshop",
+  "Brevet AB",
+  "Brevet C",
+  "BFA",
+  "Lainnya",
 ]);
 
 // ─── DIVISI ──────────────────────────────────────────────────────────────────
@@ -437,9 +447,157 @@ export const systemSettings = pgTable("system_settings", {
   singkatan: varchar("singkatan", { length: 20 }),
   logoUrl: text("logo_url"),
   faviconUrl: text("favicon_url"),
+  // Non-secret runtime preferences (admin-editable from UI)
+  defaultDisposisiDeadlineDays: integer("default_disposisi_deadline_days")
+    .default(7)
+    .notNull(),
+  notificationEmailEnabled: boolean("notification_email_enabled")
+    .default(true)
+    .notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: text("updated_by").references(() => users.id),
 });
+
+// ─── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "disposisi_baru",
+  "disposisi_deadline",
+  "surat_keluar_approval",
+  "surat_keluar_revisi",
+  "surat_keluar_selesai",
+  "surat_masuk_baru",
+  "system",
+]);
+
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .references(() => users.id)
+    .notNull(),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  entitasType: varchar("entitas_type", { length: 50 }),
+  entitasId: varchar("entitas_id", { length: 100 }),
+  isRead: boolean("is_read").default(false).notNull(),
+  isEmailSent: boolean("is_email_sent").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  readAt: timestamp("read_at"),
+});
+
+// ─── NOTIFICATION PREFERENCES ──────────────────────────────────────────────────
+// Per-user toggle: untuk tiap tipe notifikasi, user bisa enable/disable in-app & email.
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull()
+    .unique(),
+  // In-app notification toggles
+  inAppDisposisiBaru: boolean("in_app_disposisi_baru").default(true).notNull(),
+  inAppDisposisiDeadline: boolean("in_app_disposisi_deadline").default(true).notNull(),
+  inAppSuratKeluarApproval: boolean("in_app_surat_keluar_approval").default(true).notNull(),
+  inAppSuratKeluarRevisi: boolean("in_app_surat_keluar_revisi").default(true).notNull(),
+  inAppSuratKeluarSelesai: boolean("in_app_surat_keluar_selesai").default(true).notNull(),
+  inAppSuratMasukBaru: boolean("in_app_surat_masuk_baru").default(true).notNull(),
+  // Email notification toggles
+  emailDisposisiBaru: boolean("email_disposisi_baru").default(true).notNull(),
+  emailDisposisiDeadline: boolean("email_disposisi_deadline").default(true).notNull(),
+  emailSuratKeluarApproval: boolean("email_surat_keluar_approval").default(false).notNull(),
+  emailSuratKeluarRevisi: boolean("email_surat_keluar_revisi").default(false).notNull(),
+  emailSuratKeluarSelesai: boolean("email_surat_keluar_selesai").default(false).notNull(),
+  emailSuratMasukBaru: boolean("email_surat_masuk_baru").default(false).notNull(),
+  // Reminder threshold (hari sebelum deadline)
+  deadlineReminderDays: integer("deadline_reminder_days").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── CALENDAR EVENTS ───────────────────────────────────────────────────────────
+
+export const calendarEventTypeEnum = pgEnum("calendar_event_type", [
+  "surat_deadline",
+  "disposisi_deadline",
+  "rapat",
+  "reminder",
+  "other",
+]);
+
+export const calendarEvents = pgTable("calendar_events", {
+  id: text("id").primaryKey(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  eventType: calendarEventTypeEnum("event_type").notNull(),
+  entitasType: varchar("entitas_type", { length: 50 }),
+  entitasId: varchar("entitas_id", { length: 100 }),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  allDay: boolean("all_day").default(false).notNull(),
+  userId: text("user_id").references(() => users.id),
+  isPublic: boolean("is_public").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── SERTIFIKAT & KEGIATAN ───────────────────────────────────────────────────
+
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  namaKegiatan: varchar("nama_kegiatan", { length: 255 }).notNull(),
+  kategori: kategoriKegiatanEnum("kategori").default("Workshop").notNull(),
+  tanggalMulai: date("tanggal_mulai").notNull(),
+  tanggalSelesai: date("tanggal_selesai").notNull(),
+  lokasi: varchar("lokasi", { length: 255 }),
+  skp: varchar("skp", { length: 50 }),
+  keterangan: text("keterangan"),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const signatories = pgTable("signatories", {
+  id: serial("id").primaryKey(),
+  nama: varchar("nama", { length: 255 }).notNull(),
+  jabatan: varchar("jabatan", { length: 255 }),
+  pejabatId: integer("pejabat_id").references(() => pejabatPenandatangan.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventSignatories = pgTable(
+  "event_signatories",
+  {
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    signatoryId: integer("signatory_id")
+      .notNull()
+      .references(() => signatories.id),
+    urutan: integer("urutan").notNull().default(1),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.eventId, t.signatoryId] }),
+  }),
+);
+
+export const participants = pgTable(
+  "participants",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull().unique(),
+    nama: varchar("nama", { length: 255 }).notNull(),
+    role: varchar("role", { length: 50 }).default("Peserta").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => ({
+    eventIdIdx: index("participants_event_id_idx").on(t.eventId),
+  }),
+);
 
 // ─── TYPE EXPORTS ────────────────────────────────────────────────────────────
 
@@ -457,3 +615,17 @@ export type SuratMou = typeof suratMou.$inferSelect;
 export type NomorSuratCounter = typeof nomorSuratCounter.$inferSelect;
 export type AuditLog = typeof auditLog.$inferSelect;
 export type SystemSettings = typeof systemSettings.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type NewCalendarEvent = typeof calendarEvents.$inferInsert;
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type NewNotificationPreferences = typeof notificationPreferences.$inferInsert;
+export type Event = typeof events.$inferSelect;
+export type NewEvent = typeof events.$inferInsert;
+export type Signatory = typeof signatories.$inferSelect;
+export type NewSignatory = typeof signatories.$inferInsert;
+export type EventSignatory = typeof eventSignatories.$inferSelect;
+export type NewEventSignatory = typeof eventSignatories.$inferInsert;
+export type Participant = typeof participants.$inferSelect;
+export type NewParticipant = typeof participants.$inferInsert;

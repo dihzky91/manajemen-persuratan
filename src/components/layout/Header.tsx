@@ -1,13 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTanggalLengkapJakarta } from "@/lib/utils";
 import { getNavigationItem } from "@/components/layout/navigation";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
-export function Header({ userName }: { userName?: string | null }) {
+interface HeaderProps {
+  userName?: string | null;
+  userId?: string;
+}
+
+export function Header({ userName, userId }: HeaderProps) {
+  const [searchOpen, setSearchOpen] = useState(false);
   const pathname = usePathname();
   const currentItem = getNavigationItem(pathname);
   const todayLabel = useMemo(
@@ -36,13 +44,20 @@ export function Header({ userName }: { userName?: string | null }) {
         </div>
 
         <div className="flex items-center justify-between gap-3 sm:justify-end">
-          <p className="text-sm font-medium text-foreground">{userName || "Pengguna"}</p>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-            Keluar
+          <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)}>
+            <Search className="h-5 w-5" />
+          </Button>
+          {userId && <NotificationBell userId={userId} />}
+          <div className="h-6 w-px bg-border mx-1" />
+          <p className="text-sm font-medium text-foreground hidden sm:block">{userName || "Pengguna"}</p>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Keluar</span>
           </Button>
         </div>
       </div>
+
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
   );
 }

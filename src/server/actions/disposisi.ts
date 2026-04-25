@@ -11,6 +11,8 @@ import {
 import { requireRole, requireSession } from "./auth";
 import { sendEmail, buildDisposisiEmail } from "@/lib/email/mailjet";
 import { markSuratMasukDiproses } from "./suratMasuk";
+import { notifyDisposisiBaru, notifyDisposisiDeadline } from "./notifications";
+import { syncDisposisiDeadline } from "./calendar";
 
 export type DisposisiRecipientOption = {
   id: string;
@@ -206,6 +208,26 @@ export async function createDisposisi(data: unknown) {
     entitasId: row!.id,
     detail: { suratMasukId: parsed.suratMasukId, kepada: parsed.kepadaUserId },
   });
+
+  // Send in-app notification
+  if (penerima && surat && pengirim) {
+    await notifyDisposisiBaru(
+      parsed.kepadaUserId,
+      pengirim.namaLengkap ?? "Pengirim",
+      surat.perihal,
+      row!.id
+    );
+  }
+
+  // Sync calendar event for deadline
+  if (parsed.batasWaktu) {
+    await syncDisposisiDeadline(
+      row!.id,
+      surat?.perihal ?? "Disposisi",
+      new Date(parsed.batasWaktu),
+      parsed.kepadaUserId
+    );
+  }
 
   revalidatePath("/surat-masuk");
   revalidatePath("/disposisi");

@@ -22,6 +22,34 @@
       "when": 1777095237373,
       "tag": "0002_nostalgic_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777128570186,
+      "tag": "0003_cold_garia",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777132570186,
+      "tag": "0004_add_notification_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777136000000,
+      "tag": "0005_extend_system_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777136634558,
+      "tag": "0006_late_eternals",
+      "breakpoints": true
     }
   ]
 }
