@@ -16,6 +16,8 @@ export type SystemSettingsRow = {
   singkatan: string | null;
   logoUrl: string | null;
   faviconUrl: string | null;
+  defaultDisposisiDeadlineDays: number;
+  notificationEmailEnabled: boolean;
   updatedAt: Date | null;
 };
 
@@ -23,8 +25,10 @@ const FALLBACK: SystemSettingsRow = {
   id: 0,
   namaSistem: process.env.NEXT_PUBLIC_APP_NAME ?? "IAI Jakarta",
   singkatan: null,
-  logoUrl: null,
+  logoUrl: "/iai-logo.png",
   faviconUrl: null,
+  defaultDisposisiDeadlineDays: 7,
+  notificationEmailEnabled: true,
   updatedAt: null,
 };
 
@@ -39,6 +43,8 @@ export const getSystemSettings = cache(async (): Promise<SystemSettingsRow> => {
         singkatan: systemSettings.singkatan,
         logoUrl: systemSettings.logoUrl,
         faviconUrl: systemSettings.faviconUrl,
+        defaultDisposisiDeadlineDays: systemSettings.defaultDisposisiDeadlineDays,
+        notificationEmailEnabled: systemSettings.notificationEmailEnabled,
         updatedAt: systemSettings.updatedAt,
       })
       .from(systemSettings)
@@ -123,7 +129,10 @@ export async function updateSystemSettings(formData: FormData) {
 
   let rowId: number;
   if (existing.length === 0) {
-    const rows = await db.insert(systemSettings).values(updates).returning({ id: systemSettings.id });
+    const rows = await db
+      .insert(systemSettings)
+      .values({ logoUrl: logoUrl ?? "/iai-logo.png", ...updates })
+      .returning({ id: systemSettings.id });
     rowId = rows[0]!.id;
   } else {
     await db.update(systemSettings).set(updates).where(eq(systemSettings.id, existing[0]!.id));

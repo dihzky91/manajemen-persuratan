@@ -1,0 +1,126 @@
+"use server";
+
+import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { db } from "@/server/db";
+import { users, auditLog } from "@/server/db/schema";
+import { requireSession } from "./auth";
+import { getStorageProvider } from "@/lib/storage";
+import { env } from "@/lib/env";
+
+export type ProfileRow = {
+  id: string;
+  namaLengkap: string;
+  email: string;
+  emailPribadi: string | null;
+  noHp: string | null;
+  jabatan: string | null;
+  avatarUrl: string | null;
+  role: string | null;
+};
+
+export async function getMyProfile(): Promise<ProfileRow | null> {
+  const session = await requireSession();
+  const [row] = await db
+    .select({
+      id: users.id,
+      namaLengkap: users.namaLengkap,
+      email: users.email,
+      emailPribadi: users.emailPribadi,
+      noHp: users.noHp,
+      jabatan: users.jabatan,
+      avatarUrl: users.avatarUrl,
+      role: users.role,
+    })
+    .from(users)
+    .where(eq(users.id, session.user.id as string))
+    .limit(1);
+  return row ?? null;
+}
+
+const profileUpdateSchema = z.object({
+  emailPribadi: z
+    .string()
+    .trim()
+    .email("Email pribadi tidak valid")
+    .optional()
+    .or(z.literal("")),
+  noHp: z
+    .string()
+    .trim()
+    .max(20, "Maksimal 20 karakter")
+    .optional()
+    .or(z.literal("")),
+});
+
+const ALLOWED_AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+export async function updateMyProfile(formData: FormData) {
+  const session = await requireSession();
+
+  const parsed = profileUpdateSchema.safeParse({
+    emailPribadi: formData.get("emailPribadi") ?? "",
+    noHp: formData.get("noHp") ?? "",
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      error: parsed.error.issues[0]?.message ?? "Data tidak valid.",
+    };
+  }
+
+  let avatarUrl: string | undefined;
+  const avatarFile = formData.get("avatar") as File | null;
+  if (avatarFile && avatarFile.size > 0) {
+    if (!ALLOWED_AVATAR_TYPES.includes(avatarFile.type)) {
+      return {
+        ok: false as const,
+        error: "Format avatar tidak didukung. Gunakan PNG, JPG, atau WebP.",
+      };
+    }
+    const maxBytes = env.STORAGE_MAX_FILE_MB * 1024 * 1024;
+    if (avatarFile.size > maxBytes) {
+      return {
+        ok: false as const,
+        error: `Avatar melebihi batas ${env.STORAGE_MAX_FILE_MB} MB.`,
+      };
+    }
+    const storage = getStorageProvider();
+    const result = await storage.upload({
+      body: Buffer.from(await avatarFile.arrayBuffer()),
+      fileName: avatarFile.name,
+      contentType: avatarFile.type,
+      folder: "avatars",
+      publicId: session.user.id as string,
+    });
+    avatarUrl = result.url;
+  }
+
+  await db
+    .update(users)
+    .set({
+      emailPribadi: parsed.data.emailPribadi || null,
+      noHp: parsed.data.noHp || null,
+      ...(avatarUrl !== undefined && { avatarUrl }),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, session.user.id as string));
+
+  await db.insert(auditLog).values({
+    userId: session.user.id as string,
+    aksi: "UPDATE_PROFILE",
+    entitasType: "user",
+    entitasId: session.user.id as string,
+    detail: {
+      emailPribadiChanged: !!parsed.data.emailPribadi,
+      noHpChanged: !!parsed.data.noHp,
+      avatarChanged: !!avatarUrl,
+    },
+  });
+
+  revalidatePath("/pengaturan");
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}

@@ -15,19 +15,22 @@ import { Button } from "@/components/ui/button";
 import { countUnreadDisposisi, inboxDisposisi } from "@/server/actions/disposisi";
 import { listSuratKeluar } from "@/server/actions/suratKeluar";
 import { listSuratMasuk } from "@/server/actions/suratMasuk";
+import { getDashboardStats } from "@/server/actions/statistics";
 import { formatTanggalWaktuJakarta } from "@/lib/utils";
+import { StatsCharts, StatsSummary } from "@/components/dashboard/StatsCharts";
 
 export const metadata: Metadata = {
   title: "Dashboard | Manajemen Surat IAI Jakarta",
 };
 
 export default async function DashboardPage() {
-  const [suratKeluarRows, suratMasukRows, disposisiRows, unreadDisposisiCount] =
+  const [suratKeluarRows, suratMasukRows, disposisiRows, unreadDisposisiCount, stats] =
     await Promise.all([
       listSuratKeluar(),
       listSuratMasuk(),
       inboxDisposisi(),
       countUnreadDisposisi(),
+      getDashboardStats(),
     ]);
 
   const suratMasukBaru = suratMasukRows.filter((row) => row.status === "diterima");
@@ -104,6 +107,9 @@ export default async function DashboardPage() {
           icon={FileText}
         />
       </section>
+
+      <StatsSummary stats={stats} />
+      <StatsCharts stats={stats} />
 
       <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
         <div className="rounded-[24px] border border-border bg-card p-6 shadow-sm">

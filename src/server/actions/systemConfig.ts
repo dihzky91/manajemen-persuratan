@@ -1,0 +1,152 @@
+"use server";
+
+import { eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { db } from "@/server/db";
+import { systemSettings, auditLog } from "@/server/db/schema";
+import { requireRole, requireSession } from "./auth";
+import { sendEmail } from "@/lib/email/mailjet";
+import { getStorageProvider } from "@/lib/storage";
+import { env } from "@/lib/env";
+
+// ─── Update non-secret config (admin only) ────────────────────────────────────
+
+const configSchema = z.object({
+  defaultDisposisiDeadlineDays: z.number().int().min(0).max(365),
+  notificationEmailEnabled: z.boolean(),
+});
+
+export async function updateSystemConfig(input: unknown) {
+  const session = await requireRole(["admin"]);
+
+  const parsed = configSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      error: parsed.error.issues[0]?.message ?? "Data tidak valid.",
+    };
+  }
+
+  const existing = await db
+    .select({ id: systemSettings.id })
+    .from(systemSettings)
+    .limit(1);
+
+  if (existing.length === 0) {
+    await db.insert(systemSettings).values({
+      ...parsed.data,
+      logoUrl: "/iai-logo.png",
+      updatedBy: session.user.id,
+      updatedAt: new Date(),
+    });
+  } else {
+    await db
+      .update(systemSettings)
+      .set({
+        ...parsed.data,
+        updatedBy: session.user.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(systemSettings.id, existing[0]!.id));
+  }
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "UPDATE_SYSTEM_CONFIG",
+    entitasType: "system_settings",
+    entitasId: String(existing[0]?.id ?? "new"),
+    detail: parsed.data,
+  });
+
+  revalidatePath("/pengaturan");
+  return { ok: true as const };
+}
+
+// ─── Test connections (admin only) ────────────────────────────────────────────
+
+export async function testEmailConnection() {
+  const session = await requireRole(["admin"]);
+
+  // Pre-flight check — sendEmail silently returns on missing env, jadi kita
+  // harus cek manual supaya test action tidak false-positive.
+  const missing: string[] = [];
+  if (!env.MAILJET_API_KEY) missing.push("MAILJET_API_KEY");
+  if (!env.MAILJET_API_SECRET) missing.push("MAILJET_API_SECRET");
+  if (!env.MAILJET_FROM_EMAIL) missing.push("MAILJET_FROM_EMAIL");
+  if (!env.MAILJET_FROM_NAME) missing.push("MAILJET_FROM_NAME");
+  if (missing.length > 0) {
+    return {
+      ok: false as const,
+      error: `Mailjet belum dikonfigurasi. Env hilang: ${missing.join(", ")}.`,
+    };
+  }
+
+  try {
+    await sendEmail({
+      to: session.user.email,
+      toName: session.user.name ?? "Admin",
+      subject: "[TEST] Koneksi Mailjet — Manajemen Surat IAI Jakarta",
+      htmlBody: `
+        <h2>Test Email Berhasil</h2>
+        <p>Halo ${session.user.name ?? "Admin"},</p>
+        <p>Email ini dikirim dari halaman Pengaturan untuk memverifikasi koneksi Mailjet.</p>
+        <p>Jika Anda menerima email ini, integrasi Mailjet sudah siap digunakan.</p>
+        <hr/>
+        <p><small>Dikirim pada ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB</small></p>
+      `,
+      textBody: `Test Email Berhasil\n\nHalo ${session.user.name ?? "Admin"},\nEmail ini dikirim dari halaman Pengaturan untuk memverifikasi koneksi Mailjet.\n\nDikirim ${new Date().toISOString()}`,
+    });
+    return {
+      ok: true as const,
+      message: `Email test terkirim ke ${session.user.email}. Cek inbox Anda.`,
+    };
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "Gagal mengirim email test.",
+    };
+  }
+}
+
+export async function testStorageConnection() {
+  await requireRole(["admin"]);
+  try {
+    const storage = getStorageProvider();
+    const payload = `storage-test-${Date.now()}`;
+    const result = await storage.upload({
+      body: Buffer.from(payload, "utf-8"),
+      fileName: `test-${Date.now()}.txt`,
+      contentType: "text/plain",
+      folder: "system-tests",
+      publicId: `test-${Date.now()}`,
+    });
+    return {
+      ok: true as const,
+      message: `Upload berhasil. URL: ${result.url}`,
+    };
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "Gagal upload test.",
+    };
+  }
+}
+
+export async function testDatabaseConnection() {
+  await requireSession();
+  try {
+    const start = Date.now();
+    const result = await db.execute(sql`SELECT 1 as ok`);
+    const elapsed = Date.now() - start;
+    return {
+      ok: true as const,
+      message: `Database OK (${elapsed}ms). Rows: ${result.rowCount ?? result.rows?.length ?? 0}`,
+    };
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "Gagal koneksi database.",
+    };
+  }
+}
