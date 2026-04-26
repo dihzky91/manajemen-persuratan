@@ -18,6 +18,11 @@ export type EmailPayload = {
   subject: string;
   htmlBody: string;
   textBody?: string;
+  attachments?: {
+    contentType: string;
+    filename: string;
+    base64Content: string;
+  }[];
 };
 
 // Kirim email via Mailjet. Saat env kosong → log warning, tidak throw.
@@ -41,6 +46,11 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
           Subject: payload.subject,
           HTMLPart: payload.htmlBody,
           TextPart: payload.textBody,
+          Attachments: payload.attachments?.map((attachment) => ({
+            ContentType: attachment.contentType,
+            Filename: attachment.filename,
+            Base64Content: attachment.base64Content,
+          })),
         },
       ],
     });

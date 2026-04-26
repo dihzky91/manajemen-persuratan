@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Download, FileUp, Loader2, Pencil, Plus, QrCode, Trash2 } from "lucide-react";
+import { Download, FileText, FileUp, Loader2, Mail, Pencil, Plus, QrCode, Trash2 } from "lucide-react";
 import QRCode from "qrcode";
 import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -45,11 +45,18 @@ import {
   updateParticipant,
   type ParticipantRow,
 } from "@/server/actions/sertifikat/participants";
+import {
+  generateBulkCertificatesZip,
+  generateCertificatePdf,
+  sendBulkCertificateEmails,
+  sendCertificateEmail,
+} from "@/server/actions/sertifikat/certificates";
 
 const participantSchema = z.object({
-  noSertifikat: z.string().trim().min(1, "Nomor sertifikat wajib diisi."),
+  noSertifikat: z.string().trim().max(100).optional(),
   nama: z.string().trim().min(1, "Nama peserta wajib diisi."),
   role: z.string().trim().min(1, "Role wajib diisi."),
+  email: z.string().trim().email("Format email tidak valid.").optional().or(z.literal("")),
 });
 
 type ParticipantFormValues = z.infer<typeof participantSchema>;
@@ -59,6 +66,7 @@ function toFormValues(participant?: ParticipantRow): ParticipantFormValues {
     noSertifikat: participant?.noSertifikat ?? "",
     nama: participant?.nama ?? "",
     role: participant?.role ?? "Peserta",
+    email: participant?.email ?? "",
   };
 }
 
@@ -76,6 +84,19 @@ async function downloadDataUrl(dataUrl: string, fileName: string) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+function downloadBase64(base64: string, fileName: string, mimeType: string) {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function crc32(bytes: Uint8Array) {
@@ -287,6 +308,72 @@ export function ParticipantManager({
     URL.revokeObjectURL(url);
   }
 
+  function downloadPdf(participant: ParticipantRow) {
+    const toastId = toast.loading("Menyiapkan sertifikat...");
+    startTransition(async () => {
+      const result = await generateCertificatePdf(participant.id);
+      toast.dismiss(toastId);
+      if (result.ok) {
+        downloadBase64(result.data.pdfBase64, result.data.fileName, "application/pdf");
+        toast.success("Sertifikat berhasil disiapkan.");
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function downloadAllPdf() {
+    if (participants.length === 0) return;
+    const toastId = toast.loading("Menyiapkan semua sertifikat...");
+    startTransition(async () => {
+      const result = await generateBulkCertificatesZip(event.id);
+      toast.dismiss(toastId);
+      if (result.ok) {
+        downloadBase64(result.data.zipBase64, result.data.fileName, "application/zip");
+        toast.success("ZIP sertifikat berhasil disiapkan.");
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function sendEmail(participant: ParticipantRow) {
+    const toastId = toast.loading("Mengirim email sertifikat...");
+    startTransition(async () => {
+      const result = await sendCertificateEmail(participant.id);
+      toast.dismiss(toastId);
+      if (result.ok) {
+        toast.success("Email sertifikat berhasil dikirim.");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function sendAllEmails() {
+    const validRecipients = participants.filter((participant) => participant.email).length;
+    if (validRecipients === 0) {
+      toast.error("Tidak ada peserta dengan email.");
+      return;
+    }
+    if (!window.confirm(`Kirim email sertifikat ke ${validRecipients} peserta?`)) return;
+
+    const toastId = toast.loading("Mengirim email sertifikat...");
+    startTransition(async () => {
+      const result = await sendBulkCertificateEmails(event.id);
+      toast.dismiss(toastId);
+      if (result.ok) {
+        toast.success(
+          `Email selesai: ${result.data.sent} terkirim, ${result.data.skipped} dilewati, ${result.data.failed} gagal.`,
+        );
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   function submitImport() {
     if (!file) return;
     startTransition(async () => {
@@ -354,6 +441,14 @@ export function ParticipantManager({
                 <Download className="h-4 w-4" />
                 Export QR All
               </Button>
+              <Button type="button" variant="outline" onClick={downloadAllPdf} disabled={participants.length === 0}>
+                <FileText className="h-4 w-4" />
+                Download Semua Sertifikat (ZIP)
+              </Button>
+              <Button type="button" variant="outline" onClick={sendAllEmails} disabled={participants.length === 0}>
+                <Mail className="h-4 w-4" />
+                Kirim Email ke Semua
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -370,6 +465,7 @@ export function ParticipantManager({
                 <TableHead>No. Sertifikat</TableHead>
                 <TableHead>Nama</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
@@ -382,7 +478,29 @@ export function ParticipantManager({
                     <Badge variant="secondary">{participant.role}</Badge>
                   </TableCell>
                   <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <span>{participant.email ?? "-"}</span>
+                      {participant.emailSentAt ? (
+                        <Badge variant="outline" className="w-fit border-green-200 bg-green-50 text-green-700">
+                          Sent
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="icon-sm" onClick={() => downloadPdf(participant)}>
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        disabled={!participant.email}
+                        title={!participant.email ? "Peserta belum punya email" : "Kirim email sertifikat"}
+                        onClick={() => sendEmail(participant)}
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
                       <Button variant="outline" size="icon-sm" onClick={() => openQr(participant)}>
                         <QrCode className="h-4 w-4" />
                       </Button>
@@ -414,13 +532,21 @@ export function ParticipantManager({
           <form onSubmit={form.handleSubmit(submitParticipant)} className="space-y-4">
             <div className="space-y-2">
               <Label>Nomor Sertifikat</Label>
-              <Input {...form.register("noSertifikat")} />
+              <Input placeholder="Kosongkan untuk auto-generate" {...form.register("noSertifikat")} />
+              <p className="text-xs text-muted-foreground">
+                Format otomatis: {event.kodeEvent}-001/{event.tanggalMulai.slice(0, 4)}.
+              </p>
               <FormError message={form.formState.errors.noSertifikat?.message} />
             </div>
             <div className="space-y-2">
               <Label>Nama</Label>
               <Input {...form.register("nama")} />
               <FormError message={form.formState.errors.nama?.message} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" placeholder="nama@email.com" {...form.register("email")} />
+              <FormError message={form.formState.errors.email?.message} />
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
@@ -454,7 +580,7 @@ export function ParticipantManager({
           <DialogHeader>
             <DialogTitle>Import Peserta</DialogTitle>
             <DialogDescription>
-              Kolom wajib: No Sertifikat dan Nama. Kolom Role bersifat opsional.
+              Kolom wajib: Nama. Kolom No Sertifikat, Role, dan Email bersifat opsional. Nomor sertifikat kosong akan dibuat otomatis.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
