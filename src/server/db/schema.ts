@@ -80,6 +80,44 @@ export const kategoriKegiatanEnum = pgEnum("kategori_kegiatan", [
   "Lainnya",
 ]);
 
+export const statusEventEnum = pgEnum("status_event", [
+  "aktif",
+  "dibatalkan",
+  "ditunda",
+  "arsip",
+]);
+
+export type TemplateFieldKey =
+  | "namaPeserta"
+  | "noSertifikat"
+  | "namaKegiatan"
+  | "kategori"
+  | "tanggalKegiatan"
+  | "lokasi"
+  | "skp"
+  | "qrCode"
+  | "signature1Nama"
+  | "signature1Jabatan"
+  | "signature2Nama"
+  | "signature2Jabatan"
+  | "signature3Nama"
+  | "signature3Jabatan";
+
+export type TemplateFieldPosition = {
+  enabled: boolean;
+  x: number;
+  y: number;
+  width?: number;
+  fontSize: number;
+  fontWeight: "normal" | "bold";
+  fontStyle: "normal" | "italic";
+  fontFamily: "Helvetica" | "Times-Roman" | "Courier";
+  color: string;
+  align: "left" | "center" | "right";
+};
+
+export type TemplateFieldMap = Partial<Record<TemplateFieldKey, TemplateFieldPosition>>;
+
 // ─── DIVISI ──────────────────────────────────────────────────────────────────
 
 export const divisi = pgTable("divisi", {
@@ -543,17 +581,55 @@ export const calendarEvents = pgTable("calendar_events", {
 
 // ─── SERTIFIKAT & KEGIATAN ───────────────────────────────────────────────────
 
+export const certificateTemplates = pgTable(
+  "certificate_templates",
+  {
+    id: serial("id").primaryKey(),
+    nama: varchar("nama", { length: 200 }).notNull(),
+    kategori: kategoriKegiatanEnum("kategori").notNull(),
+    imageUrl: text("image_url").notNull(),
+    imageWidth: integer("image_width").notNull(),
+    imageHeight: integer("image_height").notNull(),
+    fieldPositions: jsonb("field_positions")
+      .notNull()
+      .$type<TemplateFieldMap>()
+      .default({}),
+    isDefault: boolean("is_default").default(false),
+    isActive: boolean("is_active").default(true),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => ({
+    kategoriIdx: index("certificate_templates_kategori_idx").on(t.kategori),
+  }),
+);
+
 export const events = pgTable("events", {
   id: serial("id").primaryKey(),
+  kodeEvent: varchar("kode_event", { length: 30 }).unique().notNull(),
   namaKegiatan: varchar("nama_kegiatan", { length: 255 }).notNull(),
   kategori: kategoriKegiatanEnum("kategori").default("Workshop").notNull(),
+  statusEvent: statusEventEnum("status_event").default("aktif").notNull(),
   tanggalMulai: date("tanggal_mulai").notNull(),
   tanggalSelesai: date("tanggal_selesai").notNull(),
   lokasi: varchar("lokasi", { length: 255 }),
   skp: varchar("skp", { length: 50 }),
   keterangan: text("keterangan"),
+  certificateTemplateId: integer("certificate_template_id").references(
+    () => certificateTemplates.id,
+    { onDelete: "set null" },
+  ),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventCertificateCounters = pgTable("event_certificate_counters", {
+  eventId: integer("event_id")
+    .primaryKey()
+    .references(() => events.id, { onDelete: "cascade" }),
+  lastCounter: integer("last_counter").notNull().default(0),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -561,7 +637,9 @@ export const signatories = pgTable("signatories", {
   id: serial("id").primaryKey(),
   nama: varchar("nama", { length: 255 }).notNull(),
   jabatan: varchar("jabatan", { length: 255 }),
-  pejabatId: integer("pejabat_id").references(() => pejabatPenandatangan.id),
+  pejabatId: integer("pejabat_id").references(() => pejabatPenandatangan.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -573,7 +651,7 @@ export const eventSignatories = pgTable(
       .references(() => events.id, { onDelete: "cascade" }),
     signatoryId: integer("signatory_id")
       .notNull()
-      .references(() => signatories.id),
+      .references(() => signatories.id, { onDelete: "cascade" }),
     urutan: integer("urutan").notNull().default(1),
   },
   (t) => ({
@@ -591,6 +669,8 @@ export const participants = pgTable(
     noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull().unique(),
     nama: varchar("nama", { length: 255 }).notNull(),
     role: varchar("role", { length: 50 }).default("Peserta").notNull(),
+    email: varchar("email", { length: 150 }),
+    emailSentAt: timestamp("email_sent_at"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
@@ -623,6 +703,10 @@ export type NotificationPreferences = typeof notificationPreferences.$inferSelec
 export type NewNotificationPreferences = typeof notificationPreferences.$inferInsert;
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;
+export type CertificateTemplate = typeof certificateTemplates.$inferSelect;
+export type NewCertificateTemplate = typeof certificateTemplates.$inferInsert;
+export type EventCertificateCounter = typeof eventCertificateCounters.$inferSelect;
+export type NewEventCertificateCounter = typeof eventCertificateCounters.$inferInsert;
 export type Signatory = typeof signatories.$inferSelect;
 export type NewSignatory = typeof signatories.$inferInsert;
 export type EventSignatory = typeof eventSignatories.$inferSelect;

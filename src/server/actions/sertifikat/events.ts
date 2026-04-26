@@ -16,6 +16,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import {
   auditLog,
+  certificateTemplates,
   eventSignatories,
   events,
   participants,
@@ -24,6 +25,7 @@ import {
 import { requireRole, requireSession } from "../auth";
 
 const kategoriValues = ["Workshop", "Brevet AB", "Brevet C", "BFA", "Lainnya"] as const;
+const statusEventValues = ["aktif", "dibatalkan", "ditunda", "arsip"] as const;
 
 const orderedSignatorySchema = z.object({
   signatoryId: z.coerce.number().int().positive(),
@@ -47,13 +49,16 @@ const isoDateSchema = z
   }, "Tanggal tidak valid.");
 
 const eventInputSchema = z.object({
+  kodeEvent: z.string().trim().min(1, "Kode event wajib diisi.").max(30),
   namaKegiatan: z.string().trim().min(1, "Nama kegiatan wajib diisi.").max(255),
   kategori: z.enum(kategoriValues).default("Workshop"),
+  statusEvent: z.enum(statusEventValues).default("aktif"),
   tanggalMulai: isoDateSchema,
   tanggalSelesai: isoDateSchema,
   lokasi: z.string().trim().max(255).optional().nullable(),
   skp: z.string().trim().max(50).optional().nullable(),
   keterangan: z.string().trim().optional().nullable(),
+  certificateTemplateId: z.coerce.number().int().positive().optional().nullable(),
   signatories: z.array(orderedSignatorySchema).optional(),
   signatoryIds: z.array(z.coerce.number().int().positive()).optional(),
 }).refine((data) => data.tanggalSelesai >= data.tanggalMulai, {
@@ -64,11 +69,13 @@ const eventInputSchema = z.object({
 const eventIdSchema = z.coerce.number().int().positive();
 
 export type KategoriKegiatan = (typeof kategoriValues)[number];
+export type StatusEvent = (typeof statusEventValues)[number];
 
 export type EventFilters = {
   search?: string;
   kategori?: KategoriKegiatan | "all";
   status?: "active" | "inactive" | "all";
+  statusEvent?: StatusEvent | "all";
   location?: string;
   skpMin?: string | number;
   skpMax?: string | number;
@@ -78,18 +85,28 @@ export type EventFilters = {
 
 export type EventRow = {
   id: number;
+  kodeEvent: string;
   namaKegiatan: string;
   kategori: KategoriKegiatan;
+  statusEvent: StatusEvent;
   tanggalMulai: string;
   tanggalSelesai: string;
   lokasi: string | null;
   skp: string | null;
   keterangan: string | null;
+  certificateTemplateId: number | null;
   createdBy: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
   participantCount: number;
   signatories: EventSignatoryRow[];
+};
+
+export type EventTemplateOption = {
+  id: number;
+  nama: string;
+  kategori: KategoriKegiatan;
+  isDefault: boolean | null;
 };
 
 export type EventSignatoryRow = {
@@ -113,6 +130,18 @@ function todayJakarta() {
 
 function normalizeOptional(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
+}
+
+function normalizeOptionalId(value?: number | null) {
+  return value && value > 0 ? value : null;
+}
+
+function isUniqueViolation(err: unknown) {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: string }).code === "23505"
+  );
 }
 
 function normalizeSignatories(input: EventInput) {
@@ -190,9 +219,13 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventRow[]
   }
 
   if (filters.status === "active") {
-    conditions.push(gte(events.tanggalSelesai, today));
+    conditions.push(and(eq(events.statusEvent, "aktif"), gte(events.tanggalSelesai, today)));
   } else if (filters.status === "inactive") {
     conditions.push(sql`${events.tanggalSelesai} < ${today}`);
+  }
+
+  if (filters.statusEvent && filters.statusEvent !== "all") {
+    conditions.push(eq(events.statusEvent, filters.statusEvent));
   }
 
   if (filters.location?.trim()) {
@@ -220,13 +253,16 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventRow[]
   const rows = await db
     .select({
       id: events.id,
+      kodeEvent: events.kodeEvent,
       namaKegiatan: events.namaKegiatan,
       kategori: events.kategori,
+      statusEvent: events.statusEvent,
       tanggalMulai: events.tanggalMulai,
       tanggalSelesai: events.tanggalSelesai,
       lokasi: events.lokasi,
       skp: events.skp,
       keterangan: events.keterangan,
+      certificateTemplateId: events.certificateTemplateId,
       createdBy: events.createdBy,
       createdAt: events.createdAt,
       updatedAt: events.updatedAt,
@@ -248,13 +284,16 @@ export async function getEvent(id: number): Promise<EventRow | null> {
   const rows = await db
     .select({
       id: events.id,
+      kodeEvent: events.kodeEvent,
       namaKegiatan: events.namaKegiatan,
       kategori: events.kategori,
+      statusEvent: events.statusEvent,
       tanggalMulai: events.tanggalMulai,
       tanggalSelesai: events.tanggalSelesai,
       lokasi: events.lokasi,
       skp: events.skp,
       keterangan: events.keterangan,
+      certificateTemplateId: events.certificateTemplateId,
       createdBy: events.createdBy,
       createdAt: events.createdAt,
       updatedAt: events.updatedAt,
@@ -270,6 +309,21 @@ export async function getEvent(id: number): Promise<EventRow | null> {
   return row ?? null;
 }
 
+export async function listEventTemplateOptions(): Promise<EventTemplateOption[]> {
+  await requireRole(["admin", "staff"]);
+
+  return db
+    .select({
+      id: certificateTemplates.id,
+      nama: certificateTemplates.nama,
+      kategori: certificateTemplates.kategori,
+      isDefault: certificateTemplates.isDefault,
+    })
+    .from(certificateTemplates)
+    .where(eq(certificateTemplates.isActive, true))
+    .orderBy(asc(certificateTemplates.kategori), asc(certificateTemplates.nama));
+}
+
 export async function createEvent(data: unknown) {
   const result = eventInputSchema.safeParse(data);
   if (!result.success) return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
@@ -277,34 +331,44 @@ export async function createEvent(data: unknown) {
   const session = await requireRole(["admin", "staff"]);
   const selectedSignatories = normalizeSignatories(parsed);
 
-  const [row] = await db
-    .insert(events)
-    .values({
-      namaKegiatan: parsed.namaKegiatan,
-      kategori: parsed.kategori,
-      tanggalMulai: parsed.tanggalMulai,
-      tanggalSelesai: parsed.tanggalSelesai,
-      lokasi: normalizeOptional(parsed.lokasi),
-      skp: normalizeOptional(parsed.skp),
-      keterangan: normalizeOptional(parsed.keterangan),
-      createdBy: session.user.id,
-      updatedAt: new Date(),
-    })
-    .returning();
+  try {
+    const [row] = await db
+      .insert(events)
+      .values({
+        kodeEvent: parsed.kodeEvent,
+        namaKegiatan: parsed.namaKegiatan,
+        kategori: parsed.kategori,
+        statusEvent: parsed.statusEvent,
+        tanggalMulai: parsed.tanggalMulai,
+        tanggalSelesai: parsed.tanggalSelesai,
+        lokasi: normalizeOptional(parsed.lokasi),
+        skp: normalizeOptional(parsed.skp),
+        keterangan: normalizeOptional(parsed.keterangan),
+        certificateTemplateId: normalizeOptionalId(parsed.certificateTemplateId),
+        createdBy: session.user.id,
+        updatedAt: new Date(),
+      })
+      .returning();
 
-  if (!row) throw new Error("Gagal membuat kegiatan.");
-  await attachSignatories(row.id, selectedSignatories);
+    if (!row) throw new Error("Gagal membuat kegiatan.");
+    await attachSignatories(row.id, selectedSignatories);
 
-  await db.insert(auditLog).values({
-    userId: session.user.id,
-    aksi: "CREATE_SERTIFIKAT_EVENT",
-    entitasType: "sertifikat_event",
-    entitasId: String(row.id),
-    detail: { namaKegiatan: row.namaKegiatan, kategori: row.kategori },
-  });
+    await db.insert(auditLog).values({
+      userId: session.user.id,
+      aksi: "CREATE_SERTIFIKAT_EVENT",
+      entitasType: "sertifikat_event",
+      entitasId: String(row.id),
+      detail: { kodeEvent: row.kodeEvent, namaKegiatan: row.namaKegiatan, kategori: row.kategori },
+    });
 
-  revalidatePath("/sertifikat/kegiatan");
-  return { ok: true as const, data: row };
+    revalidatePath("/sertifikat/kegiatan");
+    return { ok: true as const, data: row };
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { ok: false as const, error: "Kode event sudah digunakan." };
+    }
+    throw err;
+  }
 }
 
 export async function updateEvent(id: number, data: unknown) {
@@ -315,38 +379,48 @@ export async function updateEvent(id: number, data: unknown) {
   const session = await requireRole(["admin", "staff"]);
   const selectedSignatories = normalizeSignatories(parsed);
 
-  const [row] = await db
-    .update(events)
-    .set({
-      namaKegiatan: parsed.namaKegiatan,
-      kategori: parsed.kategori,
-      tanggalMulai: parsed.tanggalMulai,
-      tanggalSelesai: parsed.tanggalSelesai,
-      lokasi: normalizeOptional(parsed.lokasi),
-      skp: normalizeOptional(parsed.skp),
-      keterangan: normalizeOptional(parsed.keterangan),
-      updatedAt: new Date(),
-    })
-    .where(eq(events.id, parsedId))
-    .returning();
+  try {
+    const [row] = await db
+      .update(events)
+      .set({
+        kodeEvent: parsed.kodeEvent,
+        namaKegiatan: parsed.namaKegiatan,
+        kategori: parsed.kategori,
+        statusEvent: parsed.statusEvent,
+        tanggalMulai: parsed.tanggalMulai,
+        tanggalSelesai: parsed.tanggalSelesai,
+        lokasi: normalizeOptional(parsed.lokasi),
+        skp: normalizeOptional(parsed.skp),
+        keterangan: normalizeOptional(parsed.keterangan),
+        certificateTemplateId: normalizeOptionalId(parsed.certificateTemplateId),
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, parsedId))
+      .returning();
 
-  if (!row) return { ok: false as const, error: "Kegiatan tidak ditemukan." };
+    if (!row) return { ok: false as const, error: "Kegiatan tidak ditemukan." };
 
-  await db.delete(eventSignatories).where(eq(eventSignatories.eventId, parsedId));
-  await attachSignatories(parsedId, selectedSignatories);
+    await db.delete(eventSignatories).where(eq(eventSignatories.eventId, parsedId));
+    await attachSignatories(parsedId, selectedSignatories);
 
-  await db.insert(auditLog).values({
-    userId: session.user.id,
-    aksi: "UPDATE_SERTIFIKAT_EVENT",
-    entitasType: "sertifikat_event",
-    entitasId: String(parsedId),
-    detail: { namaKegiatan: row.namaKegiatan, kategori: row.kategori },
-  });
+    await db.insert(auditLog).values({
+      userId: session.user.id,
+      aksi: "UPDATE_SERTIFIKAT_EVENT",
+      entitasType: "sertifikat_event",
+      entitasId: String(parsedId),
+      detail: { kodeEvent: row.kodeEvent, namaKegiatan: row.namaKegiatan, kategori: row.kategori },
+    });
 
-  revalidatePath("/sertifikat/kegiatan");
-  revalidatePath(`/sertifikat/kegiatan/${parsedId}`);
-  revalidatePath("/verifikasi", "layout");
-  return { ok: true as const, data: row };
+    revalidatePath("/sertifikat/kegiatan");
+    revalidatePath(`/sertifikat/kegiatan/${parsedId}`);
+    revalidatePath("/verifikasi", "layout");
+    return { ok: true as const, data: row };
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { ok: false as const, error: "Kode event sudah digunakan." };
+    }
+    throw err;
+  }
 }
 
 export async function deleteEvent(id: number) {
@@ -373,4 +447,39 @@ export async function deleteEvent(id: number) {
 
   revalidatePath("/sertifikat/kegiatan");
   return { ok: true as const };
+}
+
+export async function updateEventStatus(eventId: number, statusEvent: StatusEvent) {
+  const parsedId = eventIdSchema.parse(eventId);
+  const parsedStatus = z.enum(statusEventValues).parse(statusEvent);
+  const session = await requireRole(["admin"]);
+
+  const [row] = await db
+    .update(events)
+    .set({ statusEvent: parsedStatus, updatedAt: new Date() })
+    .where(eq(events.id, parsedId))
+    .returning({
+      id: events.id,
+      kodeEvent: events.kodeEvent,
+      namaKegiatan: events.namaKegiatan,
+      statusEvent: events.statusEvent,
+    });
+
+  if (!row) return { ok: false as const, error: "Kegiatan tidak ditemukan." };
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "UPDATE_SERTIFIKAT_EVENT_STATUS",
+    entitasType: "sertifikat_event",
+    entitasId: String(parsedId),
+    detail: {
+      kodeEvent: row.kodeEvent,
+      namaKegiatan: row.namaKegiatan,
+      statusEvent: row.statusEvent,
+    },
+  });
+
+  revalidatePath("/sertifikat/kegiatan");
+  revalidatePath(`/sertifikat/kegiatan/${parsedId}`);
+  return { ok: true as const, data: row };
 }
