@@ -482,7 +482,7 @@ export const auditLog = pgTable("audit_log", {
 
 ### 4.3 Skema Drizzle Modul Sertifikat & Kegiatan
 
-Modul ini ditambahkan terpisah dari domain surat. Empat tabel + satu enum baru.
+Modul ini ditambahkan terpisah dari domain surat. Wave 2 menambahkan `certificate_templates`, `event_certificate_counters`, enum `status_event`, `events.kodeEvent`, `events.statusEvent`, `events.certificateTemplateId`, serta `participants.email` dan `participants.emailSentAt`.
 
 ```typescript
 // app/server/db/schema.ts (lanjutan)
@@ -491,17 +491,45 @@ export const kategoriKegiatanEnum = pgEnum("kategori_kegiatan", [
   "Workshop", "Brevet AB", "Brevet C", "BFA", "Lainnya",
 ]);
 
+export const statusEventEnum = pgEnum("status_event", [
+  "aktif", "dibatalkan", "ditunda", "arsip",
+]);
+
+export const certificateTemplates = pgTable("certificate_templates", {
+  id: serial("id").primaryKey(),
+  nama: varchar("nama", { length: 200 }).notNull(),
+  kategori: kategoriKegiatanEnum("kategori").notNull(),
+  imageUrl: text("image_url").notNull(),
+  imageWidth: integer("image_width").notNull(),
+  imageHeight: integer("image_height").notNull(),
+  fieldPositions: jsonb("field_positions").notNull().default({}),
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const events = pgTable("events", {
   id: serial("id").primaryKey(),
+  kodeEvent: varchar("kode_event", { length: 30 }).unique().notNull(),
   namaKegiatan: varchar("nama_kegiatan", { length: 255 }).notNull(),
   kategori: kategoriKegiatanEnum("kategori").default("Workshop").notNull(),
+  statusEvent: statusEventEnum("status_event").default("aktif").notNull(),
   tanggalMulai: date("tanggal_mulai").notNull(),
   tanggalSelesai: date("tanggal_selesai").notNull(),
   lokasi: varchar("lokasi", { length: 255 }),
   skp: varchar("skp", { length: 50 }),
   keterangan: text("keterangan"),
+  certificateTemplateId: integer("certificate_template_id").references(() => certificateTemplates.id, { onDelete: "set null" }),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventCertificateCounters = pgTable("event_certificate_counters", {
+  eventId: integer("event_id").primaryKey().references(() => events.id, { onDelete: "cascade" }),
+  lastCounter: integer("last_counter").notNull().default(0),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -525,6 +553,8 @@ export const participants = pgTable("participants", {
   noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull().unique(),
   nama: varchar("nama", { length: 255 }).notNull(),
   role: varchar("role", { length: 50 }).default("Peserta").notNull(),
+  email: varchar("email", { length: 150 }),
+  emailSentAt: timestamp("email_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({ eventIdIdx: index("participants_event_id_idx").on(t.eventId) }));
@@ -535,6 +565,8 @@ Catatan desain:
 - `eventSignatories` adalah junction many-to-many dengan `urutan` untuk render kolom kiri/kanan tanda tangan di sertifikat.
 - `signatories.pejabatId` opsional — link manual ke `pejabat_penandatangan` jika orangnya sama (cross-reference, tidak wajib).
 - Tidak ada tabel `admins` terpisah — auth memakai `users` + `requireRole(["admin","staff"])`.
+- Nomor sertifikat baru dapat dibuat otomatis dengan format `{kodeEvent}-{NNN}/{tahun}` memakai counter atomic di `event_certificate_counters`.
+- Template sertifikat menyimpan koordinat field dalam persen terhadap dimensi gambar agar tetap stabil saat preview/editor di-scale.
 
 ---
 
@@ -865,6 +897,7 @@ Notifikasi email (Mailjet):
 Sub-menu sidebar (section "Sertifikat & Kegiatan"):
   /sertifikat/kegiatan            → list events + filter (kategori, status, lokasi, SKP range, tanggal) + grid/table toggle
   /sertifikat/kegiatan/[id]       → detail event + tabel peserta + bulk import + QR generator per peserta
+  /sertifikat/template            → CRUD template sertifikat + visual drag-drop editor
   /sertifikat/penandatangan       → CRUD signatories (nama, jabatan, optional link ke pejabat)
   /sertifikat/analytics           → 4 stat cards + chart trends 12 bulan + pie kategori + top 5 events (recharts)
 
@@ -876,14 +909,18 @@ Public (tanpa login):
 
 Komponen utama (`src/components/sertifikat/`):
 - `EventManager.tsx` — list + dialog form RHF/Zod + multi-signatory selector
-- `ParticipantManager.tsx` — table peserta + dialog import CSV/XLSX + dialog QR (preview & download PNG) + bulk QR download
+- `ParticipantManager.tsx` — table peserta + dialog import CSV/XLSX + dialog QR (preview & download PNG), bulk QR download, PDF download, dan email sertifikat
+- `TemplateManager.tsx` — list template, upload gambar, set default per kategori
+- `TemplateEditor.tsx` — drag-drop field sertifikat pakai `react-rnd`; koordinat disimpan dalam persen dari dimensi image
 - `SignatoryManager.tsx` — CRUD signatories
 - `AnalyticsCharts.tsx` — recharts (LineChart, PieChart, BarChart)
 - `VerificationSearchForm.tsx` — input form publik
 
 Server actions (`src/server/actions/sertifikat/`):
 - `events.ts` — CRUD events + filter; validasi tanggal ketat (format `YYYY-MM-DD` + tanggal kalender valid, mis. `2025-13-99` ditolak)
-- `participants.ts` — CRUD peserta + `bulkImportParticipants(eventId, formData)` **transactional all-or-nothing** dengan pre-validation: pre-cek format, intra-file duplicate, intra-DB duplicate, kemudian batch insert dalam `db.transaction()`. Jika ada error pre-validation, tidak ada baris yang di-commit
+- `participants.ts` — CRUD peserta + auto-generate `noSertifikat` + `bulkImportParticipants(eventId, formData)` **transactional all-or-nothing** dengan pre-validation: pre-cek format, intra-file duplicate, intra-DB duplicate, kemudian batch insert dalam `db.transaction()`. Jika ada error pre-validation, tidak ada baris yang di-commit
+- `templates.ts` — CRUD template sertifikat, upload PNG/JPG lokal ke `public/templates`, set default per kategori
+- `certificates.ts` — generate PDF sertifikat on-demand dengan `pdf-lib`, bulk ZIP, dan kirim email via Mailjet
 - `signatories.ts` — CRUD signatories
 - `analytics.ts` — `getStats()` & `getAnalytics()`
 - `verifikasi.ts` — `verifyByNoSertifikat(no)` (no auth)
@@ -895,7 +932,14 @@ Aturan implementasi:
 - Halaman `/verifikasi/[noSertifikat]` memakai `metadata.robots = { index: false, follow: false }` — privasi nomor sertifikat.
 - QR code mengarah ke `${NEXT_PUBLIC_APP_URL}/verifikasi/${encodeURIComponent(noSertifikat)}`.
 - Logo IAI default di `public/iai-logo.png`; `system_settings.logoUrl` fallback ke path ini saat kosong.
-- Bulk import format: CSV (papaparse) + Excel xlsx/xls (xlsx lib), auto-detect dari ekstensi. Kolom case-insensitive: `no_sertifikat`, `nama`, `role` (opsional).
+- Bulk import format: CSV (papaparse) + Excel xlsx/xls (xlsx lib), auto-detect dari ekstensi. Kolom case-insensitive: `no_sertifikat` (opsional), `nama`, `role` (opsional), `email` (opsional). Cell yang diawali `=`, `+`, `-`, atau `@` ditolak untuk mencegah formula injection.
+
+Wave 2:
+- Template Manager berada di `/sertifikat/template`, memakai editor drag-resize `react-rnd`, dan menyimpan posisi field sebagai persen dari dimensi image.
+- PDF Generator memakai `pdf-lib`, dibuat on-demand tanpa caching, dengan fallback template default per kategori jika event tidak memilih template khusus.
+- Email sertifikat memakai Mailjet; kolom email peserta bersifat opsional dan bulk email melewati peserta tanpa email.
+- Auto-generate nomor sertifikat memakai format `{kodeEvent}-{NNN}/{tahun}` dengan counter atomic di tabel `event_certificate_counters`.
+- Status event memakai enum `aktif`, `dibatalkan`, `ditunda`, `arsip` dan ditampilkan sebagai badge/filter di UI.
 
 ---
 
@@ -1084,6 +1128,19 @@ Catatan implementasi:
 - Halaman publik `/verifikasi/[noSertifikat]` adalah pengecualian terbatas dari prinsip "internal only" — sejajar dengan halaman publik verifikasi surat keluar/SK/MOU.
 - Deteksi unique violation memakai Postgres error code `23505`, lebih robust dari string-matching `err.message`.
 - Bulk import berperilaku all-or-nothing: jika ada baris invalid (format salah, duplikat intra-file, duplikat intra-DB), seluruh batch tidak di-commit dan UI menampilkan daftar error per baris.
+
+---
+
+### Phase 7 — Sertifikat PDF Generator + Email + Template Editor (April 2026)
+- [x] Schema: `certificate_templates`, `event_certificate_counters`, enum `status_event`
+- [x] `events.kodeEvent` (unique), `events.statusEvent`, `events.certificateTemplateId`
+- [x] `participants.email`, `participants.emailSentAt`
+- [x] Auto-generate nomor sertifikat per event (`{kodeEvent}-{NNN}/{tahun}`)
+- [x] Page `/sertifikat/template` (CRUD + visual drag-drop editor pakai `react-rnd`)
+- [x] PDF generator (`pdf-lib`) dengan image background overlay
+- [x] Email sertifikat ke peserta via Mailjet (single + bulk)
+- [x] Status event enum dengan badge & filter
+- [x] DB hardening: CHECK constraint `events.tanggal`, FK cascade rules, formula injection rejection
 
 ---
 
