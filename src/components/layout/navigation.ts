@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarDays,
   FileSignature,
+  FileImage,
   FileText,
   Hash,
   Inbox,
@@ -112,6 +113,13 @@ export const navigationSections: NavigationSection[] = [
         icon: BadgeCheck,
         active: true,
         allowedRoles: ["admin", "staff"],
+      },
+      {
+        href: "/sertifikat/template",
+        label: "Template Sertifikat",
+        icon: FileImage,
+        active: true,
+        allowedRoles: ["admin"],
       },
       {
         href: "/sertifikat/analytics",

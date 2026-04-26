@@ -23,5 +23,9 @@ coverage
 # Default STORAGE_LOCAL_DIR=./storage/uploads di luar ./public.
 storage/
 
+# Template sertifikat lokal diunggah oleh admin.
+public/templates/*
+!public/templates/.gitkeep
+
 # TypeScript incremental build cache
 *.tsbuildinfo
