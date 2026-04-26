@@ -1,6 +1,6 @@
 "use server";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -91,22 +91,20 @@ async function resolveTemplate(event: {
     if (selected?.isActive) return selected;
   }
 
-  const [fallback] = await db
+  const [defaultTemplate] = await db
     .select()
     .from(certificateTemplates)
-    .where(eq(certificateTemplates.kategori, event.kategori))
+    .where(
+      and(
+        eq(certificateTemplates.kategori, event.kategori),
+        eq(certificateTemplates.isActive, true),
+        eq(certificateTemplates.isDefault, true),
+      ),
+    )
     .orderBy(asc(certificateTemplates.id))
-    .limit(20);
+    .limit(1);
 
-  if (fallback?.isActive && fallback.isDefault) return fallback;
-
-  const templates = await db
-    .select()
-    .from(certificateTemplates)
-    .where(eq(certificateTemplates.kategori, event.kategori))
-    .orderBy(asc(certificateTemplates.id));
-
-  return templates.find((template) => template.isActive && template.isDefault) ?? null;
+  return defaultTemplate ?? null;
 }
 
 async function buildParticipantCertificate(participantId: number): Promise<PdfResult> {
