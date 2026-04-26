@@ -480,6 +480,64 @@ export const auditLog = pgTable("audit_log", {
 
 ---
 
+### 4.3 Skema Drizzle Modul Sertifikat & Kegiatan
+
+Modul ini ditambahkan terpisah dari domain surat. Empat tabel + satu enum baru.
+
+```typescript
+// app/server/db/schema.ts (lanjutan)
+
+export const kategoriKegiatanEnum = pgEnum("kategori_kegiatan", [
+  "Workshop", "Brevet AB", "Brevet C", "BFA", "Lainnya",
+]);
+
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  namaKegiatan: varchar("nama_kegiatan", { length: 255 }).notNull(),
+  kategori: kategoriKegiatanEnum("kategori").default("Workshop").notNull(),
+  tanggalMulai: date("tanggal_mulai").notNull(),
+  tanggalSelesai: date("tanggal_selesai").notNull(),
+  lokasi: varchar("lokasi", { length: 255 }),
+  skp: varchar("skp", { length: 50 }),
+  keterangan: text("keterangan"),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const signatories = pgTable("signatories", {
+  id: serial("id").primaryKey(),
+  nama: varchar("nama", { length: 255 }).notNull(),
+  jabatan: varchar("jabatan", { length: 255 }),
+  pejabatId: integer("pejabat_id").references(() => pejabatPenandatangan.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventSignatories = pgTable("event_signatories", {
+  eventId: integer("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  signatoryId: integer("signatory_id").notNull().references(() => signatories.id),
+  urutan: integer("urutan").notNull().default(1),
+}, (t) => ({ pk: primaryKey({ columns: [t.eventId, t.signatoryId] }) }));
+
+export const participants = pgTable("participants", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull().unique(),
+  nama: varchar("nama", { length: 255 }).notNull(),
+  role: varchar("role", { length: 50 }).default("Peserta").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({ eventIdIdx: index("participants_event_id_idx").on(t.eventId) }));
+```
+
+Catatan desain:
+- `participants.noSertifikat` UNIQUE pada level sistem — dipakai sebagai target QR scan.
+- `eventSignatories` adalah junction many-to-many dengan `urutan` untuk render kolom kiri/kanan tanda tangan di sertifikat.
+- `signatories.pejabatId` opsional — link manual ke `pejabat_penandatangan` jika orangnya sama (cross-reference, tidak wajib).
+- Tidak ada tabel `admins` terpisah — auth memakai `users` + `requireRole(["admin","staff"])`.
+
+---
+
 ## 5. Arsitektur Aplikasi
 
 ### 5.1 Diagram Alur
@@ -632,6 +690,8 @@ Nomor manual:
 | Kelola Divisi | âœ… | âŒ | âŒ | âŒ |
 | Bulk Nomor Surat | âœ… | âŒ | âŒ | âŒ |
 | Lihat Audit Log | âœ… | âŒ | âŒ | âŒ |
+
+> Modul **Sertifikat & Kegiatan** menambahkan kapabilitas berikut: admin & staff dapat CRUD events/peserta/penandatangan dan generate QR; semua role internal (termasuk viewer) dapat membuka halaman publik `/verifikasi/[noSertifikat]` yang juga aksesibel oleh user anonim.
 
 ### 6.2 Pattern Server Action dengan Auth Check
 
@@ -796,6 +856,46 @@ Notifikasi email (Mailjet):
   - Kirim ke penerima saat disposisi dibuat
   - Template: subjek, nama pengirim, perihal surat, instruksi, batas waktu
 ```
+
+---
+
+### 7.5 Modul Sertifikat & Kegiatan
+
+```
+Sub-menu sidebar (section "Sertifikat & Kegiatan"):
+  /sertifikat/kegiatan            → list events + filter (kategori, status, lokasi, SKP range, tanggal) + grid/table toggle
+  /sertifikat/kegiatan/[id]       → detail event + tabel peserta + bulk import + QR generator per peserta
+  /sertifikat/penandatangan       → CRUD signatories (nama, jabatan, optional link ke pejabat)
+  /sertifikat/analytics           → 4 stat cards + chart trends 12 bulan + pie kategori + top 5 events (recharts)
+
+Public (tanpa login):
+  /verifikasi                     → form pencarian nomor sertifikat
+  /verifikasi/[noSertifikat]      → halaman verifikasi (target QR scan)
+  /api/verifikasi/[noSertifikat]  → JSON endpoint, rate-limit 30 req/menit/IP
+```
+
+Komponen utama (`src/components/sertifikat/`):
+- `EventManager.tsx` — list + dialog form RHF/Zod + multi-signatory selector
+- `ParticipantManager.tsx` — table peserta + dialog import CSV/XLSX + dialog QR (preview & download PNG) + bulk QR download
+- `SignatoryManager.tsx` — CRUD signatories
+- `AnalyticsCharts.tsx` — recharts (LineChart, PieChart, BarChart)
+- `VerificationSearchForm.tsx` — input form publik
+
+Server actions (`src/server/actions/sertifikat/`):
+- `events.ts` — CRUD events + filter; validasi tanggal ketat (format `YYYY-MM-DD` + tanggal kalender valid, mis. `2025-13-99` ditolak)
+- `participants.ts` — CRUD peserta + `bulkImportParticipants(eventId, formData)` **transactional all-or-nothing** dengan pre-validation: pre-cek format, intra-file duplicate, intra-DB duplicate, kemudian batch insert dalam `db.transaction()`. Jika ada error pre-validation, tidak ada baris yang di-commit
+- `signatories.ts` — CRUD signatories
+- `analytics.ts` — `getStats()` & `getAnalytics()`
+- `verifikasi.ts` — `verifyByNoSertifikat(no)` (no auth)
+
+Aturan implementasi:
+- `requireRole(["admin","staff"])` pada semua mutasi.
+- Audit log entry untuk setiap create/update/delete/bulk-import (entitasType: `sertifikat_event`, `sertifikat_participant`, `sertifikat_signatory`).
+- Deteksi unique violation memakai Postgres error code `23505` (helper `isUniqueViolation`).
+- Halaman `/verifikasi/[noSertifikat]` memakai `metadata.robots = { index: false, follow: false }` — privasi nomor sertifikat.
+- QR code mengarah ke `${NEXT_PUBLIC_APP_URL}/verifikasi/${encodeURIComponent(noSertifikat)}`.
+- Logo IAI default di `public/iai-logo.png`; `system_settings.logoUrl` fallback ke path ini saat kosong.
+- Bulk import format: CSV (papaparse) + Excel xlsx/xls (xlsx lib), auto-detect dari ekstensi. Kolom case-insensitive: `no_sertifikat`, `nama`, `role` (opsional).
 
 ---
 
@@ -964,6 +1064,26 @@ Catatan status April 2026: Phase 4 telah aktif secara luas. Scope yang sudah ber
 - [ ] Testing manual E2E semua alur utama
 
 Catatan status April 2026: RBAC sudah diterapkan di semua server action mutasi via requireRole(). Audit log sekarang mencakup semua modul termasuk updateStatusDisposisi. Halaman UI /audit-log tersedia khusus admin. BETTER_AUTH_SECRET sudah diganti dari placeholder ke nilai kriptografis acak yang benar. Deployment dan testing E2E masih pending.
+
+---
+
+### Phase 6 — Sertifikat & Kegiatan + Verifikasi Publik (April 2026)
+- [x] Schema baru: `events`, `participants`, `signatories`, `event_signatories`, enum `kategori_kegiatan` (Drizzle migration `0006_late_eternals.sql`)
+- [x] Server actions: `events`, `participants`, `signatories`, `analytics`, `verifikasi` di `src/server/actions/sertifikat/`
+- [x] Validasi tanggal ketat (YYYY-MM-DD + tanggal kalender valid)
+- [x] Bulk import CSV + Excel **transactional all-or-nothing** (pre-validate → batch insert dalam `db.transaction()`)
+- [x] QR code generator per peserta + bulk download
+- [x] Halaman publik `/verifikasi` & `/verifikasi/[noSertifikat]` (robots noindex)
+- [x] Route handler `/api/verifikasi/[noSertifikat]` dengan rate-limit 30 req/menit/IP
+- [x] Sidebar section baru "Sertifikat & Kegiatan" (Kegiatan, Penandatangan, Analytics)
+- [x] Audit log untuk semua mutasi modul sertifikat
+- [x] Logo IAI di `public/iai-logo.png` sebagai default branding sistem (fallback `system_settings.logoUrl`)
+
+Catatan implementasi:
+- Modul ini independen dari domain surat — tidak menyentuh schema/actions surat existing.
+- Halaman publik `/verifikasi/[noSertifikat]` adalah pengecualian terbatas dari prinsip "internal only" — sejajar dengan halaman publik verifikasi surat keluar/SK/MOU.
+- Deteksi unique violation memakai Postgres error code `23505`, lebih robust dari string-matching `err.message`.
+- Bulk import berperilaku all-or-nothing: jika ada baris invalid (format salah, duplikat intra-file, duplikat intra-DB), seluruh batch tidak di-commit dan UI menampilkan daftar error per baris.
 
 ---
 

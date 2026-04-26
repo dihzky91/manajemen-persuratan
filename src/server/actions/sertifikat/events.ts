@@ -30,11 +30,27 @@ const orderedSignatorySchema = z.object({
   urutan: z.coerce.number().int().positive().default(1),
 });
 
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD.")
+  .refine((value) => {
+    const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) return false;
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    );
+  }, "Tanggal tidak valid.");
+
 const eventInputSchema = z.object({
   namaKegiatan: z.string().trim().min(1, "Nama kegiatan wajib diisi.").max(255),
   kategori: z.enum(kategoriValues).default("Workshop"),
-  tanggalMulai: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal mulai tidak valid."),
-  tanggalSelesai: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal selesai tidak valid."),
+  tanggalMulai: isoDateSchema,
+  tanggalSelesai: isoDateSchema,
   lokasi: z.string().trim().max(255).optional().nullable(),
   skp: z.string().trim().max(50).optional().nullable(),
   keterangan: z.string().trim().optional().nullable(),

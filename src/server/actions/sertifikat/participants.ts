@@ -1,6 +1,6 @@
 "use server";
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -235,14 +235,13 @@ export async function bulkImportParticipants(
   if (!event) return { ok: false as const, error: "Kegiatan tidak ditemukan." };
 
   const rows = await parseImportFile(file);
-  const result: BulkImportResult = {
-    totalRows: rows.length,
-    successCount: 0,
-    errors: [],
-  };
+  const errors: string[] = [];
+  const validRows: { lineNumber: number; noSertifikat: string; nama: string; role: string }[] = [];
+  const seenNos = new Map<string, number>();
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index]!;
+    const lineNumber = index + 2;
     const noSertifikat = stringifyCell(
       pickCell(row, ["no_sertifikat", "No Sertifikat", "NO SERTIFIKAT"]),
     );
@@ -250,28 +249,78 @@ export async function bulkImportParticipants(
     const role = stringifyCell(pickCell(row, ["role", "Role", "ROLE"]));
 
     if (!noSertifikat || !nama) {
-      result.errors.push(`Baris ${index + 2}: nomor sertifikat dan nama wajib diisi.`);
+      errors.push(`Baris ${lineNumber}: nomor sertifikat dan nama wajib diisi.`);
       continue;
     }
 
-    try {
-      await db.insert(participants).values({
-        eventId: parsedEventId,
-        noSertifikat,
-        nama,
-        role: normalizeOptionalRole(role),
-        updatedAt: new Date(),
-      });
-      result.successCount += 1;
-    } catch (err) {
-      const message = isUniqueViolation(err)
-        ? "Nomor sertifikat sudah digunakan."
-        : err instanceof Error
-          ? err.message
-          : "Gagal menyimpan baris.";
-      result.errors.push(`Baris ${index + 2} (${nama}): ${message}`);
+    const previousLine = seenNos.get(noSertifikat);
+    if (previousLine !== undefined) {
+      errors.push(
+        `Baris ${lineNumber} (${nama}): nomor sertifikat duplikat dengan baris ${previousLine}.`,
+      );
+      continue;
+    }
+
+    seenNos.set(noSertifikat, lineNumber);
+    validRows.push({
+      lineNumber,
+      noSertifikat,
+      nama,
+      role: normalizeOptionalRole(role),
+    });
+  }
+
+  if (validRows.length > 0) {
+    const candidateNos = validRows.map((row) => row.noSertifikat);
+    const existing = await db
+      .select({ noSertifikat: participants.noSertifikat })
+      .from(participants)
+      .where(inArray(participants.noSertifikat, candidateNos));
+
+    if (existing.length > 0) {
+      const existingSet = new Set(existing.map((row) => row.noSertifikat));
+      for (let index = validRows.length - 1; index >= 0; index -= 1) {
+        const row = validRows[index]!;
+        if (existingSet.has(row.noSertifikat)) {
+          errors.push(
+            `Baris ${row.lineNumber} (${row.nama}): nomor sertifikat ${row.noSertifikat} sudah digunakan di sistem.`,
+          );
+          validRows.splice(index, 1);
+        }
+      }
     }
   }
+
+  let successCount = 0;
+  if (errors.length === 0 && validRows.length > 0) {
+    try {
+      await db.transaction(async (tx) => {
+        await tx.insert(participants).values(
+          validRows.map((row) => ({
+            eventId: parsedEventId,
+            noSertifikat: row.noSertifikat,
+            nama: row.nama,
+            role: row.role,
+            updatedAt: new Date(),
+          })),
+        );
+      });
+      successCount = validRows.length;
+    } catch (err) {
+      const message = isUniqueViolation(err)
+        ? "Nomor sertifikat duplikat terdeteksi saat insert; impor dibatalkan."
+        : err instanceof Error
+          ? err.message
+          : "Gagal menyimpan data peserta.";
+      return { ok: false as const, error: message };
+    }
+  }
+
+  const result: BulkImportResult = {
+    totalRows: rows.length,
+    successCount,
+    errors,
+  };
 
   await db.insert(auditLog).values({
     userId: session.user.id,
@@ -284,6 +333,7 @@ export async function bulkImportParticipants(
       totalRows: result.totalRows,
       successCount: result.successCount,
       errorCount: result.errors.length,
+      committed: result.successCount > 0,
     },
   });
 
