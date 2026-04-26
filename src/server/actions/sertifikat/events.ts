@@ -3,6 +3,7 @@
 import {
   and,
   asc,
+  count,
   desc,
   eq,
   gte,
@@ -10,6 +11,7 @@ import {
   inArray,
   lte,
   sql,
+  type SQL,
 } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -17,6 +19,7 @@ import { db } from "@/server/db";
 import {
   auditLog,
   certificateTemplates,
+  eventCertificateCounters,
   eventSignatories,
   events,
   participants,
@@ -81,6 +84,16 @@ export type EventFilters = {
   skpMax?: string | number;
   dateFrom?: string;
   dateTo?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type EventListResult = {
+  rows: EventRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };
 
 export type EventRow = {
@@ -204,10 +217,14 @@ async function hydrateSignatories(rows: Omit<EventRow, "signatories">[]): Promis
   }));
 }
 
-export async function listEvents(filters: EventFilters = {}): Promise<EventRow[]> {
+export async function listEvents(filters: EventFilters = {}): Promise<EventListResult> {
   await requireSession();
 
-  const conditions = [];
+  const page = Math.max(1, filters.page ?? 1);
+  const pageSize = [10, 25, 50].includes(filters.pageSize ?? 25) ? (filters.pageSize ?? 25) : 25;
+  const offset = (page - 1) * pageSize;
+
+  const conditions: SQL[] = [sql`${events.deletedAt} IS NULL`];
   const today = todayJakarta();
 
   if (filters.search?.trim()) {
@@ -219,7 +236,8 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventRow[]
   }
 
   if (filters.status === "active") {
-    conditions.push(and(eq(events.statusEvent, "aktif"), gte(events.tanggalSelesai, today)));
+    const activeCond = and(eq(events.statusEvent, "aktif"), gte(events.tanggalSelesai, today));
+    if (activeCond) conditions.push(activeCond);
   } else if (filters.status === "inactive") {
     conditions.push(sql`${events.tanggalSelesai} < ${today}`);
   }
@@ -248,33 +266,56 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventRow[]
     conditions.push(sql`${skpNumber} <= ${Number(filters.skpMax)}`);
   }
 
-  const where = conditions.length ? and(...conditions) : undefined;
+  const where = and(...conditions);
 
-  const rows = await db
-    .select({
-      id: events.id,
-      kodeEvent: events.kodeEvent,
-      namaKegiatan: events.namaKegiatan,
-      kategori: events.kategori,
-      statusEvent: events.statusEvent,
-      tanggalMulai: events.tanggalMulai,
-      tanggalSelesai: events.tanggalSelesai,
-      lokasi: events.lokasi,
-      skp: events.skp,
-      keterangan: events.keterangan,
-      certificateTemplateId: events.certificateTemplateId,
-      createdBy: events.createdBy,
-      createdAt: events.createdAt,
-      updatedAt: events.updatedAt,
-      participantCount: sql<number>`count(${participants.id})::int`,
-    })
-    .from(events)
-    .leftJoin(participants, eq(participants.eventId, events.id))
-    .where(where)
-    .groupBy(events.id)
-    .orderBy(desc(events.tanggalMulai), desc(events.id));
+  const participantWhere = and(
+    eq(participants.eventId, events.id),
+    sql`${participants.deletedAt} IS NULL`,
+    eq(participants.statusPeserta, "aktif"),
+  );
 
-  return hydrateSignatories(rows);
+  const [totalRow, rows] = await Promise.all([
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(events)
+      .where(where),
+    db
+      .select({
+        id: events.id,
+        kodeEvent: events.kodeEvent,
+        namaKegiatan: events.namaKegiatan,
+        kategori: events.kategori,
+        statusEvent: events.statusEvent,
+        tanggalMulai: events.tanggalMulai,
+        tanggalSelesai: events.tanggalSelesai,
+        lokasi: events.lokasi,
+        skp: events.skp,
+        keterangan: events.keterangan,
+        certificateTemplateId: events.certificateTemplateId,
+        createdBy: events.createdBy,
+        createdAt: events.createdAt,
+        updatedAt: events.updatedAt,
+        participantCount: sql<number>`count(${participants.id})::int`,
+      })
+      .from(events)
+      .leftJoin(participants, participantWhere)
+      .where(where)
+      .groupBy(events.id)
+      .orderBy(desc(events.tanggalMulai), desc(events.id))
+      .limit(pageSize)
+      .offset(offset),
+  ]);
+
+  const total = totalRow[0]?.total ?? 0;
+  const hydrated = await hydrateSignatories(rows);
+
+  return {
+    rows: hydrated,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
 export async function getEvent(id: number): Promise<EventRow | null> {
@@ -300,8 +341,15 @@ export async function getEvent(id: number): Promise<EventRow | null> {
       participantCount: sql<number>`count(${participants.id})::int`,
     })
     .from(events)
-    .leftJoin(participants, eq(participants.eventId, events.id))
-    .where(eq(events.id, parsedId))
+    .leftJoin(
+      participants,
+      and(
+        eq(participants.eventId, events.id),
+        sql`${participants.deletedAt} IS NULL`,
+        eq(participants.statusPeserta, "aktif"),
+      ),
+    )
+    .where(and(eq(events.id, parsedId), sql`${events.deletedAt} IS NULL`))
     .groupBy(events.id)
     .limit(1);
 
@@ -352,6 +400,11 @@ export async function createEvent(data: unknown) {
 
     if (!row) throw new Error("Gagal membuat kegiatan.");
     await attachSignatories(row.id, selectedSignatories);
+
+    await db.insert(eventCertificateCounters).values({
+      eventId: row.id,
+      lastCounter: 0,
+    });
 
     await db.insert(auditLog).values({
       userId: session.user.id,
@@ -430,22 +483,121 @@ export async function deleteEvent(id: number) {
   const [existing] = await db
     .select({ id: events.id, namaKegiatan: events.namaKegiatan })
     .from(events)
-    .where(eq(events.id, parsedId))
+    .where(and(eq(events.id, parsedId), sql`${events.deletedAt} IS NULL`))
     .limit(1);
 
   if (!existing) return { ok: false as const, error: "Kegiatan tidak ditemukan." };
 
-  await db.delete(events).where(eq(events.id, parsedId));
+  await db
+    .update(events)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(eq(events.id, parsedId));
 
   await db.insert(auditLog).values({
     userId: session.user.id,
-    aksi: "DELETE_SERTIFIKAT_EVENT",
+    aksi: "SOFT_DELETE_SERTIFIKAT_EVENT",
     entitasType: "sertifikat_event",
     entitasId: String(parsedId),
     detail: { namaKegiatan: existing.namaKegiatan },
   });
 
   revalidatePath("/sertifikat/kegiatan");
+  return { ok: true as const };
+}
+
+// ─── Quick Stats per Event (D2) ──────────────────────────────────────────────
+
+export type EventQuickStats = {
+  total: number;
+  aktif: number;
+  dicabut: number;
+  punyaEmail: number;
+  emailTerkirim: number;
+  sudahDownload: number;
+};
+
+export async function getEventQuickStats(eventId: number): Promise<EventQuickStats> {
+  await requireRole(["admin", "staff"]);
+  const parsedId = eventIdSchema.parse(eventId);
+
+  const [stats] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      aktif: sql<number>`count(*) filter (where ${participants.statusPeserta} = 'aktif')::int`,
+      dicabut: sql<number>`count(*) filter (where ${participants.statusPeserta} = 'dicabut')::int`,
+      punyaEmail: sql<number>`count(*) filter (where ${participants.email} is not null and ${participants.email} <> '')::int`,
+      emailTerkirim: sql<number>`count(*) filter (where ${participants.emailSentAt} is not null)::int`,
+      sudahDownload: sql<number>`count(*) filter (where ${participants.lastPdfGeneratedAt} is not null)::int`,
+    })
+    .from(participants)
+    .where(
+      and(
+        eq(participants.eventId, parsedId),
+        sql`${participants.deletedAt} IS NULL`,
+      ),
+    );
+
+  return stats ?? { total: 0, aktif: 0, dicabut: 0, punyaEmail: 0, emailTerkirim: 0, sudahDownload: 0 };
+}
+
+// ─── Trash / Restore (C1) ─────────────────────────────────────────────────────
+
+export type DeletedEventRow = {
+  id: number;
+  kodeEvent: string;
+  namaKegiatan: string;
+  kategori: KategoriKegiatan;
+  tanggalMulai: string;
+  tanggalSelesai: string;
+  deletedAt: Date | null;
+};
+
+export async function listDeletedEvents(): Promise<DeletedEventRow[]> {
+  await requireRole(["admin"]);
+  const rows = await db
+    .select({
+      id: events.id,
+      kodeEvent: events.kodeEvent,
+      namaKegiatan: events.namaKegiatan,
+      kategori: events.kategori,
+      tanggalMulai: events.tanggalMulai,
+      tanggalSelesai: events.tanggalSelesai,
+      deletedAt: events.deletedAt,
+    })
+    .from(events)
+    .where(sql`${events.deletedAt} IS NOT NULL`)
+    .orderBy(desc(events.deletedAt));
+  return rows;
+}
+
+export async function restoreEvent(id: number) {
+  const parsedId = eventIdSchema.parse(id);
+  const session = await requireRole(["admin"]);
+
+  const [existing] = await db
+    .select({ id: events.id, namaKegiatan: events.namaKegiatan, deletedAt: events.deletedAt })
+    .from(events)
+    .where(eq(events.id, parsedId))
+    .limit(1);
+
+  if (!existing) return { ok: false as const, error: "Kegiatan tidak ditemukan." };
+  if (!existing.deletedAt) return { ok: false as const, error: "Kegiatan tidak berada di sampah." };
+
+  await db
+    .update(events)
+    .set({ deletedAt: null, updatedAt: new Date() })
+    .where(eq(events.id, parsedId));
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "RESTORE_SERTIFIKAT_EVENT",
+    entitasType: "sertifikat_event",
+    entitasId: String(parsedId),
+    detail: { namaKegiatan: existing.namaKegiatan },
+  });
+
+  revalidatePath("/sertifikat/kegiatan");
+  revalidatePath("/sertifikat/sampah");
   return { ok: true as const };
 }
 

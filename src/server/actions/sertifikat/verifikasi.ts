@@ -1,6 +1,6 @@
 "use server";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   eventSignatories,
@@ -45,6 +45,7 @@ export async function verifyByNoSertifikat(noSertifikat: string): Promise<Verifi
       noSertifikat: participants.noSertifikat,
       nama: participants.nama,
       role: participants.role,
+      statusPeserta: participants.statusPeserta,
       eventId: events.id,
       namaKegiatan: events.namaKegiatan,
       kategori: events.kategori,
@@ -56,7 +57,13 @@ export async function verifyByNoSertifikat(noSertifikat: string): Promise<Verifi
     })
     .from(participants)
     .innerJoin(events, eq(participants.eventId, events.id))
-    .where(eq(participants.noSertifikat, no))
+    .where(
+      and(
+        eq(participants.noSertifikat, no),
+        sql`${participants.deletedAt} IS NULL`,
+        eq(participants.statusPeserta, "aktif"),
+      ),
+    )
     .limit(1);
 
   if (!row) return { found: false };

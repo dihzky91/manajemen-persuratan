@@ -87,6 +87,11 @@ export const statusEventEnum = pgEnum("status_event", [
   "arsip",
 ]);
 
+export const statusPesertaEnum = pgEnum("status_peserta", [
+  "aktif",
+  "dicabut",
+]);
+
 export type TemplateFieldKey =
   | "namaPeserta"
   | "noSertifikat"
@@ -621,6 +626,7 @@ export const events = pgTable("events", {
     { onDelete: "set null" },
   ),
   createdBy: text("created_by").references(() => users.id),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -666,17 +672,111 @@ export const participants = pgTable(
     eventId: integer("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" }),
-    noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull().unique(),
+    noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull(),
     nama: varchar("nama", { length: 255 }).notNull(),
     role: varchar("role", { length: 50 }).default("Peserta").notNull(),
     email: varchar("email", { length: 150 }),
     emailSentAt: timestamp("email_sent_at"),
+    statusPeserta: statusPesertaEnum("status_peserta").default("aktif").notNull(),
+    revokedAt: timestamp("revoked_at"),
+    revokedBy: text("revoked_by").references(() => users.id),
+    revokeReason: text("revoke_reason"),
+    deletedAt: timestamp("deleted_at"),
+    lastPdfHash: varchar("last_pdf_hash", { length: 64 }),
+    lastPdfGeneratedAt: timestamp("last_pdf_generated_at"),
+    replacesParticipantId: integer("replaces_participant_id"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
   (t) => ({
     eventIdIdx: index("participants_event_id_idx").on(t.eventId),
+    statusIdx: index("participants_status_idx").on(t.statusPeserta),
+    replacesIdx: index("participants_replaces_idx").on(t.replacesParticipantId),
   }),
+);
+
+export const participantRevisions = pgTable(
+  "participant_revisions",
+  {
+    id: serial("id").primaryKey(),
+    participantId: integer("participant_id")
+      .notNull()
+      .references(() => participants.id, { onDelete: "cascade" }),
+    changedBy: text("changed_by").references(() => users.id),
+    changeType: varchar("change_type", { length: 30 }).notNull(), // create, update, revoke, reactivate, soft_delete, restore, reissue
+    before: jsonb("before"),
+    after: jsonb("after"),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    participantIdx: index("participant_revisions_participant_idx").on(t.participantId),
+  }),
+);
+
+// ─── JADWAL UJIAN ────────────────────────────────────────────────────────────
+
+// Nilai lookup (program, tipe, mode) dikelola admin dari UI — tidak pakai enum
+export const jadwalUjianConfig = pgTable(
+  "jadwal_ujian_config",
+  {
+    id: text("id").primaryKey(),
+    jenis: varchar("jenis", { length: 20 }).notNull(),  // "program" | "tipe" | "mode"
+    nilai: varchar("nilai", { length: 100 }).notNull(),
+    urutan: integer("urutan").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("uniq_config_jenis_nilai").on(t.jenis, t.nilai)],
+);
+
+export const pengawas = pgTable("pengawas", {
+  id: text("id").primaryKey(),
+  nama: varchar("nama", { length: 200 }).notNull(),
+  catatan: text("catatan"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const kelasUjian = pgTable("kelas_ujian", {
+  id: text("id").primaryKey(),
+  namaKelas: varchar("nama_kelas", { length: 200 }).notNull(),
+  program: varchar("program", { length: 100 }).notNull(),
+  tipe: varchar("tipe", { length: 100 }).notNull(),
+  mode: varchar("mode", { length: 50 }).notNull(),
+  lokasi: varchar("lokasi", { length: 300 }),
+  catatan: text("catatan"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jadwalUjian = pgTable("jadwal_ujian", {
+  id: text("id").primaryKey(),
+  kelasId: text("kelas_id")
+    .notNull()
+    .references(() => kelasUjian.id, { onDelete: "cascade" }),
+  mataPelajaran: varchar("mata_pelajaran", { length: 200 }).notNull(),
+  tanggalUjian: date("tanggal_ujian").notNull(),
+  jamMulai: varchar("jam_mulai", { length: 5 }).notNull(),
+  jamSelesai: varchar("jam_selesai", { length: 5 }).notNull(),
+  catatan: text("catatan"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const penugasanPengawas = pgTable(
+  "penugasan_pengawas",
+  {
+    id: text("id").primaryKey(),
+    ujianId: text("ujian_id")
+      .notNull()
+      .references(() => jadwalUjian.id, { onDelete: "cascade" }),
+    pengawasId: text("pengawas_id")
+      .notNull()
+      .references(() => pengawas.id, { onDelete: "cascade" }),
+    konflik: boolean("konflik").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("uniq_ujian_pengawas").on(t.ujianId, t.pengawasId)],
 );
 
 // ─── TYPE EXPORTS ────────────────────────────────────────────────────────────
@@ -713,3 +813,13 @@ export type EventSignatory = typeof eventSignatories.$inferSelect;
 export type NewEventSignatory = typeof eventSignatories.$inferInsert;
 export type Participant = typeof participants.$inferSelect;
 export type NewParticipant = typeof participants.$inferInsert;
+export type Pengawas = typeof pengawas.$inferSelect;
+export type NewPengawas = typeof pengawas.$inferInsert;
+export type KelasUjian = typeof kelasUjian.$inferSelect;
+export type NewKelasUjian = typeof kelasUjian.$inferInsert;
+export type JadwalUjian = typeof jadwalUjian.$inferSelect;
+export type NewJadwalUjian = typeof jadwalUjian.$inferInsert;
+export type PenugasanPengawas = typeof penugasanPengawas.$inferSelect;
+export type NewPenugasanPengawas = typeof penugasanPengawas.$inferInsert;
+export type JadwalUjianConfig = typeof jadwalUjianConfig.$inferSelect;
+export type NewJadwalUjianConfig = typeof jadwalUjianConfig.$inferInsert;

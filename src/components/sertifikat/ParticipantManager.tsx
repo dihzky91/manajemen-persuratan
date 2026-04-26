@@ -1,16 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Download, FileText, FileUp, Loader2, Mail, Pencil, Plus, QrCode, Trash2 } from "lucide-react";
+import { Ban, CheckCircle, Download, Eye, FileSpreadsheet, FileText, FileUp, Loader2, Mail, Pencil, Plus, QrCode, RefreshCw, Trash2 } from "lucide-react";
 import QRCode from "qrcode";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,14 +36,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { formatTanggal } from "@/lib/utils";
-import type { EventRow } from "@/server/actions/sertifikat/events";
+import { getEventQuickStats, type EventRow, type EventQuickStats } from "@/server/actions/sertifikat/events";
 import {
   bulkImportParticipants,
+  bulkDeleteParticipants,
+  bulkRevokeParticipants,
   createParticipant,
   deleteParticipant,
+  listByEvent,
+  reactivateParticipant,
+  reissueParticipant,
+  revokeParticipant,
   updateParticipant,
+  type ParticipantFilters,
+  type ParticipantListResult,
   type ParticipantRow,
+  type StatusPeserta,
 } from "@/server/actions/sertifikat/participants";
 import {
   generateBulkCertificatesZip,
@@ -51,6 +61,8 @@ import {
   sendBulkCertificateEmails,
   sendCertificateEmail,
 } from "@/server/actions/sertifikat/certificates";
+import { exportEventReport } from "@/server/actions/sertifikat/reports";
+import { ParticipantRevisionsTimeline } from "./ParticipantRevisionsTimeline";
 
 const participantSchema = z.object({
   noSertifikat: z.string().trim().max(100).optional(),
@@ -199,35 +211,97 @@ async function dataUrlToBytes(dataUrl: string) {
 
 export function ParticipantManager({
   event,
-  participants,
+  initialParticipants,
+  initialStats,
 }: {
   event: EventRow;
-  participants: ParticipantRow[];
+  initialParticipants: ParticipantListResult;
+  initialStats: EventQuickStats;
 }) {
-  const router = useRouter();
+  const [data, setData] = useState<ParticipantListResult>(initialParticipants);
+  const [stats, setStats] = useState<EventQuickStats>(initialStats);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusPeserta | "all">("aktif");
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(25);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<ParticipantRow | null>(null);
+  const [revokeReason, setRevokeReason] = useState("");
+  const [bulkRevokeOpen, setBulkRevokeOpen] = useState(false);
+  const [bulkRevokeReason, setBulkRevokeReason] = useState("");
+  const [reissueTarget, setReissueTarget] = useState<ParticipantRow | null>(null);
+  const [reissueForm, setReissueForm] = useState({ nama: "", role: "Peserta", email: "", reason: "" });
+  const [previewPdf, setPreviewPdf] = useState<{ url: string; fileName: string; participantName: string } | null>(null);
   const [qrParticipant, setQrParticipant] = useState<ParticipantRow | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [editingParticipant, setEditingParticipant] = useState<ParticipantRow | null>(null);
   const [isPending, startTransition] = useTransition();
   const [file, setFile] = useState<File | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const form = useForm<ParticipantFormValues>({
     resolver: zodResolver(participantSchema),
     defaultValues: toFormValues(),
   });
 
-  const filteredParticipants = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return participants;
-    return participants.filter(
-      (participant) =>
-        participant.nama.toLowerCase().includes(term) ||
-        participant.noSertifikat.toLowerCase().includes(term),
-    );
-  }, [participants, search]);
+  const fetchData = useCallback(
+    (overrides: Partial<ParticipantFilters> = {}) => {
+      startTransition(async () => {
+        const [result, freshStats] = await Promise.all([
+          listByEvent(event.id, {
+            search: (overrides.search as string) ?? search,
+            status: (overrides.status as StatusPeserta | "all") ?? statusFilter,
+            page: (overrides.page as number) ?? page,
+            pageSize,
+          }),
+          getEventQuickStats(event.id),
+        ]);
+        setData(result);
+        setStats(freshStats);
+      });
+    },
+    [event.id, search, statusFilter, page, pageSize],
+  );
+
+  const allChecked = data.rows.length > 0 && data.rows.every((row) => selectedIds.has(row.id));
+  const someChecked = data.rows.some((row) => selectedIds.has(row.id)) && !allChecked;
+
+  function toggleAll() {
+    if (allChecked) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(data.rows.map((row) => row.id)));
+    }
+  }
+
+  function toggleOne(id: number) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  }
+
+  function handleSearch() {
+    setPage(1);
+    setSelectedIds(new Set());
+    fetchData({ search, page: 1 });
+  }
+
+  function handleStatusChange(value: string) {
+    const status = value as StatusPeserta | "all";
+    setStatusFilter(status);
+    setPage(1);
+    setSelectedIds(new Set());
+    fetchData({ status, page: 1 });
+  }
+
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
+    setSelectedIds(new Set());
+    fetchData({ page: newPage });
+  }
 
   function openCreateDialog() {
     setEditingParticipant(null);
@@ -250,7 +324,7 @@ export function ParticipantManager({
       if (result.ok) {
         toast.success(editingParticipant ? "Peserta berhasil diperbarui." : "Peserta berhasil ditambahkan.");
         setDialogOpen(false);
-        router.refresh();
+        fetchData();
       } else {
         toast.error(result.error);
       }
@@ -263,9 +337,147 @@ export function ParticipantManager({
       const result = await deleteParticipant(participant.id);
       if (result.ok) {
         toast.success("Peserta berhasil dihapus.");
-        router.refresh();
+        fetchData();
       } else {
         toast.error(result.error);
+      }
+    });
+  }
+
+  function handleRevoke(participant: ParticipantRow) {
+    setRevokeTarget(participant);
+    setRevokeReason("");
+    setRevokeOpen(true);
+  }
+
+  function confirmRevoke() {
+    if (!revokeTarget) return;
+    startTransition(async () => {
+      const result = await revokeParticipant(revokeTarget.id, revokeReason || undefined);
+      if (result.ok) {
+        toast.success("Sertifikat berhasil dicabut.");
+        setRevokeOpen(false);
+        setRevokeTarget(null);
+        fetchData();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleReissue(participant: ParticipantRow) {
+    setReissueTarget(participant);
+    setReissueForm({
+      nama: participant.nama,
+      role: participant.role,
+      email: participant.email ?? "",
+      reason: "",
+    });
+  }
+
+  function confirmReissue() {
+    if (!reissueTarget) return;
+    if (!reissueForm.nama.trim()) {
+      toast.error("Nama wajib diisi.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await reissueParticipant(reissueTarget.id, {
+        nama: reissueForm.nama.trim(),
+        role: reissueForm.role.trim() || undefined,
+        email: reissueForm.email.trim() || null,
+        reason: reissueForm.reason.trim() || undefined,
+      });
+      if (result.ok) {
+        toast.success(`Sertifikat baru terbit: ${result.data.noSertifikat}`);
+        setReissueTarget(null);
+        fetchData();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleReactivate(participant: ParticipantRow) {
+    if (!window.confirm(`Aktifkan kembali sertifikat "${participant.nama}"?`)) return;
+    startTransition(async () => {
+      const result = await reactivateParticipant(participant.id);
+      if (result.ok) {
+        toast.success("Sertifikat berhasil diaktifkan kembali.");
+        fetchData();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    const idsToDelete = [...selectedIds];
+    if (!window.confirm(`Hapus ${idsToDelete.length} peserta terpilih?`)) return;
+
+    // Optimistic: remove rows immediately
+    const targetSet = new Set(idsToDelete);
+    setData((prev) => ({
+      ...prev,
+      rows: prev.rows.filter((row) => !targetSet.has(row.id)),
+      total: Math.max(0, prev.total - idsToDelete.length),
+    }));
+    setStats((prev) => ({
+      ...prev,
+      total: Math.max(0, prev.total - idsToDelete.length),
+      aktif: Math.max(0, prev.aktif - idsToDelete.length),
+    }));
+    setSelectedIds(new Set());
+
+    startTransition(async () => {
+      const result = await bulkDeleteParticipants(idsToDelete);
+      if (result.ok) {
+        toast.success(`${result.data.deleted} peserta berhasil dihapus.`);
+        fetchData(); // Sync with truth
+      } else {
+        toast.error(result.error);
+        fetchData(); // Rollback
+      }
+    });
+  }
+
+  function handleBulkRevoke() {
+    if (selectedIds.size === 0) return;
+    setBulkRevokeReason("");
+    setBulkRevokeOpen(true);
+  }
+
+  function confirmBulkRevoke() {
+    const idsToRevoke = [...selectedIds];
+    if (idsToRevoke.length === 0) return;
+
+    // Optimistic: mark as dicabut, or remove from view if filter is "aktif"
+    const targetSet = new Set(idsToRevoke);
+    setData((prev) => ({
+      ...prev,
+      rows:
+        statusFilter === "aktif"
+          ? prev.rows.filter((row) => !targetSet.has(row.id))
+          : prev.rows.map((row) => (targetSet.has(row.id) ? { ...row, statusPeserta: "dicabut" as StatusPeserta } : row)),
+      total: statusFilter === "aktif" ? Math.max(0, prev.total - idsToRevoke.length) : prev.total,
+    }));
+    setStats((prev) => ({
+      ...prev,
+      aktif: Math.max(0, prev.aktif - idsToRevoke.length),
+      dicabut: prev.dicabut + idsToRevoke.length,
+    }));
+    setBulkRevokeOpen(false);
+    setSelectedIds(new Set());
+
+    startTransition(async () => {
+      const result = await bulkRevokeParticipants(idsToRevoke, bulkRevokeReason || undefined);
+      if (result.ok) {
+        toast.success(`${result.data.revoked} sertifikat berhasil dicabut.`);
+        fetchData();
+      } else {
+        toast.error(result.error);
+        fetchData(); // Rollback
       }
     });
   }
@@ -288,10 +500,12 @@ export function ParticipantManager({
   }
 
   async function exportAllQr() {
-    if (participants.length === 0) return;
-    toast.info("Menyiapkan file QR.");
+    if (data.total === 0) return;
+    toast.info("Menyiapkan file QR...");
+    const { listAllByEvent } = await import("@/server/actions/sertifikat/participants");
+    const allParticipants = await listAllByEvent(event.id);
     const files = await Promise.all(
-      participants.map(async (participant) => {
+      allParticipants.map(async (participant) => {
         const dataUrl = await QRCode.toDataURL(buildVerificationUrl(participant.noSertifikat), {
           width: 512,
           margin: 2,
@@ -322,8 +536,51 @@ export function ParticipantManager({
     });
   }
 
+  function previewPdfFor(participant: ParticipantRow) {
+    const toastId = toast.loading("Menyiapkan preview...");
+    startTransition(async () => {
+      const result = await generateCertificatePdf(participant.id);
+      toast.dismiss(toastId);
+      if (result.ok) {
+        const byteChars = atob(result.data.pdfBase64);
+        const bytes = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        // Revoke previous URL if any
+        if (previewPdf?.url) URL.revokeObjectURL(previewPdf.url);
+        setPreviewPdf({ url, fileName: result.data.fileName, participantName: participant.nama });
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function closePreview() {
+    if (previewPdf?.url) URL.revokeObjectURL(previewPdf.url);
+    setPreviewPdf(null);
+  }
+
+  function downloadReport() {
+    const toastId = toast.loading("Menyiapkan laporan...");
+    startTransition(async () => {
+      const result = await exportEventReport(event.id);
+      toast.dismiss(toastId);
+      if (result.ok) {
+        downloadBase64(
+          result.data.xlsxBase64,
+          result.data.fileName,
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
+        toast.success("Laporan berhasil diekspor.");
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   function downloadAllPdf() {
-    if (participants.length === 0) return;
+    if (data.total === 0) return;
     const toastId = toast.loading("Menyiapkan semua sertifikat...");
     startTransition(async () => {
       const result = await generateBulkCertificatesZip(event.id);
@@ -344,7 +601,7 @@ export function ParticipantManager({
       toast.dismiss(toastId);
       if (result.ok) {
         toast.success("Email sertifikat berhasil dikirim.");
-        router.refresh();
+        fetchData();
       } else {
         toast.error(result.error);
       }
@@ -352,22 +609,22 @@ export function ParticipantManager({
   }
 
   function sendAllEmails() {
-    const validRecipients = participants.filter((participant) => participant.email).length;
-    if (validRecipients === 0) {
-      toast.error("Tidak ada peserta dengan email.");
+    if (data.total === 0) {
+      toast.error("Tidak ada peserta aktif.");
       return;
     }
-    if (!window.confirm(`Kirim email sertifikat ke ${validRecipients} peserta?`)) return;
+    if (!window.confirm("Kirim email sertifikat ke semua peserta aktif?")) return;
 
     const toastId = toast.loading("Mengirim email sertifikat...");
     startTransition(async () => {
       const result = await sendBulkCertificateEmails(event.id);
       toast.dismiss(toastId);
       if (result.ok) {
-        toast.success(
-          `Email selesai: ${result.data.sent} terkirim, ${result.data.skipped} dilewati, ${result.data.failed} gagal.`,
-        );
-        router.refresh();
+        const { sent, skipped, failed } = result.data;
+        toast.success(`Bulk email selesai: ${sent} terkirim`, {
+          description: `${skipped} dilewati (tanpa email) · ${failed} gagal`,
+        });
+        fetchData();
       } else {
         toast.error(result.error);
       }
@@ -381,24 +638,35 @@ export function ParticipantManager({
       formData.append("file", file);
       const result = await bulkImportParticipants(event.id, formData);
       if (result.ok) {
-        toast.success(
-          `Import selesai: ${result.data.successCount}/${result.data.totalRows} berhasil.`,
-        );
+        toast.success(`Import selesai: ${result.data.successCount}/${result.data.totalRows} baris berhasil`, {
+          description: result.data.errors.length > 0 ? `${result.data.errors.length} baris gagal — cek console untuk detail.` : "Semua data berhasil diimpor.",
+        });
         if (result.data.errors.length > 0) {
-          toast.warning(`${result.data.errors.length} baris gagal diproses.`);
           console.error("Import peserta gagal:", result.data.errors);
         }
         setImportOpen(false);
         setFile(null);
-        router.refresh();
+        fetchData();
       } else {
         toast.error(result.error);
       }
     });
   }
 
+  const pctDownload = stats.aktif > 0 ? Math.round((stats.sudahDownload / stats.aktif) * 100) : 0;
+  const pctEmail = stats.punyaEmail > 0 ? Math.round((stats.emailTerkirim / stats.punyaEmail) * 100) : 0;
+
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard label="Total" value={stats.total} />
+        <StatCard label="Aktif" value={stats.aktif} className="text-emerald-600" />
+        <StatCard label="Dicabut" value={stats.dicabut} className="text-red-600" />
+        <StatCard label="Punya Email" value={stats.punyaEmail} />
+        <StatCard label="Email Terkirim" value={`${stats.emailTerkirim} (${pctEmail}%)`} />
+        <StatCard label="Sudah Download" value={`${stats.sudahDownload} (${pctDownload}%)`} />
+      </div>
+
       <Card className="rounded-xl">
         <CardHeader>
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -414,7 +682,7 @@ export function ParticipantManager({
         <CardContent className="grid gap-3 text-sm md:grid-cols-4">
           <Info label="Lokasi" value={event.lokasi ?? "-"} />
           <Info label="SKP" value={event.skp ?? "-"} />
-          <Info label="Peserta" value={String(participants.length)} />
+          <Info label="Peserta Aktif" value={String(data.total)} />
           <Info label="Penandatangan" value={String(event.signatories.length)} />
         </CardContent>
       </Card>
@@ -437,41 +705,92 @@ export function ParticipantManager({
                 <FileUp className="h-4 w-4" />
                 Import Excel/CSV
               </Button>
-              <Button type="button" variant="outline" onClick={exportAllQr} disabled={participants.length === 0}>
+              <Button type="button" variant="outline" onClick={exportAllQr} disabled={data.total === 0}>
                 <Download className="h-4 w-4" />
                 Export QR All
               </Button>
-              <Button type="button" variant="outline" onClick={downloadAllPdf} disabled={participants.length === 0}>
+              <Button type="button" variant="outline" onClick={downloadAllPdf} disabled={data.total === 0}>
                 <FileText className="h-4 w-4" />
                 Download Semua Sertifikat (ZIP)
               </Button>
-              <Button type="button" variant="outline" onClick={sendAllEmails} disabled={participants.length === 0}>
+              <Button type="button" variant="outline" onClick={sendAllEmails} disabled={data.total === 0}>
                 <Mail className="h-4 w-4" />
                 Kirim Email ke Semua
+              </Button>
+              <Button type="button" variant="outline" onClick={downloadReport}>
+                <FileSpreadsheet className="h-4 w-4" />
+                Export Laporan (Excel)
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input
-            placeholder="Cari nama atau nomor sertifikat"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="max-w-md"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Cari nama atau nomor sertifikat"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="w-64"
+              />
+              <Button type="button" variant="outline" onClick={handleSearch}>
+                Cari
+              </Button>
+            </div>
+            <Select value={statusFilter} onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aktif">Aktif</SelectItem>
+                <SelectItem value="dicabut">Dicabut</SelectItem>
+                <SelectItem value="all">Semua</SelectItem>
+              </SelectContent>
+            </Select>
+            {selectedIds.size > 0 ? (
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={handleBulkDelete}>
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Hapus ({selectedIds.size})
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleBulkRevoke}>
+                  <Ban className="mr-1 h-4 w-4" />
+                  Cabut Sertifikat ({selectedIds.size})
+                </Button>
+              </div>
+            ) : null}
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allChecked}
+                    ref={(el) => {
+                      if (el) el.dataset.state = someChecked ? "indeterminate" : allChecked ? "checked" : "unchecked";
+                    }}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
                 <TableHead>No. Sertifikat</TableHead>
                 <TableHead>Nama</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredParticipants.map((participant) => (
-                <TableRow key={participant.id}>
+              {data.rows.map((participant) => (
+                <TableRow key={participant.id} className={participant.statusPeserta === "dicabut" ? "opacity-60" : ""}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(participant.id)}
+                      onCheckedChange={() => toggleOne(participant.id)}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono">{participant.noSertifikat}</TableCell>
                   <TableCell className="font-medium">{participant.nama}</TableCell>
                   <TableCell>
@@ -488,26 +807,55 @@ export function ParticipantManager({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="icon-sm" onClick={() => downloadPdf(participant)}>
+                    {participant.statusPeserta === "dicabut" ? (
+                      <Badge variant="destructive" className="gap-1">
+                        <Ban className="h-3 w-3" />
+                        DICABUT
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                        Aktif
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Button variant="outline" size="icon-sm" onClick={() => previewPdfFor(participant)} title="Preview Sertifikat">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon-sm" onClick={() => downloadPdf(participant)} title="Download PDF">
                         <FileText className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="icon-sm"
-                        disabled={!participant.email}
+                        disabled={!participant.email || participant.statusPeserta === "dicabut"}
                         title={!participant.email ? "Peserta belum punya email" : "Kirim email sertifikat"}
                         onClick={() => sendEmail(participant)}
                       >
                         <Mail className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="icon-sm" onClick={() => openQr(participant)}>
+                      <Button variant="outline" size="icon-sm" onClick={() => openQr(participant)} title="QR Code">
                         <QrCode className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="icon-sm" onClick={() => openEditDialog(participant)}>
+                      <Button variant="outline" size="icon-sm" onClick={() => openEditDialog(participant)} title="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="destructive" size="icon-sm" onClick={() => removeParticipant(participant)}>
+                      {participant.statusPeserta === "aktif" ? (
+                        <>
+                          <Button variant="outline" size="icon-sm" onClick={() => handleReissue(participant)} title="Terbitkan Ulang" className="text-purple-600 hover:text-purple-700">
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon-sm" onClick={() => handleRevoke(participant)} title="Cabut Sertifikat" className="text-orange-600 hover:text-orange-700">
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button variant="outline" size="icon-sm" onClick={() => handleReactivate(participant)} title="Aktifkan Kembali" className="text-green-600 hover:text-green-700">
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button variant="destructive" size="icon-sm" onClick={() => removeParticipant(participant)} title="Hapus">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -516,16 +864,33 @@ export function ParticipantManager({
               ))}
             </TableBody>
           </Table>
-          {filteredParticipants.length === 0 ? (
+
+          {data.rows.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-              Belum ada peserta.
+              {statusFilter === "dicabut" ? "Tidak ada sertifikat yang dicabut." : "Belum ada peserta."}
+            </div>
+          ) : null}
+
+          {data.totalPages > 1 ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Halaman {data.page} dari {data.totalPages} ({data.total} total)
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={data.page <= 1} onClick={() => handlePageChange(data.page - 1)}>
+                  Sebelumnya
+                </Button>
+                <Button variant="outline" size="sm" disabled={data.page >= data.totalPages} onClick={() => handlePageChange(data.page + 1)}>
+                  Berikutnya
+                </Button>
+              </div>
             </div>
           ) : null}
         </CardContent>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingParticipant ? "Edit Peserta" : "Tambah Peserta"}</DialogTitle>
           </DialogHeader>
@@ -572,6 +937,12 @@ export function ParticipantManager({
               </Button>
             </DialogFooter>
           </form>
+          {editingParticipant ? (
+            <div className="mt-4 border-t border-border pt-4">
+              <h4 className="mb-3 text-sm font-semibold">Riwayat Perubahan</h4>
+              <ParticipantRevisionsTimeline participantId={editingParticipant.id} />
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 
@@ -596,6 +967,158 @@ export function ParticipantManager({
               <Button type="button" onClick={submitImport} disabled={!file || isPending}>
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Import
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cabut Sertifikat</DialogTitle>
+            <DialogDescription>
+              Sertifikat <strong>{revokeTarget?.noSertifikat}</strong> atas nama <strong>{revokeTarget?.nama}</strong> akan dicabut. Sertifikat yang dicabut tidak akan muncul di verifikasi publik.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Alasan Pencabutan (opsional)</Label>
+              <Textarea
+                placeholder="Masukkan alasan pencabutan..."
+                value={revokeReason}
+                onChange={(e) => setRevokeReason(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRevokeOpen(false)}>
+                Batal
+              </Button>
+              <Button type="button" variant="destructive" onClick={confirmRevoke} disabled={isPending}>
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Cabut Sertifikat
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!reissueTarget} onOpenChange={(open) => !open && setReissueTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Terbitkan Ulang Sertifikat</DialogTitle>
+            <DialogDescription>
+              Sertifikat lama <strong>{reissueTarget?.noSertifikat}</strong> akan dicabut, lalu sertifikat baru diterbitkan dengan nomor baru otomatis.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nama Penerima</Label>
+              <Input
+                value={reissueForm.nama}
+                onChange={(e) => setReissueForm((prev) => ({ ...prev, nama: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={reissueForm.role} onValueChange={(value) => setReissueForm((prev) => ({ ...prev, role: value }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Peserta">Peserta</SelectItem>
+                    <SelectItem value="Pembicara">Pembicara</SelectItem>
+                    <SelectItem value="Panitia">Panitia</SelectItem>
+                    <SelectItem value="Moderator">Moderator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={reissueForm.email}
+                  onChange={(e) => setReissueForm((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Alasan Re-issue (opsional)</Label>
+              <Textarea
+                placeholder="Contoh: koreksi nama, perbaikan ejaan, dll."
+                value={reissueForm.reason}
+                onChange={(e) => setReissueForm((prev) => ({ ...prev, reason: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setReissueTarget(null)}>
+                Batal
+              </Button>
+              <Button type="button" onClick={confirmReissue} disabled={isPending} className="bg-purple-600 hover:bg-purple-700">
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Terbitkan Ulang
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!previewPdf} onOpenChange={(open) => !open && closePreview()}>
+        <DialogContent className="max-h-[95vh] sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Preview Sertifikat</DialogTitle>
+            <DialogDescription>{previewPdf?.participantName}</DialogDescription>
+          </DialogHeader>
+          {previewPdf ? (
+            <iframe
+              src={previewPdf.url}
+              title="Preview Sertifikat"
+              className="h-[70vh] w-full rounded-md border border-border"
+            />
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closePreview}>
+              Tutup
+            </Button>
+            {previewPdf ? (
+              <a
+                href={previewPdf.url}
+                download={previewPdf.fileName}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                <FileText className="h-4 w-4" />
+                Download
+              </a>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkRevokeOpen} onOpenChange={setBulkRevokeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cabut Sertifikat Terpilih</DialogTitle>
+            <DialogDescription>
+              {selectedIds.size} sertifikat akan dicabut. Sertifikat yang dicabut tidak akan muncul di verifikasi publik.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Alasan Pencabutan (opsional)</Label>
+              <Textarea
+                placeholder="Masukkan alasan pencabutan..."
+                value={bulkRevokeReason}
+                onChange={(e) => setBulkRevokeReason(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setBulkRevokeOpen(false)}>
+                Batal
+              </Button>
+              <Button type="button" variant="destructive" onClick={confirmBulkRevoke} disabled={isPending}>
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Cabut {selectedIds.size} Sertifikat
               </Button>
             </DialogFooter>
           </div>
@@ -637,4 +1160,21 @@ function Info({ label, value }: { label: string; value: string }) {
 
 function FormError({ message }: { message?: string }) {
   return message ? <p className="text-xs text-destructive">{message}</p> : null;
+}
+
+function StatCard({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | number;
+  className?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-xl font-semibold ${className ?? ""}`}>{value}</p>
+    </div>
+  );
 }

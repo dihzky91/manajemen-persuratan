@@ -1,0 +1,313 @@
+"use server";
+
+import { asc, desc, eq, sql, and, gte, lte } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { nanoid } from "nanoid";
+import { db } from "@/server/db";
+import {
+  jadwalUjian,
+  kelasUjian,
+  penugasanPengawas,
+  pengawas,
+  auditLog,
+} from "@/server/db/schema";
+import { requireRole, requireSession } from "@/server/actions/auth";
+import {
+  ujianCreateSchema,
+  ujianUpdateSchema,
+  type UjianCreateInput,
+  type UjianUpdateInput,
+  type UjianFilter,
+} from "@/lib/validators/jadwalUjian.schema";
+
+export type UjianRow = {
+  id: string;
+  kelasId: string;
+  namaKelas: string;
+  program: string;
+  tipe: string;
+  mode: string;
+  mataPelajaran: string;
+  tanggalUjian: string;
+  jamMulai: string;
+  jamSelesai: string;
+  catatan: string | null;
+  jumlahPengawas: number;
+  adaKonflik: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type UjianDetail = UjianRow & {
+  penugasan: {
+    id: string;
+    pengawasId: string;
+    namaPengawas: string;
+    konflik: boolean;
+    createdAt: Date;
+  }[];
+};
+
+export type UjianListResult = {
+  rows: UjianRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export async function listUjian(filter: UjianFilter = {}): Promise<UjianListResult> {
+  await requireSession();
+
+  const page = Math.max(1, filter.page ?? 1);
+  const pageSize = filter.pageSize ?? 25;
+  const offset = (page - 1) * pageSize;
+
+  const conditions = [];
+  if (filter.tanggalMulai) conditions.push(gte(jadwalUjian.tanggalUjian, filter.tanggalMulai));
+  if (filter.tanggalSelesai) conditions.push(lte(jadwalUjian.tanggalUjian, filter.tanggalSelesai));
+  if (filter.kelasId) conditions.push(eq(jadwalUjian.kelasId, filter.kelasId));
+  if (filter.program) conditions.push(eq(kelasUjian.program, filter.program));
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [totalResult, rows] = await Promise.all([
+    db
+      .select({ total: sql<number>`count(distinct ${jadwalUjian.id})::int` })
+      .from(jadwalUjian)
+      .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
+      .where(where),
+    db
+      .select({
+        id: jadwalUjian.id,
+        kelasId: jadwalUjian.kelasId,
+        namaKelas: kelasUjian.namaKelas,
+        program: kelasUjian.program,
+        tipe: kelasUjian.tipe,
+        mode: kelasUjian.mode,
+        mataPelajaran: jadwalUjian.mataPelajaran,
+        tanggalUjian: jadwalUjian.tanggalUjian,
+        jamMulai: jadwalUjian.jamMulai,
+        jamSelesai: jadwalUjian.jamSelesai,
+        catatan: jadwalUjian.catatan,
+        jumlahPengawas: sql<number>`count(${penugasanPengawas.id})::int`.as("jumlah_pengawas"),
+        adaKonflik:
+          sql<boolean>`bool_or(${penugasanPengawas.konflik})`.as("ada_konflik"),
+        createdAt: jadwalUjian.createdAt,
+        updatedAt: jadwalUjian.updatedAt,
+      })
+      .from(jadwalUjian)
+      .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
+      .leftJoin(penugasanPengawas, eq(penugasanPengawas.ujianId, jadwalUjian.id))
+      .where(where)
+      .groupBy(jadwalUjian.id, kelasUjian.id)
+      .orderBy(desc(jadwalUjian.tanggalUjian), asc(jadwalUjian.jamMulai))
+      .limit(pageSize)
+      .offset(offset),
+  ]);
+
+  const total = totalResult[0]?.total ?? 0;
+  return {
+    rows: rows as UjianRow[],
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+export async function getUjianById(id: string): Promise<UjianDetail | null> {
+  await requireSession();
+
+  const ujianRows = await db
+    .select({
+      id: jadwalUjian.id,
+      kelasId: jadwalUjian.kelasId,
+      namaKelas: kelasUjian.namaKelas,
+      program: kelasUjian.program,
+      tipe: kelasUjian.tipe,
+      mode: kelasUjian.mode,
+      mataPelajaran: jadwalUjian.mataPelajaran,
+      tanggalUjian: jadwalUjian.tanggalUjian,
+      jamMulai: jadwalUjian.jamMulai,
+      jamSelesai: jadwalUjian.jamSelesai,
+      catatan: jadwalUjian.catatan,
+      createdAt: jadwalUjian.createdAt,
+      updatedAt: jadwalUjian.updatedAt,
+    })
+    .from(jadwalUjian)
+    .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
+    .where(eq(jadwalUjian.id, id));
+
+  const ujian = ujianRows[0];
+  if (!ujian) return null;
+
+  const penugasanRows = await db
+    .select({
+      id: penugasanPengawas.id,
+      pengawasId: penugasanPengawas.pengawasId,
+      namaPengawas: pengawas.nama,
+      konflik: penugasanPengawas.konflik,
+      createdAt: penugasanPengawas.createdAt,
+    })
+    .from(penugasanPengawas)
+    .leftJoin(pengawas, eq(penugasanPengawas.pengawasId, pengawas.id))
+    .where(eq(penugasanPengawas.ujianId, id))
+    .orderBy(asc(pengawas.nama));
+
+  const jumlahPengawas = penugasanRows.length;
+  const adaKonflik = penugasanRows.some((p) => p.konflik);
+
+  return {
+    ...(ujian as Omit<UjianRow, "jumlahPengawas" | "adaKonflik">),
+    jumlahPengawas,
+    adaKonflik,
+    penugasan: penugasanRows as UjianDetail["penugasan"],
+  };
+}
+
+export async function createUjian(data: UjianCreateInput) {
+  const parsed = ujianCreateSchema.parse(data);
+  const session = await requireRole(["admin", "staff"]);
+
+  const id = nanoid();
+  const rows = await db
+    .insert(jadwalUjian)
+    .values({
+      id,
+      kelasId: parsed.kelasId,
+      mataPelajaran: parsed.mataPelajaran,
+      tanggalUjian: parsed.tanggalUjian,
+      jamMulai: parsed.jamMulai,
+      jamSelesai: parsed.jamSelesai,
+      catatan: parsed.catatan || null,
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("Gagal membuat jadwal ujian");
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "CREATE_JADWAL_UJIAN",
+    entitasType: "jadwal_ujian",
+    entitasId: id,
+    detail: {
+      mataPelajaran: parsed.mataPelajaran,
+      tanggalUjian: parsed.tanggalUjian,
+      jamMulai: parsed.jamMulai,
+      jamSelesai: parsed.jamSelesai,
+    },
+  });
+
+  revalidatePath("/jadwal-ujian");
+  return { ok: true as const, data: row };
+}
+
+export async function updateUjian(data: UjianUpdateInput) {
+  const parsed = ujianUpdateSchema.parse(data);
+  const session = await requireRole(["admin", "staff"]);
+
+  const rows = await db
+    .update(jadwalUjian)
+    .set({
+      kelasId: parsed.kelasId,
+      mataPelajaran: parsed.mataPelajaran,
+      tanggalUjian: parsed.tanggalUjian,
+      jamMulai: parsed.jamMulai,
+      jamSelesai: parsed.jamSelesai,
+      catatan: parsed.catatan || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(jadwalUjian.id, parsed.id))
+    .returning();
+  const row = rows[0];
+  if (!row) return { ok: false as const, error: "Jadwal ujian tidak ditemukan." };
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "UPDATE_JADWAL_UJIAN",
+    entitasType: "jadwal_ujian",
+    entitasId: parsed.id,
+    detail: {
+      mataPelajaran: parsed.mataPelajaran,
+      tanggalUjian: parsed.tanggalUjian,
+      jamMulai: parsed.jamMulai,
+      jamSelesai: parsed.jamSelesai,
+    },
+  });
+
+  revalidatePath("/jadwal-ujian");
+  revalidatePath(`/jadwal-ujian/${parsed.id}`);
+  return { ok: true as const, data: row };
+}
+
+export async function deleteUjian(id: string) {
+  const session = await requireRole(["admin"]);
+
+  const ujianRows = await db
+    .select({ mataPelajaran: jadwalUjian.mataPelajaran })
+    .from(jadwalUjian)
+    .where(eq(jadwalUjian.id, id));
+  if (!ujianRows[0]) return { ok: false as const, error: "Jadwal ujian tidak ditemukan." };
+
+  // Cascade delete penugasan_pengawas otomatis via FK
+  await db.delete(jadwalUjian).where(eq(jadwalUjian.id, id));
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "DELETE_JADWAL_UJIAN",
+    entitasType: "jadwal_ujian",
+    entitasId: id,
+    detail: { mataPelajaran: ujianRows[0].mataPelajaran },
+  });
+
+  revalidatePath("/jadwal-ujian");
+  return { ok: true as const };
+}
+
+// Kembalikan data mentah untuk diolah XLSX di sisi client
+export type UjianExportRow = {
+  tanggalUjian: string;
+  jamMulai: string;
+  jamSelesai: string;
+  namaKelas: string;
+  program: string;
+  tipe: string;
+  mode: string;
+  mataPelajaran: string;
+  pengawas: string;
+  catatan: string | null;
+};
+
+export async function getUjianForExport(filter: UjianFilter = {}): Promise<UjianExportRow[]> {
+  await requireSession();
+
+  const conditions = [];
+  if (filter.tanggalMulai) conditions.push(gte(jadwalUjian.tanggalUjian, filter.tanggalMulai));
+  if (filter.tanggalSelesai) conditions.push(lte(jadwalUjian.tanggalUjian, filter.tanggalSelesai));
+  if (filter.kelasId) conditions.push(eq(jadwalUjian.kelasId, filter.kelasId));
+  if (filter.program) conditions.push(eq(kelasUjian.program, filter.program));
+
+  const rows = await db
+    .select({
+      tanggalUjian: jadwalUjian.tanggalUjian,
+      jamMulai: jadwalUjian.jamMulai,
+      jamSelesai: jadwalUjian.jamSelesai,
+      namaKelas: kelasUjian.namaKelas,
+      program: kelasUjian.program,
+      tipe: kelasUjian.tipe,
+      mode: kelasUjian.mode,
+      mataPelajaran: jadwalUjian.mataPelajaran,
+      pengawas: sql<string>`coalesce(string_agg(${pengawas.nama}, ', ' order by ${pengawas.nama}), '-')`.as("pengawas"),
+      catatan: jadwalUjian.catatan,
+    })
+    .from(jadwalUjian)
+    .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
+    .leftJoin(penugasanPengawas, eq(penugasanPengawas.ujianId, jadwalUjian.id))
+    .leftJoin(pengawas, eq(penugasanPengawas.pengawasId, pengawas.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .groupBy(jadwalUjian.id, kelasUjian.id)
+    .orderBy(asc(jadwalUjian.tanggalUjian), asc(jadwalUjian.jamMulai));
+
+  return rows as UjianExportRow[];
+}

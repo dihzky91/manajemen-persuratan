@@ -2,6 +2,7 @@ import {
   PDFDocument,
   rgb,
   StandardFonts,
+  degrees,
   type PDFFont,
   type PDFPage,
 } from "pdf-lib";
@@ -148,6 +149,7 @@ export async function buildCertificatePdf(opts: {
   imageHeightPx: number;
   fieldPositions: TemplateFieldMap;
   data: CertificateData;
+  isRevoked?: boolean;
 }): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const templateImage =
@@ -194,6 +196,25 @@ export async function buildCertificatePdf(opts: {
       pageWidth: opts.imageWidthPx,
       pageHeight: opts.imageHeightPx,
       data: opts.data,
+    });
+  }
+
+  if (opts.isRevoked) {
+    const watermarkFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontSize = Math.min(opts.imageWidthPx, opts.imageHeightPx) * 0.12;
+    const text = "DICABUT";
+    const textWidth = watermarkFont.widthOfTextAtSize(text, fontSize);
+    const centerX = (opts.imageWidthPx - textWidth) / 2;
+    const centerY = opts.imageHeightPx / 2;
+
+    page.drawText(text, {
+      x: centerX,
+      y: centerY,
+      size: fontSize,
+      font: watermarkFont,
+      color: rgb(0.8, 0, 0),
+      opacity: 0.35,
+      rotate: degrees(-35),
     });
   }
 

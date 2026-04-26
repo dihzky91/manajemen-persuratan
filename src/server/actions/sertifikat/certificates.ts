@@ -1,6 +1,7 @@
 "use server";
 
-import { and, asc, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -19,12 +20,14 @@ import {
   type TemplateFieldMap,
 } from "@/server/db/schema";
 import { requireRole } from "../auth";
+import { checkSertifikatRateLimit, formatRetryAfter } from "@/lib/rate-limit/user-bucket";
 
 type TemplateKategori = typeof certificateTemplates.$inferSelect["kategori"];
 
 type PdfResult = {
   fileName: string;
   pdfBase64: string;
+  pdfHash: string;
   eventId: number;
   participantId: number;
   noSertifikat: string;
@@ -32,6 +35,7 @@ type PdfResult = {
   email: string | null;
   namaKegiatan: string;
   tanggalKegiatan: string;
+  isRevoked: boolean;
 };
 
 function sanitizeFileName(value: string) {
@@ -115,6 +119,7 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
       noSertifikat: participants.noSertifikat,
       namaPeserta: participants.nama,
       email: participants.email,
+      statusPeserta: participants.statusPeserta,
       namaKegiatan: events.namaKegiatan,
       kategori: events.kategori,
       tanggalMulai: events.tanggalMulai,
@@ -125,10 +130,17 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
     })
     .from(participants)
     .innerJoin(events, eq(participants.eventId, events.id))
-    .where(eq(participants.id, participantId))
+    .where(
+      and(
+        eq(participants.id, participantId),
+        sql`${participants.deletedAt} IS NULL`,
+      ),
+    )
     .limit(1);
 
   if (!row) throw new Error("Peserta tidak ditemukan.");
+
+  const isRevoked = row.statusPeserta === "dicabut";
 
   const template = await resolveTemplate(row);
   if (!template) {
@@ -175,11 +187,23 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
         jabatan: signature.jabatan ?? "",
       })),
     },
+    isRevoked,
   });
+
+  const pdfHash = createHash("sha256").update(pdf).digest("hex");
+
+  // Persist hash & generation timestamp; only update active certificates so revoked ones keep their last legitimate hash
+  if (!isRevoked) {
+    await db
+      .update(participants)
+      .set({ lastPdfHash: pdfHash, lastPdfGeneratedAt: new Date(), updatedAt: new Date() })
+      .where(eq(participants.id, row.participantId));
+  }
 
   return {
     fileName: `Sertifikat-${sanitizeFileName(row.noSertifikat)}.pdf`,
     pdfBase64: Buffer.from(pdf).toString("base64"),
+    pdfHash,
     eventId: row.eventId,
     participantId: row.participantId,
     noSertifikat: row.noSertifikat,
@@ -187,6 +211,7 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
     email: row.email,
     namaKegiatan: row.namaKegiatan,
     tanggalKegiatan,
+    isRevoked,
   };
 }
 
@@ -195,6 +220,11 @@ export async function generateCertificatePdf(participantId: number): Promise<
 > {
   const session = await requireRole(["admin", "staff"]);
 
+  const limit = checkSertifikatRateLimit(session.user.id, "certificate_download");
+  if (!limit.ok) {
+    return { ok: false, error: `Terlalu banyak request download. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+  }
+
   try {
     const result = await buildParticipantCertificate(participantId);
     await db.insert(auditLog).values({
@@ -202,7 +232,7 @@ export async function generateCertificatePdf(participantId: number): Promise<
       aksi: "GENERATE_CERTIFICATE_PDF",
       entitasType: "sertifikat_participant",
       entitasId: String(result.participantId),
-      detail: { noSertifikat: result.noSertifikat },
+      detail: { noSertifikat: result.noSertifikat, pdfHash: result.pdfHash, isRevoked: result.isRevoked },
     });
     return { ok: true, data: { fileName: result.fileName, pdfBase64: result.pdfBase64 } };
   } catch (err) {
@@ -215,12 +245,23 @@ export async function generateBulkCertificatesZip(eventId: number): Promise<
 > {
   const session = await requireRole(["admin", "staff"]);
 
+  const limit = checkSertifikatRateLimit(session.user.id, "certificate_bulk_download");
+  if (!limit.ok) {
+    return { ok: false, error: `Terlalu banyak request bulk download. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+  }
+
   try {
     const rows = await db
       .select({ id: participants.id, namaKegiatan: events.namaKegiatan })
       .from(participants)
       .innerJoin(events, eq(participants.eventId, events.id))
-      .where(eq(participants.eventId, eventId))
+      .where(
+        and(
+          eq(participants.eventId, eventId),
+          sql`${participants.deletedAt} IS NULL`,
+          eq(participants.statusPeserta, "aktif"),
+        ),
+      )
       .orderBy(asc(participants.id));
 
     const zip = new JSZip();
@@ -250,9 +291,10 @@ export async function generateBulkCertificatesZip(eventId: number): Promise<
   }
 }
 
-export async function sendCertificateEmail(participantId: number): Promise<{ ok: true } | { ok: false; error: string }> {
-  const session = await requireRole(["admin", "staff"]);
-
+async function sendCertificateEmailInternal(
+  participantId: number,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const certificate = await buildParticipantCertificate(participantId);
     if (!certificate.email) return { ok: false, error: "Peserta belum punya email." };
@@ -295,7 +337,7 @@ export async function sendCertificateEmail(participantId: number): Promise<{ ok:
       .where(eq(participants.id, participantId));
 
     await db.insert(auditLog).values({
-      userId: session.user.id,
+      userId,
       aksi: "SEND_CERTIFICATE_EMAIL",
       entitasType: "sertifikat_participant",
       entitasId: String(participantId),
@@ -309,24 +351,55 @@ export async function sendCertificateEmail(participantId: number): Promise<{ ok:
   }
 }
 
+export async function sendCertificateEmail(participantId: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await requireRole(["admin", "staff"]);
+
+  const limit = checkSertifikatRateLimit(session.user.id, "certificate_email");
+  if (!limit.ok) {
+    return { ok: false, error: `Terlalu banyak request email. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+  }
+
+  return sendCertificateEmailInternal(participantId, session.user.id);
+}
+
 export async function sendBulkCertificateEmails(eventId: number): Promise<
   { ok: true; data: { sent: number; skipped: number; failed: number } } | { ok: false; error: string }
 > {
   const session = await requireRole(["admin", "staff"]);
+
+  const limit = checkSertifikatRateLimit(session.user.id, "certificate_bulk_email");
+  if (!limit.ok) {
+    return { ok: false, error: `Terlalu banyak request bulk email. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+  }
+
   const rows = await db
     .select({ id: participants.id, email: participants.email })
     .from(participants)
-    .where(eq(participants.eventId, eventId))
+    .where(
+      and(
+        eq(participants.eventId, eventId),
+        sql`${participants.deletedAt} IS NULL`,
+        eq(participants.statusPeserta, "aktif"),
+      ),
+    )
     .orderBy(asc(participants.id));
 
   let sent = 0;
   const skipped = rows.filter((row) => !row.email).length;
   let failed = 0;
 
-  for (const row of rows.filter((item) => item.email)) {
-    const result = await sendCertificateEmail(row.id);
-    if (result.ok) sent += 1;
-    else failed += 1;
+  const BATCH_SIZE = 5;
+  const emailRows = rows.filter((item) => item.email);
+
+  for (let i = 0; i < emailRows.length; i += BATCH_SIZE) {
+    const batch = emailRows.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((row) => sendCertificateEmailInternal(row.id, session.user.id)),
+    );
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value.ok) sent += 1;
+      else failed += 1;
+    }
   }
 
   await db.insert(auditLog).values({

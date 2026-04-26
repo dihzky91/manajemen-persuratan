@@ -1,13 +1,40 @@
 "use server";
 
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { z } from "zod";
 import { db } from "@/server/db";
-import { auditLog, events, participants } from "@/server/db/schema";
+import { auditLog, eventCertificateCounters, events, participantRevisions, participants, users } from "@/server/db/schema";
 import { requireRole, requireSession } from "../auth";
+
+type RevisionChangeType =
+  | "create"
+  | "update"
+  | "revoke"
+  | "reactivate"
+  | "soft_delete"
+  | "restore"
+  | "reissue";
+
+async function logRevision(params: {
+  participantId: number;
+  changedBy: string;
+  changeType: RevisionChangeType;
+  before?: unknown;
+  after?: unknown;
+  note?: string;
+}) {
+  await db.insert(participantRevisions).values({
+    participantId: params.participantId,
+    changedBy: params.changedBy,
+    changeType: params.changeType,
+    before: params.before ?? null,
+    after: params.after ?? null,
+    note: params.note ?? null,
+  });
+}
 
 const participantInputSchema = z.object({
   eventId: z.coerce.number().int().positive(),
@@ -36,6 +63,8 @@ function isUniqueViolation(err: unknown) {
   );
 }
 
+export type StatusPeserta = "aktif" | "dicabut";
+
 export type ParticipantRow = {
   id: number;
   eventId: number;
@@ -44,8 +73,28 @@ export type ParticipantRow = {
   role: string;
   email: string | null;
   emailSentAt: Date | null;
+  statusPeserta: StatusPeserta;
+  revokedAt: Date | null;
+  revokedBy: string | null;
+  revokeReason: string | null;
+  deletedAt: Date | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+};
+
+export type ParticipantListResult = {
+  rows: ParticipantRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export type ParticipantFilters = {
+  search?: string;
+  status?: StatusPeserta | "all";
+  page?: number;
+  pageSize?: number;
 };
 
 export type BulkImportResult = {
@@ -164,15 +213,79 @@ async function generateNoSertifikat(
   return `${event.kodeEvent}-${String(nextCounter).padStart(3, "0")}/${year}`;
 }
 
-export async function listByEvent(eventId: number): Promise<ParticipantRow[]> {
+export async function listByEvent(
+  eventId: number,
+  filters: ParticipantFilters = {},
+): Promise<ParticipantListResult> {
+  await requireSession();
+  const parsedEventId = idSchema.parse(eventId);
+
+  const page = Math.max(1, filters.page ?? 1);
+  const pageSize = [10, 25, 50].includes(filters.pageSize ?? 25) ? (filters.pageSize ?? 25) : 25;
+  const offset = (page - 1) * pageSize;
+
+  const conditions = [
+    eq(participants.eventId, parsedEventId),
+    sql`${participants.deletedAt} IS NULL`,
+  ];
+
+  if (filters.status === "aktif") {
+    conditions.push(eq(participants.statusPeserta, "aktif"));
+  } else if (filters.status === "dicabut") {
+    conditions.push(eq(participants.statusPeserta, "dicabut"));
+  } else {
+    conditions.push(eq(participants.statusPeserta, "aktif"));
+  }
+
+  if (filters.search?.trim()) {
+    const term = `%${filters.search.trim()}%`;
+    conditions.push(
+      sql`(${participants.nama} ILIKE ${term} OR ${participants.noSertifikat} ILIKE ${term})`,
+    );
+  }
+
+  const where = and(...conditions);
+
+  const [totalRow, rows] = await Promise.all([
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(participants)
+      .where(where),
+    db
+      .select()
+      .from(participants)
+      .where(where)
+      .orderBy(desc(participants.id))
+      .limit(pageSize)
+      .offset(offset),
+  ]);
+
+  const total = totalRow[0]?.total ?? 0;
+
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+export async function listAllByEvent(eventId: number): Promise<ParticipantRow[]> {
   await requireSession();
   const parsedEventId = idSchema.parse(eventId);
 
   return db
     .select()
     .from(participants)
-    .where(eq(participants.eventId, parsedEventId))
-    .orderBy(desc(participants.id));
+    .where(
+      and(
+        eq(participants.eventId, parsedEventId),
+        sql`${participants.deletedAt} IS NULL`,
+        eq(participants.statusPeserta, "aktif"),
+      ),
+    )
+    .orderBy(asc(participants.id));
 }
 
 export async function createParticipant(data: unknown) {
@@ -216,6 +329,13 @@ export async function createParticipant(data: unknown) {
       },
     });
 
+    await logRevision({
+      participantId: row.id,
+      changedBy: session.user.id,
+      changeType: "create",
+      after: { noSertifikat: row.noSertifikat, nama: row.nama, role: row.role, email: row.email },
+    });
+
     revalidatePath(`/sertifikat/kegiatan/${parsed.eventId}`);
     revalidatePath(`/verifikasi/${row.noSertifikat}`);
     return { ok: true as const, data: row };
@@ -236,6 +356,17 @@ export async function updateParticipant(id: number, data: unknown) {
   const session = await requireRole(["admin", "staff"]);
 
   try {
+    const [before] = await db
+      .select({
+        noSertifikat: participants.noSertifikat,
+        nama: participants.nama,
+        role: participants.role,
+        email: participants.email,
+      })
+      .from(participants)
+      .where(eq(participants.id, parsedId))
+      .limit(1);
+
     const [row] = await db
       .update(participants)
       .set({
@@ -258,6 +389,14 @@ export async function updateParticipant(id: number, data: unknown) {
       detail: { noSertifikat: parsed.noSertifikat, nama: parsed.nama },
     });
 
+    await logRevision({
+      participantId: row.id,
+      changedBy: session.user.id,
+      changeType: "update",
+      before,
+      after: { noSertifikat: row.noSertifikat, nama: row.nama, role: row.role, email: row.email },
+    });
+
     revalidatePath(`/sertifikat/kegiatan/${row.eventId}`);
     revalidatePath(`/verifikasi/${row.noSertifikat}`);
     return { ok: true as const, data: row };
@@ -276,24 +415,568 @@ export async function deleteParticipant(id: number) {
   const [existing] = await db
     .select()
     .from(participants)
-    .where(eq(participants.id, parsedId))
+    .where(and(eq(participants.id, parsedId), sql`${participants.deletedAt} IS NULL`))
     .limit(1);
 
   if (!existing) return { ok: false as const, error: "Peserta tidak ditemukan." };
 
-  await db.delete(participants).where(eq(participants.id, parsedId));
+  await db
+    .update(participants)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(eq(participants.id, parsedId));
 
   await db.insert(auditLog).values({
     userId: session.user.id,
-    aksi: "DELETE_SERTIFIKAT_PARTICIPANT",
+    aksi: "SOFT_DELETE_SERTIFIKAT_PARTICIPANT",
     entitasType: "sertifikat_participant",
     entitasId: String(parsedId),
     detail: { noSertifikat: existing.noSertifikat, nama: existing.nama },
   });
 
+  await logRevision({
+    participantId: parsedId,
+    changedBy: session.user.id,
+    changeType: "soft_delete",
+    before: { noSertifikat: existing.noSertifikat, nama: existing.nama, statusPeserta: existing.statusPeserta },
+  });
+
   revalidatePath(`/sertifikat/kegiatan/${existing.eventId}`);
   revalidatePath(`/verifikasi/${existing.noSertifikat}`);
   return { ok: true as const };
+}
+
+export async function revokeParticipant(
+  id: number,
+  reason?: string,
+): Promise<{ ok: true; data: ParticipantRow } | { ok: false; error: string }> {
+  const parsedId = idSchema.parse(id);
+  const session = await requireRole(["admin"]);
+
+  const [existing] = await db
+    .select()
+    .from(participants)
+    .where(and(eq(participants.id, parsedId), sql`${participants.deletedAt} IS NULL`))
+    .limit(1);
+
+  if (!existing) return { ok: false as const, error: "Peserta tidak ditemukan." };
+  if (existing.statusPeserta === "dicabut") return { ok: false as const, error: "Sertifikat sudah dicabut." };
+
+  const [row] = await db
+    .update(participants)
+    .set({
+      statusPeserta: "dicabut",
+      revokedAt: new Date(),
+      revokedBy: session.user.id,
+      revokeReason: reason?.trim() || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(participants.id, parsedId))
+    .returning();
+
+  if (!row) return { ok: false as const, error: "Gagal mencabut sertifikat." };
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "REVOKE_CERTIFICATE",
+    entitasType: "sertifikat_participant",
+    entitasId: String(parsedId),
+    detail: {
+      noSertifikat: existing.noSertifikat,
+      nama: existing.nama,
+      reason: reason ?? null,
+    },
+  });
+
+  await logRevision({
+    participantId: parsedId,
+    changedBy: session.user.id,
+    changeType: "revoke",
+    before: { statusPeserta: "aktif" },
+    after: { statusPeserta: "dicabut", revokedAt: row.revokedAt, revokedBy: row.revokedBy },
+    note: reason?.trim() || undefined,
+  });
+
+  revalidatePath(`/sertifikat/kegiatan/${existing.eventId}`);
+  revalidatePath(`/verifikasi/${existing.noSertifikat}`);
+  return { ok: true as const, data: row };
+}
+
+export async function reactivateParticipant(
+  id: number,
+): Promise<{ ok: true; data: ParticipantRow } | { ok: false; error: string }> {
+  const parsedId = idSchema.parse(id);
+  const session = await requireRole(["admin"]);
+
+  const [existing] = await db
+    .select()
+    .from(participants)
+    .where(and(eq(participants.id, parsedId), sql`${participants.deletedAt} IS NULL`))
+    .limit(1);
+
+  if (!existing) return { ok: false as const, error: "Peserta tidak ditemukan." };
+  if (existing.statusPeserta === "aktif") return { ok: false as const, error: "Sertifikat sudah aktif." };
+
+  const [row] = await db
+    .update(participants)
+    .set({
+      statusPeserta: "aktif",
+      revokedAt: null,
+      revokedBy: null,
+      revokeReason: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(participants.id, parsedId))
+    .returning();
+
+  if (!row) return { ok: false as const, error: "Gagal mengaktifkan kembali sertifikat." };
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "REACTIVATE_CERTIFICATE",
+    entitasType: "sertifikat_participant",
+    entitasId: String(parsedId),
+    detail: { noSertifikat: existing.noSertifikat, nama: existing.nama },
+  });
+
+  await logRevision({
+    participantId: parsedId,
+    changedBy: session.user.id,
+    changeType: "reactivate",
+    before: { statusPeserta: "dicabut", revokedAt: existing.revokedAt, revokeReason: existing.revokeReason },
+    after: { statusPeserta: "aktif" },
+  });
+
+  revalidatePath(`/sertifikat/kegiatan/${existing.eventId}`);
+  revalidatePath(`/verifikasi/${existing.noSertifikat}`);
+  return { ok: true as const, data: row };
+}
+
+// ─── Global Search (D4) ──────────────────────────────────────────────────────
+
+export type GlobalParticipantRow = {
+  id: number;
+  eventId: number;
+  noSertifikat: string;
+  nama: string;
+  role: string;
+  email: string | null;
+  statusPeserta: StatusPeserta;
+  emailSentAt: Date | null;
+  lastPdfGeneratedAt: Date | null;
+  createdAt: Date | null;
+  eventNamaKegiatan: string;
+  eventKodeEvent: string;
+  eventTanggalMulai: string;
+};
+
+export type GlobalSearchFilters = {
+  search?: string;
+  status?: StatusPeserta | "all";
+  page?: number;
+  pageSize?: number;
+};
+
+export type GlobalSearchResult = {
+  rows: GlobalParticipantRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export async function searchAllParticipants(
+  filters: GlobalSearchFilters = {},
+): Promise<GlobalSearchResult> {
+  await requireRole(["admin", "staff"]);
+
+  const page = Math.max(1, filters.page ?? 1);
+  const pageSize = [10, 25, 50, 100].includes(filters.pageSize ?? 25) ? (filters.pageSize ?? 25) : 25;
+  const offset = (page - 1) * pageSize;
+  const search = filters.search?.trim();
+  const status = filters.status ?? "all";
+
+  const conditions = [
+    sql`${participants.deletedAt} IS NULL`,
+    sql`${events.deletedAt} IS NULL`,
+  ];
+
+  if (status !== "all") {
+    conditions.push(eq(participants.statusPeserta, status));
+  }
+
+  if (search && search.length > 0) {
+    const term = `%${search}%`;
+    conditions.push(
+      sql`(${participants.nama} ILIKE ${term} OR ${participants.noSertifikat} ILIKE ${term} OR ${participants.email} ILIKE ${term})`,
+    );
+  }
+
+  const whereClause = and(...conditions);
+
+  const [totalRow, rows] = await Promise.all([
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(participants)
+      .innerJoin(events, eq(participants.eventId, events.id))
+      .where(whereClause),
+    db
+      .select({
+        id: participants.id,
+        eventId: participants.eventId,
+        noSertifikat: participants.noSertifikat,
+        nama: participants.nama,
+        role: participants.role,
+        email: participants.email,
+        statusPeserta: participants.statusPeserta,
+        emailSentAt: participants.emailSentAt,
+        lastPdfGeneratedAt: participants.lastPdfGeneratedAt,
+        createdAt: participants.createdAt,
+        eventNamaKegiatan: events.namaKegiatan,
+        eventKodeEvent: events.kodeEvent,
+        eventTanggalMulai: events.tanggalMulai,
+      })
+      .from(participants)
+      .innerJoin(events, eq(participants.eventId, events.id))
+      .where(whereClause)
+      .orderBy(desc(participants.createdAt))
+      .limit(pageSize)
+      .offset(offset),
+  ]);
+
+  const total = totalRow[0]?.total ?? 0;
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+// ─── Re-issue (C3) ───────────────────────────────────────────────────────────
+
+const reissueInputSchema = z.object({
+  nama: z.string().trim().min(1, "Nama wajib diisi.").max(255),
+  role: z.string().trim().max(50).optional(),
+  email: z.string().trim().email().max(150).optional().nullable().or(z.literal("")),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export async function reissueParticipant(
+  oldParticipantId: number,
+  data: unknown,
+): Promise<{ ok: true; data: ParticipantRow } | { ok: false; error: string }> {
+  const parsedOldId = idSchema.parse(oldParticipantId);
+  const parsed = reissueInputSchema.parse(data);
+  const session = await requireRole(["admin"]);
+
+  const [old] = await db
+    .select()
+    .from(participants)
+    .where(and(eq(participants.id, parsedOldId), sql`${participants.deletedAt} IS NULL`))
+    .limit(1);
+
+  if (!old) return { ok: false as const, error: "Peserta lama tidak ditemukan." };
+  if (old.statusPeserta === "dicabut") {
+    return { ok: false as const, error: "Sertifikat lama sudah dicabut. Tidak perlu re-issue." };
+  }
+
+  try {
+    const newRow = await db.transaction(async (tx) => {
+      // 1. Revoke old participant
+      await tx
+        .update(participants)
+        .set({
+          statusPeserta: "dicabut",
+          revokedAt: new Date(),
+          revokedBy: session.user.id,
+          revokeReason: parsed.reason?.trim() || `Diterbitkan ulang (re-issue)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(participants.id, parsedOldId));
+
+      // 2. Create new participant with new noSertifikat (auto-generate)
+      const newNoSertifikat = await generateNoSertifikat(old.eventId, tx);
+
+      const [created] = await tx
+        .insert(participants)
+        .values({
+          eventId: old.eventId,
+          noSertifikat: newNoSertifikat,
+          nama: parsed.nama,
+          role: normalizeOptionalRole(parsed.role ?? old.role),
+          email: normalizeOptionalEmail(parsed.email ?? old.email),
+          replacesParticipantId: parsedOldId,
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      if (!created) throw new Error("Gagal membuat sertifikat baru.");
+      return created;
+    });
+
+    await db.insert(auditLog).values({
+      userId: session.user.id,
+      aksi: "REISSUE_CERTIFICATE",
+      entitasType: "sertifikat_participant",
+      entitasId: String(newRow.id),
+      detail: {
+        oldParticipantId: parsedOldId,
+        oldNoSertifikat: old.noSertifikat,
+        newNoSertifikat: newRow.noSertifikat,
+        nama: parsed.nama,
+        reason: parsed.reason ?? null,
+      },
+    });
+
+    await logRevision({
+      participantId: parsedOldId,
+      changedBy: session.user.id,
+      changeType: "revoke",
+      before: { statusPeserta: "aktif" },
+      after: { statusPeserta: "dicabut", reissuedAs: newRow.id },
+      note: `Diterbitkan ulang sebagai ${newRow.noSertifikat}`,
+    });
+
+    await logRevision({
+      participantId: newRow.id,
+      changedBy: session.user.id,
+      changeType: "reissue",
+      before: { replacesParticipantId: parsedOldId, oldNoSertifikat: old.noSertifikat },
+      after: { noSertifikat: newRow.noSertifikat, nama: newRow.nama },
+      note: parsed.reason?.trim() || undefined,
+    });
+
+    revalidatePath(`/sertifikat/kegiatan/${old.eventId}`);
+    revalidatePath(`/verifikasi/${old.noSertifikat}`);
+    revalidatePath(`/verifikasi/${newRow.noSertifikat}`);
+    return { ok: true as const, data: newRow };
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { ok: false as const, error: "Nomor sertifikat baru sudah dipakai." };
+    }
+    return {
+      ok: false as const,
+      error: err instanceof Error ? err.message : "Gagal melakukan re-issue.",
+    };
+  }
+}
+
+// ─── Revisions (C2) ──────────────────────────────────────────────────────────
+
+export type ParticipantRevisionRow = {
+  id: number;
+  participantId: number;
+  changedBy: string | null;
+  changedByName: string | null;
+  changeType: string;
+  before: unknown;
+  after: unknown;
+  note: string | null;
+  createdAt: Date | null;
+};
+
+export async function listParticipantRevisions(participantId: number): Promise<ParticipantRevisionRow[]> {
+  await requireRole(["admin", "staff"]);
+  const parsedId = idSchema.parse(participantId);
+
+  const rows = await db
+    .select({
+      id: participantRevisions.id,
+      participantId: participantRevisions.participantId,
+      changedBy: participantRevisions.changedBy,
+      changedByName: users.namaLengkap,
+      changeType: participantRevisions.changeType,
+      before: participantRevisions.before,
+      after: participantRevisions.after,
+      note: participantRevisions.note,
+      createdAt: participantRevisions.createdAt,
+    })
+    .from(participantRevisions)
+    .leftJoin(users, eq(participantRevisions.changedBy, users.id))
+    .where(eq(participantRevisions.participantId, parsedId))
+    .orderBy(desc(participantRevisions.createdAt));
+
+  return rows;
+}
+
+// ─── Trash / Restore (C1) ─────────────────────────────────────────────────────
+
+export type DeletedParticipantRow = ParticipantRow & {
+  eventNamaKegiatan: string;
+  eventKodeEvent: string;
+};
+
+export async function listDeletedParticipants(): Promise<DeletedParticipantRow[]> {
+  await requireRole(["admin"]);
+  const rows = await db
+    .select({
+      id: participants.id,
+      eventId: participants.eventId,
+      noSertifikat: participants.noSertifikat,
+      nama: participants.nama,
+      role: participants.role,
+      email: participants.email,
+      emailSentAt: participants.emailSentAt,
+      statusPeserta: participants.statusPeserta,
+      revokedAt: participants.revokedAt,
+      revokedBy: participants.revokedBy,
+      revokeReason: participants.revokeReason,
+      deletedAt: participants.deletedAt,
+      lastPdfHash: participants.lastPdfHash,
+      lastPdfGeneratedAt: participants.lastPdfGeneratedAt,
+      createdAt: participants.createdAt,
+      updatedAt: participants.updatedAt,
+      eventNamaKegiatan: events.namaKegiatan,
+      eventKodeEvent: events.kodeEvent,
+    })
+    .from(participants)
+    .innerJoin(events, eq(participants.eventId, events.id))
+    .where(sql`${participants.deletedAt} IS NOT NULL`)
+    .orderBy(desc(participants.deletedAt));
+  return rows as DeletedParticipantRow[];
+}
+
+export async function restoreParticipant(id: number) {
+  const parsedId = idSchema.parse(id);
+  const session = await requireRole(["admin"]);
+
+  const [existing] = await db
+    .select()
+    .from(participants)
+    .where(eq(participants.id, parsedId))
+    .limit(1);
+
+  if (!existing) return { ok: false as const, error: "Peserta tidak ditemukan." };
+  if (!existing.deletedAt) return { ok: false as const, error: "Peserta tidak berada di sampah." };
+
+  // Pre-check: if active record with the same noSertifikat already exists, restore would violate the partial unique index
+  const [conflicting] = await db
+    .select({ id: participants.id })
+    .from(participants)
+    .where(
+      and(
+        eq(participants.noSertifikat, existing.noSertifikat),
+        eq(participants.statusPeserta, "aktif"),
+        sql`${participants.deletedAt} IS NULL`,
+      ),
+    )
+    .limit(1);
+  if (conflicting) {
+    return {
+      ok: false as const,
+      error: `Tidak dapat memulihkan: nomor sertifikat ${existing.noSertifikat} sudah dipakai peserta aktif lain.`,
+    };
+  }
+
+  await db
+    .update(participants)
+    .set({ deletedAt: null, updatedAt: new Date() })
+    .where(eq(participants.id, parsedId));
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "RESTORE_SERTIFIKAT_PARTICIPANT",
+    entitasType: "sertifikat_participant",
+    entitasId: String(parsedId),
+    detail: { noSertifikat: existing.noSertifikat, nama: existing.nama },
+  });
+
+  await logRevision({
+    participantId: parsedId,
+    changedBy: session.user.id,
+    changeType: "restore",
+    before: { deletedAt: existing.deletedAt },
+    after: { deletedAt: null },
+  });
+
+  revalidatePath(`/sertifikat/kegiatan/${existing.eventId}`);
+  revalidatePath("/sertifikat/sampah");
+  return { ok: true as const };
+}
+
+export async function bulkDeleteParticipants(ids: number[]) {
+  const parsedIds = z.array(z.coerce.number().int().positive()).min(1).parse(ids);
+  const session = await requireRole(["admin", "staff"]);
+
+  const existing = await db
+    .select({ id: participants.id, noSertifikat: participants.noSertifikat, nama: participants.nama, eventId: participants.eventId })
+    .from(participants)
+    .where(and(inArray(participants.id, parsedIds), sql`${participants.deletedAt} IS NULL`));
+
+  if (existing.length === 0) return { ok: false as const, error: "Tidak ada peserta yang ditemukan." };
+
+  await db
+    .update(participants)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(inArray(participants.id, existing.map((row) => row.id)));
+
+  const eventIds = [...new Set(existing.map((row) => row.eventId))];
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "BULK_SOFT_DELETE_PARTICIPANTS",
+    entitasType: "sertifikat_participant",
+    entitasId: existing.map((row) => row.id).join(","),
+    detail: { count: existing.length, nos: existing.map((row) => row.noSertifikat) },
+  });
+
+  for (const eventId of eventIds) {
+    revalidatePath(`/sertifikat/kegiatan/${eventId}`);
+  }
+  for (const row of existing) {
+    revalidatePath(`/verifikasi/${row.noSertifikat}`);
+  }
+
+  return { ok: true as const, data: { deleted: existing.length } };
+}
+
+export async function bulkRevokeParticipants(ids: number[], reason?: string) {
+  const parsedIds = z.array(z.coerce.number().int().positive()).min(1).parse(ids);
+  const session = await requireRole(["admin"]);
+
+  const existing = await db
+    .select({ id: participants.id, noSertifikat: participants.noSertifikat, nama: participants.nama, eventId: participants.eventId })
+    .from(participants)
+    .where(
+      and(
+        inArray(participants.id, parsedIds),
+        sql`${participants.deletedAt} IS NULL`,
+        eq(participants.statusPeserta, "aktif"),
+      ),
+    );
+
+  if (existing.length === 0) return { ok: false as const, error: "Tidak ada peserta aktif yang ditemukan." };
+
+  await db
+    .update(participants)
+    .set({
+      statusPeserta: "dicabut",
+      revokedAt: new Date(),
+      revokedBy: session.user.id,
+      revokeReason: reason?.trim() || null,
+      updatedAt: new Date(),
+    })
+    .where(inArray(participants.id, existing.map((row) => row.id)));
+
+  const eventIds = [...new Set(existing.map((row) => row.eventId))];
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "BULK_REVOKE_CERTIFICATES",
+    entitasType: "sertifikat_participant",
+    entitasId: existing.map((row) => row.id).join(","),
+    detail: { count: existing.length, reason: reason ?? null },
+  });
+
+  for (const eventId of eventIds) {
+    revalidatePath(`/sertifikat/kegiatan/${eventId}`);
+  }
+  for (const row of existing) {
+    revalidatePath(`/verifikasi/${row.noSertifikat}`);
+  }
+
+  return { ok: true as const, data: { revoked: existing.length } };
 }
 
 export async function bulkImportParticipants(
@@ -379,7 +1062,12 @@ export async function bulkImportParticipants(
       const existing = await db
         .select({ noSertifikat: participants.noSertifikat })
         .from(participants)
-        .where(inArray(participants.noSertifikat, candidateNos));
+        .where(
+          and(
+            inArray(participants.noSertifikat, candidateNos),
+            sql`${participants.deletedAt} IS NULL`,
+          ),
+        );
 
       if (existing.length > 0) {
         const existingSet = new Set(existing.map((row) => row.noSertifikat));

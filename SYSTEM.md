@@ -482,7 +482,7 @@ export const auditLog = pgTable("audit_log", {
 
 ### 4.3 Skema Drizzle Modul Sertifikat & Kegiatan
 
-Modul ini ditambahkan terpisah dari domain surat. Wave 2 menambahkan `certificate_templates`, `event_certificate_counters`, enum `status_event`, `events.kodeEvent`, `events.statusEvent`, `events.certificateTemplateId`, serta `participants.email` dan `participants.emailSentAt`.
+Modul ini ditambahkan terpisah dari domain surat. Wave 2 menambahkan `certificate_templates`, `event_certificate_counters`, enum `status_event`, `events.kodeEvent`, `events.statusEvent`, `events.certificateTemplateId`, serta `participants.email` dan `participants.emailSentAt`. Wave 3 menambahkan enum `status_peserta`, kolom `revoked_at`, `revoked_by`, `revoke_reason`, `deleted_at` pada `participants`, kolom `deleted_at` pada `events`, partial unique index `participants_no_sertifikat_active_unique`, serta counter pre-allocation pada event creation.
 
 ```typescript
 // app/server/db/schema.ts (lanjutan)
@@ -550,23 +550,33 @@ export const eventSignatories = pgTable("event_signatories", {
 export const participants = pgTable("participants", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
-  noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull().unique(),
+  noSertifikat: varchar("no_sertifikat", { length: 100 }).notNull(),
   nama: varchar("nama", { length: 255 }).notNull(),
   role: varchar("role", { length: 50 }).default("Peserta").notNull(),
   email: varchar("email", { length: 150 }),
   emailSentAt: timestamp("email_sent_at"),
+  statusPeserta: statusPesertaEnum("status_peserta").default("aktif").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  revokedBy: text("revoked_by").references(() => users.id),
+  revokeReason: text("revoke_reason"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-}, (t) => ({ eventIdIdx: index("participants_event_id_idx").on(t.eventId) }));
+}, (t) => ({
+  eventIdIdx: index("participants_event_id_idx").on(t.eventId),
+  statusIdx: index("participants_status_idx").on(t.statusPeserta),
+}));
 ```
 
 Catatan desain:
-- `participants.noSertifikat` UNIQUE pada level sistem — dipakai sebagai target QR scan.
+- `participants.noSertifikat` memiliki partial unique index `participants_no_sertifikat_active_unique` yang hanya meng-enforce uniqueness untuk peserta aktif (`status_peserta = 'aktif' AND deleted_at IS NULL`). Ini memungkinkan nomor sertifikat yang dicabut atau di-soft-delete untuk di-reuse.
 - `eventSignatories` adalah junction many-to-many dengan `urutan` untuk render kolom kiri/kanan tanda tangan di sertifikat.
 - `signatories.pejabatId` opsional — link manual ke `pejabat_penandatangan` jika orangnya sama (cross-reference, tidak wajib).
 - Tidak ada tabel `admins` terpisah — auth memakai `users` + `requireRole(["admin","staff"])`.
-- Nomor sertifikat baru dapat dibuat otomatis dengan format `{kodeEvent}-{NNN}/{tahun}` memakai counter atomic di `event_certificate_counters`.
+- Nomor sertifikat baru dapat dibuat otomatis dengan format `{kodeEvent}-{NNN}/{tahun}` memakai counter atomic di `event_certificate_counters`. Counter row di-pre-allocate saat event dibuat.
 - Template sertifikat menyimpan koordinat field dalam persen terhadap dimensi gambar agar tetap stabil saat preview/editor di-scale.
+- Soft delete: `events.deletedAt` dan `participants.deletedAt` — semua query mengecualikan record yang di-soft-delete (`WHERE deleted_at IS NULL`).
+- Revokasi sertifikat: `participants.statusPeserta` enum (`aktif`/`dicabut`) dengan metadata `revokedAt`, `revokedBy`, `revokeReason`. Sertifikat yang dicabut disembunyikan dari daftar peserta default dan verifikasi publik mengembalikan `found: false` (sembunyikan total).
 
 ---
 
@@ -895,11 +905,12 @@ Notifikasi email (Mailjet):
 
 ```
 Sub-menu sidebar (section "Sertifikat & Kegiatan"):
-  /sertifikat/kegiatan            → list events + filter (kategori, status, lokasi, SKP range, tanggal) + grid/table toggle
-  /sertifikat/kegiatan/[id]       → detail event + tabel peserta + bulk import + QR generator per peserta
+  /sertifikat/kegiatan            → list events + filter (kategori, status, lokasi, SKP range, tanggal) + grid/table toggle + server-side pagination
+  /sertifikat/kegiatan/[id]       → detail event + tabel peserta + bulk import + QR generator per peserta + server-side pagination + status filter + bulk actions
   /sertifikat/template            → CRUD template sertifikat + visual drag-drop editor
   /sertifikat/penandatangan       → CRUD signatories (nama, jabatan, optional link ke pejabat)
   /sertifikat/analytics           → 4 stat cards + chart trends 12 bulan + pie kategori + top 5 events (recharts)
+  /sertifikat/audit-log           → audit log khusus modul sertifikat (admin only)
 
 Public (tanpa login):
   /verifikasi                     → form pencarian nomor sertifikat
@@ -908,8 +919,8 @@ Public (tanpa login):
 ```
 
 Komponen utama (`src/components/sertifikat/`):
-- `EventManager.tsx` — list + dialog form RHF/Zod + multi-signatory selector
-- `ParticipantManager.tsx` — table peserta + dialog import CSV/XLSX + dialog QR (preview & download PNG), bulk QR download, PDF download, dan email sertifikat
+- `EventManager.tsx` — list + dialog form RHF/Zod + multi-signatory selector + server-side pagination & filter
+- `ParticipantManager.tsx` — table peserta + dialog import CSV/XLSX + dialog QR (preview & download PNG), bulk QR download, PDF download, email sertifikat, server-side pagination & status filter, multi-select bulk delete/revoke, revoke/reactivate dialog
 - `TemplateManager.tsx` — list template, upload gambar, set default per kategori
 - `TemplateEditor.tsx` — drag-drop field sertifikat pakai `react-rnd`; koordinat disimpan dalam persen dari dimensi image
 - `SignatoryManager.tsx` — CRUD signatories
@@ -917,10 +928,10 @@ Komponen utama (`src/components/sertifikat/`):
 - `VerificationSearchForm.tsx` — input form publik
 
 Server actions (`src/server/actions/sertifikat/`):
-- `events.ts` — CRUD events + filter; validasi tanggal ketat (format `YYYY-MM-DD` + tanggal kalender valid, mis. `2025-13-99` ditolak)
-- `participants.ts` — CRUD peserta + auto-generate `noSertifikat` + `bulkImportParticipants(eventId, formData)` **transactional all-or-nothing** dengan pre-validation: pre-cek format, intra-file duplicate, intra-DB duplicate, kemudian batch insert dalam `db.transaction()`. Jika ada error pre-validation, tidak ada baris yang di-commit
+- `events.ts` — CRUD events + server-side pagination & filter + soft delete + counter pre-allocation; validasi tanggal ketat (format `YYYY-MM-DD` + tanggal kalender valid, mis. `2025-13-99` ditolak)
+- `participants.ts` — CRUD peserta + auto-generate `noSertifikat` + server-side pagination & status filter + soft delete + revocation (`revokeParticipant`, `reactivateParticipant`) + bulk actions (`bulkDeleteParticipants`, `bulkRevokeParticipants`) + `bulkImportParticipants(eventId, formData)` **transactional all-or-nothing**
 - `templates.ts` — CRUD template sertifikat, upload PNG/JPG lokal ke `public/templates`, set default per kategori
-- `certificates.ts` — generate PDF sertifikat on-demand dengan `pdf-lib`, bulk ZIP, dan kirim email via Mailjet
+- `certificates.ts` — generate PDF sertifikat on-demand dengan `pdf-lib` (termasuk watermark "DICABUT" untuk sertifikat yang dicabut), bulk ZIP, dan kirim email via Mailjet dengan batched processing
 - `signatories.ts` — CRUD signatories
 - `analytics.ts` — `getStats()` & `getAnalytics()`
 - `verifikasi.ts` — `verifyByNoSertifikat(no)` (no auth)
@@ -940,6 +951,32 @@ Wave 2:
 - Email sertifikat memakai Mailjet; kolom email peserta bersifat opsional dan bulk email melewati peserta tanpa email.
 - Auto-generate nomor sertifikat memakai format `{kodeEvent}-{NNN}/{tahun}` dengan counter atomic di tabel `event_certificate_counters`.
 - Status event memakai enum `aktif`, `dibatalkan`, `ditunda`, `arsip` dan ditampilkan sebagai badge/filter di UI.
+
+Wave 3 (Operational Polish):
+- **F5 — Certificate Revocation**: Peserta dapat dicabut sertifikatnya (`revokeParticipant`) atau diaktifkan kembali (`reactivateParticipant`). Sertifikat yang dicabut disembunyikan dari daftar default (filter `statusPeserta = aktif`) dan verifikasi publik mengembalikan `found: false`. PDF sertifikat yang dicabut mendapat watermark merah "DICABUT" diagonal. Hanya admin yang dapat mencabut/mengaktifkan kembali.
+- **F6 — Server-side Pagination & Filter**: `listEvents` dan `listByEvent` sekarang mendukung pagination (`page`, `pageSize`, `totalPages`) dan filter server-side. UI menampilkan navigasi halaman dan filter status.
+- **F7 — Bulk Actions**: Multi-select peserta dengan checkbox, bulk soft-delete (`bulkDeleteParticipants`), dan bulk revoke (`bulkRevokeParticipants`) dengan dialog alasan opsional.
+- **F10 — Soft Delete**: `deleteEvent` dan `deleteParticipant` sekarang melakukan soft delete (`deletedAt = now()`) bukan hard delete. Semua query mengecualikan record yang di-soft-delete.
+- **F11 — Audit Log Sertifikat**: Halaman `/sertifikat/audit-log` (admin only) menampilkan audit log khusus modul sertifikat, memfilter entitas `sertifikat_event`, `sertifikat_participant`, `sertifikat_template`, `sertifikat_signatory`.
+- **Issue #2 — Bulk Email Scalability**: `sendBulkCertificateEmails` sekarang menggunakan batched processing (`Promise.allSettled` per 5 email) untuk menghindari timeout pada jumlah besar.
+- **Issue #5 — Partial Unique Index**: `participants_no_sertifikat_active_unique` hanya meng-enforce uniqueness untuk peserta aktif yang tidak di-soft-delete, memungkinkan reuse nomor sertifikat.
+- **Issue #7 — Counter Pre-allocation**: `createEvent` otomatis membuat row di `event_certificate_counters` saat event dibuat, menghindari race condition pada generate nomor pertama.
+- Migration: `drizzle/migrations/0008_thin_wasp.sql`
+
+Wave 4 (Security, Operational, UX, Notifications):
+- **B2 — PDF Hash Logging**: Setiap PDF yang di-generate dihitung SHA-256 hash-nya, disimpan di `participants.lastPdfHash` + `lastPdfGeneratedAt`, dan dicatat di audit log entry. Memungkinkan deteksi tampering dan forensic.
+- **B3 — Per-user Rate Limit**: In-memory token bucket per `userId+action` (`src/lib/rate-limit/user-bucket.ts`). Default policies: download 60/menit, email 30/menit, bulk download 5/menit, bulk email 3/menit. Bulk email memakai internal helper `sendCertificateEmailInternal` agar tidak double-count rate limit per email individual.
+- **B1 — Signed PDF**: Ditunda menunggu PKCS#12 cert tersedia.
+- **C1 — Restore Soft-Deleted**: Halaman `/sertifikat/sampah` (admin only) menampilkan kegiatan & peserta yang di-soft-delete dengan tombol "Pulihkan". Pre-check uniqueness `noSertifikat` saat restore peserta untuk mencegah konflik dengan partial unique index.
+- **C2 — Participant Revisions**: Tabel baru `participant_revisions` mencatat perubahan setiap peserta (create/update/revoke/reactivate/soft_delete/restore/reissue) dengan before/after JSON. Timeline ditampilkan di dialog edit peserta.
+- **C3 — Re-issue Certificate**: Kolom baru `participants.replacesParticipantId`. Server action `reissueParticipant` melakukan revoke peserta lama + create peserta baru dengan nomor baru auto-generated, dalam 1 transaction. UI dialog re-issue dengan tombol RefreshCw di action column.
+- **C4 — Export Laporan Event**: Server action `exportEventReport` (`src/server/actions/sertifikat/reports.ts`) menghasilkan Excel multi-sheet (Ringkasan + Daftar Peserta lengkap dengan hash PDF). Tombol "Export Laporan (Excel)" di header detail event.
+- **D1 — Preview PDF**: Tombol Eye di action column membuka Dialog dengan iframe blob URL untuk preview PDF tanpa download. Tetap kena audit log + rate limit (sama seperti download).
+- **D2 — Quick Stats per Event**: 6 stat cards di header detail event (Total / Aktif / Dicabut / Punya Email / Email Terkirim % / Sudah Download %). Auto-refresh saat fetchData.
+- **D3 — Optimistic UI**: Bulk delete & bulk revoke melakukan optimistic update (remove/update rows segera, sync setelah server response, rollback via fetchData jika error).
+- **D4 — Global Search Peserta**: Halaman `/sertifikat/peserta` dengan pencarian lintas event by nama, nomor sertifikat, atau email + filter status + pagination.
+- **A1 — Notifikasi Internal**: Toast notifications dengan `description` untuk feedback yang lebih kaya pada bulk operations (import, bulk email).
+- Migrations: `0009_chubby_mulholland_black.sql` (B2), `0010_yellow_the_executioner.sql` (C2), `0011_tearful_hiroim.sql` (C3).
 
 ---
 

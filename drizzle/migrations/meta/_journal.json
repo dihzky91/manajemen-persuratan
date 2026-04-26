@@ -57,6 +57,41 @@
       "when": 1777212285432,
       "tag": "0007_flippant_mattie_franklin",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777215317901,
+      "tag": "0008_thin_wasp",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777218446532,
+      "tag": "0009_chubby_mulholland_black",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777218789560,
+      "tag": "0010_yellow_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777219142097,
+      "tag": "0011_tearful_hiroim",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777220403195,
+      "tag": "0012_sloppy_loners",
+      "breakpoints": true
     }
   ]
 }

@@ -16,21 +16,24 @@ import { countUnreadDisposisi, inboxDisposisi } from "@/server/actions/disposisi
 import { listSuratKeluar } from "@/server/actions/suratKeluar";
 import { listSuratMasuk } from "@/server/actions/suratMasuk";
 import { getDashboardStats } from "@/server/actions/statistics";
+import { getStatistikUjian } from "@/server/actions/jadwal-ujian/bebanKerja";
 import { formatTanggalWaktuJakarta } from "@/lib/utils";
 import { StatsCharts, StatsSummary } from "@/components/dashboard/StatsCharts";
+import { UjianDashboardWidget } from "@/components/jadwal-ujian/UjianDashboardWidget";
 
 export const metadata: Metadata = {
   title: "Dashboard | Manajemen Surat IAI Jakarta",
 };
 
 export default async function DashboardPage() {
-  const [suratKeluarRows, suratMasukRows, disposisiRows, unreadDisposisiCount, stats] =
+  const [suratKeluarRows, suratMasukRows, disposisiRows, unreadDisposisiCount, stats, statistikUjian] =
     await Promise.all([
       listSuratKeluar(),
       listSuratMasuk(),
       inboxDisposisi(),
       countUnreadDisposisi(),
       getDashboardStats(),
+      getStatistikUjian(),
     ]);
 
   const suratMasukBaru = suratMasukRows.filter((row) => row.status === "diterima");
@@ -106,6 +109,10 @@ export default async function DashboardPage() {
           href="/surat-keluar"
           icon={FileText}
         />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <UjianDashboardWidget data={statistikUjian} />
       </section>
 
       <StatsSummary stats={stats} />

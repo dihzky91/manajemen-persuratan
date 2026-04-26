@@ -4,6 +4,7 @@ import React, { useState, useCallback, useTransition } from "react";
 import {
   listAuditLog,
   listAuditEntitasTypes,
+  listSertifikatAuditLog,
   type AuditLogRow,
   type AuditLogResult,
 } from "@/server/actions/auditLog";
@@ -104,12 +105,14 @@ function DetailCell({ detail }: { detail: unknown }) {
 interface AuditLogManagerProps {
   initialData: AuditLogResult;
   entitasTypes: string[];
+  scope?: "all" | "sertifikat";
 }
 
 // ─── Komponen utama ───────────────────────────────────────────────────────────
 export default function AuditLogManager({
   initialData,
   entitasTypes,
+  scope = "all",
 }: AuditLogManagerProps) {
   const [data, setData] = useState<AuditLogResult>(initialData);
   const [search, setSearch] = useState("");
@@ -122,18 +125,24 @@ export default function AuditLogManager({
   const fetchData = useCallback(
     (page = 1, overrides: Record<string, unknown> = {}) => {
       startTransition(async () => {
-        const result = await listAuditLog({
+        const params = {
           search: (overrides.search as string) ?? search,
-          entitasType: (overrides.entitas as string) ?? entitas,
           startDate: (overrides.startDate as string) ?? startDate,
           endDate: (overrides.endDate as string) ?? endDate,
           page,
           pageSize: (overrides.pageSize as number) ?? pageSize,
-        });
+        };
+        const result =
+          scope === "sertifikat"
+            ? await listSertifikatAuditLog(params)
+            : await listAuditLog({
+                ...params,
+                entitasType: (overrides.entitas as string) ?? entitas,
+              });
         setData(result);
       });
     },
-    [search, entitas, startDate, endDate, pageSize],
+    [search, entitas, startDate, endDate, pageSize, scope],
   );
 
   const handleFilter = () => fetchData(1);
@@ -144,7 +153,10 @@ export default function AuditLogManager({
     setEndDate("");
     setPageSize(25);
     startTransition(async () => {
-      const result = await listAuditLog({ page: 1, pageSize: 25 });
+      const result =
+        scope === "sertifikat"
+          ? await listSertifikatAuditLog({ page: 1, pageSize: 25 })
+          : await listAuditLog({ page: 1, pageSize: 25 });
       setData(result);
     });
   };

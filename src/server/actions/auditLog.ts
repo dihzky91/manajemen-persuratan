@@ -1,6 +1,6 @@
 "use server";
 
-import { desc, eq, and, gte, lte, like, sql } from "drizzle-orm";
+import { desc, eq, and, gte, lte, like, inArray, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { auditLog, users } from "@/server/db/schema";
 import { requireRole } from "./auth";
@@ -35,9 +35,19 @@ export type AuditLogResult = {
   totalPages: number;
 };
 
+const SERTIFIKAT_ENTITY_TYPES = [
+  "sertifikat_event",
+  "sertifikat_participant",
+  "sertifikat_template",
+  "sertifikat_signatory",
+];
+
 export async function listAuditLog(filter: AuditLogFilter = {}): Promise<AuditLogResult> {
   await requireRole(["admin"]);
+  return listAuditLogInternal(filter);
+}
 
+async function listAuditLogInternal(filter: AuditLogFilter = {}): Promise<AuditLogResult> {
   const page = Math.max(1, filter.page ?? 1);
   const pageSize = [10, 25, 50].includes(filter.pageSize ?? 25) ? (filter.pageSize ?? 25) : 25;
   const offset = (page - 1) * pageSize;
@@ -45,7 +55,11 @@ export async function listAuditLog(filter: AuditLogFilter = {}): Promise<AuditLo
   const conditions = [];
 
   if (filter.entitasType && filter.entitasType !== "__all__") {
-    conditions.push(eq(auditLog.entitasType, filter.entitasType));
+    if (filter.entitasType === "__sertifikat__") {
+      conditions.push(inArray(auditLog.entitasType, SERTIFIKAT_ENTITY_TYPES));
+    } else {
+      conditions.push(eq(auditLog.entitasType, filter.entitasType));
+    }
   }
 
   if (filter.startDate) {
@@ -111,4 +125,10 @@ export async function listAuditEntitasTypes(): Promise<string[]> {
     .where(sql`${auditLog.entitasType} IS NOT NULL`)
     .orderBy(auditLog.entitasType);
   return rows.map((r) => r.entitasType!);
+}
+
+export async function listSertifikatAuditLog(filter: Omit<AuditLogFilter, "entitasType"> = {}): Promise<AuditLogResult> {
+  // Sertifikat audit log accessible to staff (filtered to sertifikat entities only)
+  await requireRole(["admin", "staff"]);
+  return listAuditLogInternal({ ...filter, entitasType: "__sertifikat__" });
 }

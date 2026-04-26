@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { ParticipantManager } from "@/components/sertifikat/ParticipantManager";
-import { getEvent } from "@/server/actions/sertifikat/events";
+import { getEvent, getEventQuickStats } from "@/server/actions/sertifikat/events";
 import { listByEvent } from "@/server/actions/sertifikat/participants";
 
 export const metadata: Metadata = {
@@ -18,9 +18,10 @@ export default async function Page({ params }: PageProps) {
   const eventId = Number(id);
   if (!Number.isInteger(eventId) || eventId <= 0) notFound();
 
-  const [event, participants] = await Promise.all([
+  const [event, participantList, initialStats] = await Promise.all([
     getEvent(eventId),
     listByEvent(eventId),
+    getEventQuickStats(eventId),
   ]);
 
   if (!event) notFound();
@@ -30,7 +31,7 @@ export default async function Page({ params }: PageProps) {
       title="Detail Kegiatan"
       description="Kelola peserta, import data, dan QR verifikasi untuk kegiatan ini."
     >
-      <ParticipantManager event={event} participants={participants} />
+      <ParticipantManager event={event} initialParticipants={participantList} initialStats={initialStats} />
     </PageWrapper>
   );
 }

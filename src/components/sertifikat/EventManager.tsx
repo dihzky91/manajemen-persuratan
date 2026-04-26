@@ -14,7 +14,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -57,8 +57,10 @@ import { formatTanggal } from "@/lib/utils";
 import {
   createEvent,
   deleteEvent,
+  listEvents,
   updateEventStatus,
   updateEvent,
+  type EventListResult,
   type EventTemplateOption,
   type EventRow,
   type KategoriKegiatan,
@@ -146,17 +148,19 @@ function toFormValues(event?: EventRow): EventFormValues {
 }
 
 export function EventManager({
-  initialEvents,
+  initialEventList,
   signatoryOptions,
   templateOptions,
 }: {
-  initialEvents: EventRow[];
+  initialEventList: EventListResult;
   signatoryOptions: SignatoryRow[];
   templateOptions: EventTemplateOption[];
 }) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [data, setData] = useState<EventListResult>(initialEventList);
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -170,36 +174,26 @@ export function EventManager({
     name: "signatories",
   });
 
-  const filteredEvents = useMemo(() => {
-    const today = todayIso();
-    return initialEvents.filter((event) => {
-      const search = filters.search.trim().toLowerCase();
-      if (search && !event.namaKegiatan.toLowerCase().includes(search)) return false;
-      if (filters.kategori !== "all" && event.kategori !== filters.kategori) return false;
-      if (filters.status === "active" && (event.statusEvent !== "aktif" || event.tanggalSelesai < today)) return false;
-      if (filters.status === "inactive" && event.tanggalSelesai >= today) return false;
-      if (
-        filters.status !== "all" &&
-        filters.status !== "active" &&
-        filters.status !== "inactive" &&
-        event.statusEvent !== filters.status
-      ) {
-        return false;
-      }
-      if (
-        filters.location.trim() &&
-        !(event.lokasi ?? "").toLowerCase().includes(filters.location.trim().toLowerCase())
-      ) {
-        return false;
-      }
-      const skpNumber = Number((event.skp ?? "").replace(/\D/g, ""));
-      if (filters.skpMin && skpNumber < Number(filters.skpMin)) return false;
-      if (filters.skpMax && skpNumber > Number(filters.skpMax)) return false;
-      if (filters.dateFrom && event.tanggalMulai < filters.dateFrom) return false;
-      if (filters.dateTo && event.tanggalSelesai > filters.dateTo) return false;
-      return true;
+  function fetchData(overrides: Partial<FilterState & { page?: number }> = {}) {
+    startTransition(async () => {
+      const f = { ...filters, ...overrides };
+      const result = await listEvents({
+        search: f.search || undefined,
+        kategori: f.kategori !== "all" ? f.kategori as KategoriKegiatan : undefined,
+        statusEvent: (f.status !== "all" && f.status !== "active" && f.status !== "inactive") ? f.status as StatusEvent : undefined,
+        location: f.location || undefined,
+        skpMin: f.skpMin || undefined,
+        skpMax: f.skpMax || undefined,
+        dateFrom: f.dateFrom || undefined,
+        dateTo: f.dateTo || undefined,
+        page: f.page ?? page,
+        pageSize: 25,
+      });
+      setData(result);
     });
-  }, [filters, initialEvents]);
+  }
+
+  const filteredEvents = data.rows;
 
   function openCreateDialog() {
     setEditingEvent(null);
@@ -222,7 +216,7 @@ export function EventManager({
       if (result.ok) {
         toast.success(editingEvent ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil ditambahkan.");
         setDialogOpen(false);
-        router.refresh();
+        fetchData();
       } else {
         toast.error(result.error);
       }
@@ -237,7 +231,7 @@ export function EventManager({
       const result = await deleteEvent(event.id);
       if (result.ok) {
         toast.success("Kegiatan berhasil dihapus.");
-        router.refresh();
+        fetchData();
       } else {
         toast.error(result.error);
       }
@@ -249,7 +243,7 @@ export function EventManager({
       const result = await updateEventStatus(event.id, statusEvent);
       if (result.ok) {
         toast.success("Status kegiatan berhasil diperbarui.");
-        router.refresh();
+        fetchData();
       } else {
         toast.error(result.error);
       }
@@ -271,12 +265,14 @@ export function EventManager({
             placeholder="Cari kegiatan"
             value={filters.search}
             onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
+            onKeyDown={(e) => e.key === "Enter" && fetchData()}
           />
           <Select
             value={filters.kategori}
-            onValueChange={(value) =>
-              setFilters((prev) => ({ ...prev, kategori: value as FilterState["kategori"] }))
-            }
+            onValueChange={(value) => {
+              setFilters((prev) => ({ ...prev, kategori: value as FilterState["kategori"] }));
+              fetchData({ kategori: value as FilterState["kategori"] });
+            }}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Kategori" />
@@ -292,9 +288,10 @@ export function EventManager({
           </Select>
           <Select
             value={filters.status}
-            onValueChange={(value) =>
-              setFilters((prev) => ({ ...prev, status: value as FilterState["status"] }))
-            }
+            onValueChange={(value) => {
+              setFilters((prev) => ({ ...prev, status: value as FilterState["status"] }));
+              fetchData({ status: value as FilterState["status"] });
+            }}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Status" />
@@ -499,6 +496,22 @@ export function EventManager({
       {filteredEvents.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
           Belum ada kegiatan yang sesuai filter.
+        </div>
+      ) : null}
+
+      {data.totalPages > 1 ? (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            Halaman {data.page} dari {data.totalPages} ({data.total} total)
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={data.page <= 1} onClick={() => { setPage(data.page - 1); fetchData({ page: data.page - 1 }); }}>
+              Sebelumnya
+            </Button>
+            <Button variant="outline" size="sm" disabled={data.page >= data.totalPages} onClick={() => { setPage(data.page + 1); fetchData({ page: data.page + 1 }); }}>
+              Berikutnya
+            </Button>
+          </div>
         </div>
       ) : null}
 

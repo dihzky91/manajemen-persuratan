@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
-  const [events, signatories, templates] = await Promise.all([
+  const [eventList, signatories, templates] = await Promise.all([
     listEvents(),
     listSignatories(),
     listEventTemplateOptions(),
@@ -21,7 +21,7 @@ export default async function Page() {
       description="Kelola kegiatan, penandatangan, peserta, dan QR verifikasi sertifikat."
     >
       <EventManager
-        initialEvents={events}
+        initialEventList={eventList}
         signatoryOptions={signatories}
         templateOptions={templates}
       />
