@@ -823,3 +823,101 @@ export type PenugasanPengawas = typeof penugasanPengawas.$inferSelect;
 export type NewPenugasanPengawas = typeof penugasanPengawas.$inferInsert;
 export type JadwalUjianConfig = typeof jadwalUjianConfig.$inferSelect;
 export type NewJadwalUjianConfig = typeof jadwalUjianConfig.$inferInsert;
+
+// ─── PENOMORAN SERTIFIKAT (Certificate Hub) ──────────────────────────────────
+// Sub-modul terpisah dari modul sertifikat kegiatan/event.
+// Fokus: penomoran batch formal (Brevet AB, Brevet C, BFA, dll.)
+// dengan sistem serial counter global yang berkesinambungan antar batch.
+
+export const certificatePrograms = pgTable("certificate_programs", {
+  id:        text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name:      varchar("name", { length: 200 }).notNull().unique(),
+  code:      varchar("code", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const certificateClassTypes = pgTable("certificate_class_types", {
+  id:        text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name:      varchar("name", { length: 200 }).notNull(),
+  code:      varchar("code", { length: 2 }).notNull().unique(), // "01", "02", "03"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Singleton config — hanya 1 baris: { key: 'last_serial_number', value: '0' }
+export const certificateSerialConfig = pgTable("certificate_serial_config", {
+  key:       text("key").primaryKey(),
+  value:     text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const certificateBatchStatusEnum = pgEnum("certificate_batch_status", [
+  "active",
+  "revised",
+  "cancelled",
+]);
+
+export const certificateBatches = pgTable(
+  "certificate_batches",
+  {
+    id:                     text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    programId:              text("program_id")
+                              .notNull()
+                              .references(() => certificatePrograms.id),
+    classTypeId:            text("class_type_id")
+                              .notNull()
+                              .references(() => certificateClassTypes.id),
+    angkatan:               integer("angkatan").notNull(),                // contoh: 223
+    quantityRequested:      integer("quantity_requested").notNull(),
+    firstCertificateNumber: varchar("first_certificate_number", { length: 50 }).notNull(),
+    lastCertificateNumber:  varchar("last_certificate_number", { length: 50 }).notNull(),
+    status:                 certificateBatchStatusEnum("status").default("active").notNull(),
+    notes:                  text("notes"),
+    createdBy:              text("created_by").references(() => users.id),
+    createdAt:              timestamp("created_at").defaultNow().notNull(),
+    updatedAt:              timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("cert_batches_program_idx").on(t.programId),
+    index("cert_batches_angkatan_idx").on(t.angkatan),
+    index("cert_batches_status_idx").on(t.status),
+  ],
+);
+
+export const certificateItemStatusEnum = pgEnum("certificate_item_status", [
+  "active",
+  "cancelled",
+]);
+
+export const certificateItems = pgTable(
+  "certificate_items",
+  {
+    id:            text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    batchId:       text("batch_id")
+                     .notNull()
+                     .references(() => certificateBatches.id, { onDelete: "cascade" }),
+    fullNumber:    varchar("full_number", { length: 50 }).notNull().unique(), // "22301.3386"
+    angkatan:      integer("angkatan").notNull(),
+    classTypeCode: varchar("class_type_code", { length: 2 }).notNull(),
+    serialNumber:  integer("serial_number").notNull(),
+    status:        certificateItemStatusEnum("status").default("active").notNull(),
+    createdAt:     timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("cert_items_batch_idx").on(t.batchId),
+    index("cert_items_serial_idx").on(t.serialNumber),
+    index("cert_items_status_idx").on(t.status),
+  ],
+);
+
+// ─── TYPE EXPORTS (Penomoran Sertifikat) ─────────────────────────────────────
+
+export type CertificateProgram = typeof certificatePrograms.$inferSelect;
+export type NewCertificateProgram = typeof certificatePrograms.$inferInsert;
+export type CertificateClassType = typeof certificateClassTypes.$inferSelect;
+export type NewCertificateClassType = typeof certificateClassTypes.$inferInsert;
+export type CertificateBatch = typeof certificateBatches.$inferSelect;
+export type NewCertificateBatch = typeof certificateBatches.$inferInsert;
+export type CertificateItem = typeof certificateItems.$inferSelect;
+export type NewCertificateItem = typeof certificateItems.$inferInsert;

@@ -114,6 +114,20 @@ export const navigationSections: NavigationSection[] = [
         allowedRoles: ["admin", "staff"],
       },
       {
+        href: "/sertifikat/nomor",
+        label: "Penomoran Sertifikat",
+        icon: Hash,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+      },
+      {
+        href: "/sertifikat/nomor/rekap",
+        label: "Rekap Tahunan",
+        icon: BarChart2,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+      },
+      {
         href: "/sertifikat/peserta",
         label: "Cari Peserta",
         icon: Users,
