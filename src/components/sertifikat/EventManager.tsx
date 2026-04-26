@@ -9,6 +9,7 @@ import {
   Grid2X2,
   List,
   Loader2,
+  MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
@@ -28,6 +29,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -50,22 +57,29 @@ import { formatTanggal } from "@/lib/utils";
 import {
   createEvent,
   deleteEvent,
+  updateEventStatus,
   updateEvent,
+  type EventTemplateOption,
   type EventRow,
   type KategoriKegiatan,
+  type StatusEvent,
 } from "@/server/actions/sertifikat/events";
 import type { SignatoryRow } from "@/server/actions/sertifikat/signatories";
 
 const categories = ["Workshop", "Brevet AB", "Brevet C", "BFA", "Lainnya"] as const;
+const statusOptions = ["aktif", "dibatalkan", "ditunda", "arsip"] as const;
 
 const eventFormSchema = z.object({
+  kodeEvent: z.string().trim().min(1, "Kode event wajib diisi.").max(30),
   namaKegiatan: z.string().trim().min(1, "Nama kegiatan wajib diisi."),
   kategori: z.enum(categories),
+  statusEvent: z.enum(statusOptions),
   tanggalMulai: z.string().min(1, "Tanggal mulai wajib diisi."),
   tanggalSelesai: z.string().min(1, "Tanggal selesai wajib diisi."),
   lokasi: z.string().optional(),
   skp: z.string().optional(),
   keterangan: z.string().optional(),
+  certificateTemplateId: z.coerce.number().int().positive().optional().nullable(),
   signatories: z.array(
     z.object({
       signatoryId: z.coerce.number().int().positive(),
@@ -83,7 +97,7 @@ type ViewMode = "grid" | "table";
 type FilterState = {
   search: string;
   kategori: KategoriKegiatan | "all";
-  status: "active" | "inactive" | "all";
+  status: "active" | "inactive" | StatusEvent | "all";
   location: string;
   skpMin: string;
   skpMax: string;
@@ -113,13 +127,16 @@ function todayIso() {
 
 function toFormValues(event?: EventRow): EventFormValues {
   return {
+    kodeEvent: event?.kodeEvent ?? "",
     namaKegiatan: event?.namaKegiatan ?? "",
     kategori: event?.kategori ?? "Workshop",
+    statusEvent: event?.statusEvent ?? "aktif",
     tanggalMulai: event?.tanggalMulai ?? "",
     tanggalSelesai: event?.tanggalSelesai ?? "",
     lokasi: event?.lokasi ?? "",
     skp: event?.skp ?? "",
     keterangan: event?.keterangan ?? "",
+    certificateTemplateId: event?.certificateTemplateId ?? null,
     signatories:
       event?.signatories.map((item, index) => ({
         signatoryId: item.id,
@@ -131,9 +148,11 @@ function toFormValues(event?: EventRow): EventFormValues {
 export function EventManager({
   initialEvents,
   signatoryOptions,
+  templateOptions,
 }: {
   initialEvents: EventRow[];
   signatoryOptions: SignatoryRow[];
+  templateOptions: EventTemplateOption[];
 }) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -157,8 +176,16 @@ export function EventManager({
       const search = filters.search.trim().toLowerCase();
       if (search && !event.namaKegiatan.toLowerCase().includes(search)) return false;
       if (filters.kategori !== "all" && event.kategori !== filters.kategori) return false;
-      if (filters.status === "active" && event.tanggalSelesai < today) return false;
+      if (filters.status === "active" && (event.statusEvent !== "aktif" || event.tanggalSelesai < today)) return false;
       if (filters.status === "inactive" && event.tanggalSelesai >= today) return false;
+      if (
+        filters.status !== "all" &&
+        filters.status !== "active" &&
+        filters.status !== "inactive" &&
+        event.statusEvent !== filters.status
+      ) {
+        return false;
+      }
       if (
         filters.location.trim() &&
         !(event.lokasi ?? "").toLowerCase().includes(filters.location.trim().toLowerCase())
@@ -217,6 +244,18 @@ export function EventManager({
     });
   }
 
+  function handleStatusChange(event: EventRow, statusEvent: StatusEvent) {
+    startTransition(async () => {
+      const result = await updateEventStatus(event.id, statusEvent);
+      if (result.ok) {
+        toast.success("Status kegiatan berhasil diperbarui.");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   function addSignatory(signatoryId: string) {
     const id = Number(signatoryId);
     const current = form.getValues("signatories");
@@ -263,7 +302,10 @@ export function EventManager({
             <SelectContent>
               <SelectItem value="all">Semua</SelectItem>
               <SelectItem value="active">Aktif</SelectItem>
-              <SelectItem value="inactive">Selesai</SelectItem>
+              <SelectItem value="inactive">Lewat Tanggal</SelectItem>
+              <SelectItem value="dibatalkan">Dibatalkan</SelectItem>
+              <SelectItem value="ditunda">Ditunda</SelectItem>
+              <SelectItem value="arsip">Arsip</SelectItem>
             </SelectContent>
           </Select>
           <Input
@@ -326,12 +368,18 @@ export function EventManager({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <CardTitle className="leading-6">{event.namaKegiatan}</CardTitle>
-                    <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                      <CalendarDays className="h-4 w-4" />
-                      {formatTanggal(event.tanggalMulai)} - {formatTanggal(event.tanggalSelesai)}
-                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span className="font-mono">{event.kodeEvent}</span>
+                      <span className="flex items-center gap-2">
+                        <CalendarDays className="h-4 w-4" />
+                        {formatTanggal(event.tanggalMulai)} - {formatTanggal(event.tanggalSelesai)}
+                      </span>
+                    </div>
                   </div>
-                  <Badge variant="secondary">{event.kategori}</Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge variant="secondary">{event.kategori}</Badge>
+                    <StatusBadge status={event.statusEvent} />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -351,6 +399,24 @@ export function EventManager({
                     <Pencil className="h-4 w-4" />
                     Edit
                   </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                        Status
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {statusOptions.map((status) => (
+                        <DropdownMenuItem
+                          key={status}
+                          onClick={() => handleStatusChange(event, status)}
+                        >
+                          {statusLabel(status)}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(event)}>
                     <Trash2 className="h-4 w-4" />
                     Hapus
@@ -366,8 +432,10 @@ export function EventManager({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Kode</TableHead>
                   <TableHead>Nama Kegiatan</TableHead>
                   <TableHead>Kategori</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Tanggal</TableHead>
                   <TableHead>Lokasi</TableHead>
                   <TableHead>SKP</TableHead>
@@ -378,8 +446,10 @@ export function EventManager({
               <TableBody>
                 {filteredEvents.map((event) => (
                   <TableRow key={event.id}>
+                    <TableCell className="font-mono">{event.kodeEvent}</TableCell>
                     <TableCell className="font-medium">{event.namaKegiatan}</TableCell>
                     <TableCell>{event.kategori}</TableCell>
+                    <TableCell><StatusBadge status={event.statusEvent} /></TableCell>
                     <TableCell>
                       {formatTanggal(event.tanggalMulai)} - {formatTanggal(event.tanggalSelesai)}
                     </TableCell>
@@ -396,6 +466,23 @@ export function EventManager({
                         <Button variant="outline" size="icon-sm" onClick={() => openEditDialog(event)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon-sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {statusOptions.map((status) => (
+                              <DropdownMenuItem
+                                key={status}
+                                onClick={() => handleStatusChange(event, status)}
+                              >
+                                {statusLabel(status)}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button variant="destructive" size="icon-sm" onClick={() => handleDelete(event)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -422,6 +509,31 @@ export function EventManager({
             <DialogDescription>Lengkapi data kegiatan dan penandatangan sertifikat.</DialogDescription>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Kode Event</Label>
+                <Input placeholder="Contoh: WS-TEST-001" {...form.register("kodeEvent")} />
+                <FormError message={form.formState.errors.kodeEvent?.message} />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={form.watch("statusEvent")}
+                  onValueChange={(value) => form.setValue("statusEvent", value as StatusEvent)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {statusLabel(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="space-y-2">
               <Label>Nama Kegiatan</Label>
               <Input {...form.register("namaKegiatan")} />
@@ -470,6 +582,29 @@ export function EventManager({
             <div className="space-y-2">
               <Label>Keterangan</Label>
               <Textarea {...form.register("keterangan")} />
+            </div>
+            <div className="space-y-2">
+              <Label>Template Sertifikat</Label>
+              <Select
+                value={form.watch("certificateTemplateId") ? String(form.watch("certificateTemplateId")) : "__default__"}
+                onValueChange={(value) =>
+                  form.setValue("certificateTemplateId", value === "__default__" ? null : Number(value))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Gunakan default kategori" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__default__">Gunakan default kategori</SelectItem>
+                  {templateOptions
+                    .filter((template) => template.kategori === form.watch("kategori"))
+                    .map((template) => (
+                      <SelectItem key={template.id} value={String(template.id)}>
+                        {template.nama}{template.isDefault ? " (Default)" : ""}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-3 rounded-xl border border-border p-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -541,6 +676,30 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 truncate font-medium">{value}</p>
     </div>
+  );
+}
+
+function statusLabel(status: StatusEvent) {
+  const labels: Record<StatusEvent, string> = {
+    aktif: "Aktif",
+    dibatalkan: "Dibatalkan",
+    ditunda: "Ditunda",
+    arsip: "Arsip",
+  };
+  return labels[status];
+}
+
+function StatusBadge({ status }: { status: StatusEvent }) {
+  const classes: Record<StatusEvent, string> = {
+    aktif: "border-green-200 bg-green-50 text-green-700",
+    dibatalkan: "border-red-200 bg-red-50 text-red-700",
+    ditunda: "border-orange-200 bg-orange-50 text-orange-700",
+    arsip: "border-gray-200 bg-gray-50 text-gray-700",
+  };
+  return (
+    <Badge variant="outline" className={classes[status]}>
+      {statusLabel(status)}
+    </Badge>
   );
 }
 

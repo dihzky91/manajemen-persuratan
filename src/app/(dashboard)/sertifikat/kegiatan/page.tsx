@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { EventManager } from "@/components/sertifikat/EventManager";
-import { listEvents } from "@/server/actions/sertifikat/events";
+import { listEventTemplateOptions, listEvents } from "@/server/actions/sertifikat/events";
 import { listSignatories } from "@/server/actions/sertifikat/signatories";
 
 export const metadata: Metadata = {
@@ -9,9 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
-  const [events, signatories] = await Promise.all([
+  const [events, signatories, templates] = await Promise.all([
     listEvents(),
     listSignatories(),
+    listEventTemplateOptions(),
   ]);
 
   return (
@@ -19,7 +20,11 @@ export default async function Page() {
       title="Sertifikat & Kegiatan"
       description="Kelola kegiatan, penandatangan, peserta, dan QR verifikasi sertifikat."
     >
-      <EventManager initialEvents={events} signatoryOptions={signatories} />
+      <EventManager
+        initialEvents={events}
+        signatoryOptions={signatories}
+        templateOptions={templates}
+      />
     </PageWrapper>
   );
 }
