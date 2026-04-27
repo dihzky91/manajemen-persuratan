@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -30,9 +31,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { ujianCreateSchema, type UjianCreateInput } from "@/lib/validators/jadwalUjian.schema";
 import { createUjian, updateUjian, type UjianRow } from "@/server/actions/jadwal-ujian/ujian";
+import { getPenugasanByUjian } from "@/server/actions/jadwal-ujian/penugasan";
 import type { KelasRow } from "@/server/actions/jadwal-ujian/kelas";
+import type { PengawasRow } from "@/server/actions/jadwal-ujian/pengawas";
+import type { MateriRow } from "@/server/actions/jadwal-ujian/materi";
 
 interface UjianFormProps {
   open: boolean;
@@ -40,52 +46,113 @@ interface UjianFormProps {
   mode: "create" | "edit";
   initialData?: UjianRow | null;
   kelasList: Pick<KelasRow, "id" | "namaKelas" | "program">[];
+  pengawasList: Pick<PengawasRow, "id" | "nama">[];
+  materiList: Pick<MateriRow, "id" | "nama" | "program">[];
 }
 
-export function UjianForm({ open, onOpenChange, mode, initialData, kelasList }: UjianFormProps) {
+export function UjianForm({ open, onOpenChange, mode, initialData, kelasList, pengawasList, materiList }: UjianFormProps) {
   const [isPending, startTransition] = useTransition();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedMateri, setSelectedMateri] = useState<string[]>([]);
 
   const form = useForm<UjianCreateInput>({
     resolver: zodResolver(ujianCreateSchema),
-    defaultValues: { kelasId: "", mataPelajaran: "", tanggalUjian: "", jamMulai: "", jamSelesai: "", catatan: "" },
+    defaultValues: { kelasId: "", mataPelajaran: [], tanggalUjian: "", jamMulai: "", jamSelesai: "", catatan: "" },
   });
 
+  const selectedKelasId = useWatch({ control: form.control, name: "kelasId" });
+  const selectedKelasProgram = useMemo(
+    () => kelasList.find((k) => k.id === selectedKelasId)?.program ?? null,
+    [kelasList, selectedKelasId],
+  );
+  const filteredMateri = useMemo(
+    () => selectedKelasProgram ? materiList.filter((m) => m.program === selectedKelasProgram) : materiList,
+    [materiList, selectedKelasProgram],
+  );
+
+  const prevKelasId = useMemo(() => initialData?.kelasId, [initialData]);
   useEffect(() => {
-    if (open) {
-      form.reset(
-        mode === "edit" && initialData
-          ? {
-              kelasId: initialData.kelasId,
-              mataPelajaran: initialData.mataPelajaran,
-              tanggalUjian: initialData.tanggalUjian,
-              jamMulai: initialData.jamMulai,
-              jamSelesai: initialData.jamSelesai,
-              catatan: initialData.catatan ?? "",
-            }
-          : { kelasId: "", mataPelajaran: "", tanggalUjian: "", jamMulai: "", jamSelesai: "", catatan: "" },
-      );
+    if (!open) return;
+    if (selectedKelasId && selectedKelasId !== prevKelasId && mode === "create") {
+      setSelectedMateri([]);
+      form.setValue("mataPelajaran", [], { shouldValidate: false });
+    }
+  }, [selectedKelasId, prevKelasId, mode, open, form]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (mode === "edit" && initialData) {
+      form.reset({
+        kelasId: initialData.kelasId,
+        mataPelajaran: initialData.mataPelajaran,
+        tanggalUjian: initialData.tanggalUjian,
+        jamMulai: initialData.jamMulai,
+        jamSelesai: initialData.jamSelesai,
+        catatan: initialData.catatan ?? "",
+      });
+      setSelectedMateri(initialData.mataPelajaran);
+      getPenugasanByUjian(initialData.id).then((rows) => {
+        setSelectedIds(new Set(rows.map((r) => r.pengawasId)));
+      });
+    } else {
+      form.reset({ kelasId: "", mataPelajaran: [], tanggalUjian: "", jamMulai: "", jamSelesai: "", catatan: "" });
+      setSelectedMateri([]);
+      setSelectedIds(new Set());
     }
   }, [open, mode, initialData, form]);
 
+  function toggleMateri(nama: string) {
+    let next: string[];
+    if (selectedMateri.includes(nama)) {
+      next = selectedMateri.filter((n) => n !== nama);
+    } else {
+      if (selectedMateri.length >= 2) return;
+      next = [...selectedMateri, nama];
+    }
+    setSelectedMateri(next);
+    form.setValue("mataPelajaran", next, { shouldValidate: true });
+  }
+
+  function togglePengawas(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   function onSubmit(values: UjianCreateInput) {
     startTransition(async () => {
+      const pengawasIds = Array.from(selectedIds);
       const res =
         mode === "edit" && initialData
-          ? await updateUjian({ ...values, id: initialData.id })
-          : await createUjian(values);
+          ? await updateUjian({ ...values, id: initialData.id, pengawasIds })
+          : await createUjian({ ...values, pengawasIds });
 
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      toast.success(mode === "edit" ? "Jadwal ujian diperbarui." : "Jadwal ujian berhasil dibuat.");
+
+      if (res.konflikPengawasIds && res.konflikPengawasIds.length > 0) {
+        const namaKonflik = res.konflikPengawasIds
+          .map((id) => pengawasList.find((p) => p.id === id)?.nama ?? id)
+          .join(", ");
+        toast.warning(`Jadwal disimpan, namun terdeteksi konflik untuk: ${namaKonflik}`);
+      } else {
+        toast.success(mode === "edit" ? "Jadwal ujian diperbarui." : "Jadwal ujian berhasil dibuat.");
+      }
       onOpenChange(false);
     });
   }
 
+  const sortedPengawas = [...pengawasList].sort((a, b) => a.nama.localeCompare(b.nama, "id"));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Ubah Jadwal Ujian" : "Tambah Jadwal Ujian"}</DialogTitle>
           <DialogDescription>
@@ -124,12 +191,47 @@ export function UjianForm({ open, onOpenChange, mode, initialData, kelasList }: 
             <FormField
               control={form.control}
               name="mataPelajaran"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
-                  <FormLabel>Mata Pelajaran / Materi</FormLabel>
-                  <FormControl>
-                    <Input placeholder="mis. Akuntansi Keuangan" autoFocus {...field} />
-                  </FormControl>
+                  <FormLabel>
+                    Mata Ujian{" "}
+                    <span className="text-muted-foreground font-normal">(pilih 1–2)</span>
+                  </FormLabel>
+                  {!selectedKelasId ? (
+                    <p className="text-sm text-muted-foreground">Pilih kelas terlebih dahulu.</p>
+                  ) : filteredMateri.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Belum ada materi untuk program {selectedKelasProgram}. Tambah di halaman Materi Ujian.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
+                      {filteredMateri.map((m) => {
+                        const checked = selectedMateri.includes(m.nama);
+                        const disabled = !checked && selectedMateri.length >= 2;
+                        return (
+                          <div key={m.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`mat-${m.id}`}
+                              checked={checked}
+                              disabled={disabled}
+                              onCheckedChange={() => toggleMateri(m.nama)}
+                            />
+                            <label
+                              htmlFor={`mat-${m.id}`}
+                              className={`text-sm leading-none select-none ${disabled ? "text-muted-foreground" : "cursor-pointer"}`}
+                            >
+                              {m.nama}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {selectedMateri.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Dipilih: {selectedMateri.join(" & ")}
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -193,6 +295,48 @@ export function UjianForm({ open, onOpenChange, mode, initialData, kelasList }: 
                 </FormItem>
               )}
             />
+
+            <Separator />
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                Pengawas{" "}
+                <span className="text-muted-foreground font-normal">(opsional)</span>
+              </p>
+              {sortedPengawas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Belum ada data pengawas.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
+                  {sortedPengawas.map((p) => (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`pg-${p.id}`}
+                        checked={selectedIds.has(p.id)}
+                        onCheckedChange={() => togglePengawas(p.id)}
+                      />
+                      <label
+                        htmlFor={`pg-${p.id}`}
+                        className="text-sm leading-none cursor-pointer select-none"
+                      >
+                        {p.nama}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {selectedIds.size > 0 && (
+                <p className="text-xs text-muted-foreground">{selectedIds.size} pengawas dipilih</p>
+              )}
+            </div>
+
+            {selectedIds.size > 0 && (
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <p className="text-xs">
+                  Konflik jadwal akan terdeteksi otomatis saat menyimpan dan ditampilkan sebagai peringatan.
+                </p>
+              </div>
+            )}
           </form>
         </Form>
 

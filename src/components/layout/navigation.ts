@@ -209,6 +209,13 @@ export const navigationSections: NavigationSection[] = [
         allowedRoles: ["admin", "staff"],
       },
       {
+        href: "/jadwal-ujian/materi",
+        label: "Materi Ujian",
+        icon: ClipboardList,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+      },
+      {
         href: "/jadwal-ujian/pengaturan",
         label: "Pengaturan",
         icon: Settings,

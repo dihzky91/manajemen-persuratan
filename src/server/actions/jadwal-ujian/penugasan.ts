@@ -14,7 +14,7 @@ import {
 export type PenugasanRow = {
   id: string;
   ujianId: string;
-  mataPelajaran: string;
+  mataPelajaran: string[];
   tanggalUjian: string;
   jamMulai: string;
   jamSelesai: string;
@@ -103,7 +103,7 @@ export type JadwalPengawasRow = {
   pengawasId: string;
   namaPengawas: string;
   ujianId: string;
-  mataPelajaran: string;
+  mataPelajaran: string[];
   tanggalUjian: string;
   jamMulai: string;
   jamSelesai: string;

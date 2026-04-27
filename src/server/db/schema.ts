@@ -749,12 +749,21 @@ export const kelasUjian = pgTable("kelas_ujian", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const materiUjian = pgTable("materi_ujian", {
+  id: text("id").primaryKey(),
+  nama: varchar("nama", { length: 200 }).notNull(),
+  program: varchar("program", { length: 100 }).notNull(),
+  urutan: integer("urutan").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const jadwalUjian = pgTable("jadwal_ujian", {
   id: text("id").primaryKey(),
   kelasId: text("kelas_id")
     .notNull()
     .references(() => kelasUjian.id, { onDelete: "cascade" }),
-  mataPelajaran: varchar("mata_pelajaran", { length: 200 }).notNull(),
+  mataPelajaran: text("mata_pelajaran").array().notNull(),
   tanggalUjian: date("tanggal_ujian").notNull(),
   jamMulai: varchar("jam_mulai", { length: 5 }).notNull(),
   jamSelesai: varchar("jam_selesai", { length: 5 }).notNull(),
@@ -815,6 +824,8 @@ export type Participant = typeof participants.$inferSelect;
 export type NewParticipant = typeof participants.$inferInsert;
 export type Pengawas = typeof pengawas.$inferSelect;
 export type NewPengawas = typeof pengawas.$inferInsert;
+export type MateriUjian = typeof materiUjian.$inferSelect;
+export type NewMateriUjian = typeof materiUjian.$inferInsert;
 export type KelasUjian = typeof kelasUjian.$inferSelect;
 export type NewKelasUjian = typeof kelasUjian.$inferInsert;
 export type JadwalUjian = typeof jadwalUjian.$inferSelect;

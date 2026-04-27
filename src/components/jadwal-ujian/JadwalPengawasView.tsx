@@ -65,7 +65,7 @@ export function JadwalPengawasView({ pengawasList, allPenugasan }: JadwalPengawa
       {
         accessorKey: "mataPelajaran",
         header: "Mata Pelajaran",
-        cell: ({ row }) => <span className="font-medium">{row.original.mataPelajaran}</span>,
+        cell: ({ row }) => <span className="font-medium">{row.original.mataPelajaran.join(" & ")}</span>,
       },
       {
         accessorKey: "namaKelas",

@@ -11,6 +11,33 @@ import {
   pengawas,
   auditLog,
 } from "@/server/db/schema";
+
+async function buildKonflikMap(
+  pengawasIds: string[],
+  tanggalUjian: string,
+  jamMulai: string,
+  jamSelesai: string,
+  excludeUjianId: string,
+): Promise<Record<string, boolean>> {
+  const result: Record<string, boolean> = {};
+  for (const pgId of pengawasIds) {
+    const existing = await db
+      .select({
+        ujianId: penugasanPengawas.ujianId,
+        jamMulai: jadwalUjian.jamMulai,
+        jamSelesai: jadwalUjian.jamSelesai,
+      })
+      .from(penugasanPengawas)
+      .leftJoin(jadwalUjian, eq(penugasanPengawas.ujianId, jadwalUjian.id))
+      .where(and(eq(penugasanPengawas.pengawasId, pgId), eq(jadwalUjian.tanggalUjian, tanggalUjian)));
+    result[pgId] = existing.some((e) => {
+      if (e.ujianId === excludeUjianId) return false;
+      if (!e.jamMulai || !e.jamSelesai) return false;
+      return jamMulai < e.jamSelesai && jamSelesai > e.jamMulai;
+    });
+  }
+  return result;
+}
 import { requireRole, requireSession } from "@/server/actions/auth";
 import {
   ujianCreateSchema,
@@ -27,7 +54,7 @@ export type UjianRow = {
   program: string;
   tipe: string;
   mode: string;
-  mataPelajaran: string;
+  mataPelajaran: string[];
   tanggalUjian: string;
   jamMulai: string;
   jamSelesai: string;
@@ -166,8 +193,9 @@ export async function getUjianById(id: string): Promise<UjianDetail | null> {
   };
 }
 
-export async function createUjian(data: UjianCreateInput) {
+export async function createUjian(data: UjianCreateInput & { pengawasIds?: string[] }) {
   const parsed = ujianCreateSchema.parse(data);
+  const pengawasIds = data.pengawasIds ?? [];
   const session = await requireRole(["admin", "staff"]);
 
   const id = nanoid();
@@ -186,6 +214,20 @@ export async function createUjian(data: UjianCreateInput) {
   const row = rows[0];
   if (!row) throw new Error("Gagal membuat jadwal ujian");
 
+  const konflikIds: string[] = [];
+  if (pengawasIds.length > 0) {
+    const konflikMap = await buildKonflikMap(pengawasIds, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai, id);
+    await db.insert(penugasanPengawas).values(
+      pengawasIds.map((pgId) => ({
+        id: nanoid(),
+        ujianId: id,
+        pengawasId: pgId,
+        konflik: konflikMap[pgId] ?? false,
+      })),
+    );
+    konflikIds.push(...pengawasIds.filter((pgId) => konflikMap[pgId]));
+  }
+
   await db.insert(auditLog).values({
     userId: session.user.id,
     aksi: "CREATE_JADWAL_UJIAN",
@@ -196,14 +238,15 @@ export async function createUjian(data: UjianCreateInput) {
       tanggalUjian: parsed.tanggalUjian,
       jamMulai: parsed.jamMulai,
       jamSelesai: parsed.jamSelesai,
+      jumlahPengawas: pengawasIds.length,
     },
   });
 
   revalidatePath("/jadwal-ujian");
-  return { ok: true as const, data: row };
+  return { ok: true as const, data: row, konflikPengawasIds: konflikIds };
 }
 
-export async function updateUjian(data: UjianUpdateInput) {
+export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: string[] }) {
   const parsed = ujianUpdateSchema.parse(data);
   const session = await requireRole(["admin", "staff"]);
 
@@ -223,6 +266,23 @@ export async function updateUjian(data: UjianUpdateInput) {
   const row = rows[0];
   if (!row) return { ok: false as const, error: "Jadwal ujian tidak ditemukan." };
 
+  const konflikIds: string[] = [];
+  if (data.pengawasIds !== undefined) {
+    await db.delete(penugasanPengawas).where(eq(penugasanPengawas.ujianId, parsed.id));
+    if (data.pengawasIds.length > 0) {
+      const konflikMap = await buildKonflikMap(data.pengawasIds, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai, parsed.id);
+      await db.insert(penugasanPengawas).values(
+        data.pengawasIds.map((pgId) => ({
+          id: nanoid(),
+          ujianId: parsed.id,
+          pengawasId: pgId,
+          konflik: konflikMap[pgId] ?? false,
+        })),
+      );
+      konflikIds.push(...data.pengawasIds.filter((pgId) => konflikMap[pgId]));
+    }
+  }
+
   await db.insert(auditLog).values({
     userId: session.user.id,
     aksi: "UPDATE_JADWAL_UJIAN",
@@ -238,7 +298,7 @@ export async function updateUjian(data: UjianUpdateInput) {
 
   revalidatePath("/jadwal-ujian");
   revalidatePath(`/jadwal-ujian/${parsed.id}`);
-  return { ok: true as const, data: row };
+  return { ok: true as const, data: row, konflikPengawasIds: konflikIds };
 }
 
 export async function deleteUjian(id: string) {
@@ -274,7 +334,7 @@ export type UjianExportRow = {
   program: string;
   tipe: string;
   mode: string;
-  mataPelajaran: string;
+  mataPelajaran: string[];
   pengawas: string;
   catatan: string | null;
 };

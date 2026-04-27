@@ -32,12 +32,12 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <PageWrapper
-      title={ujian.mataPelajaran}
+      title={ujian.mataPelajaran.join(" & ")}
       description={`${ujian.namaKelas} · ${ujian.tanggalUjian} · ${ujian.jamMulai}–${ujian.jamSelesai}`}
     >
       <PenugasanManager
         ujianId={ujian.id}
-        mataPelajaran={ujian.mataPelajaran}
+        mataPelajaran={ujian.mataPelajaran.join(" & ")}
         tanggalUjian={ujian.tanggalUjian}
         jamMulai={ujian.jamMulai}
         jamSelesai={ujian.jamSelesai}

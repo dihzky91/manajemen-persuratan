@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Eye, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,14 @@ import { UjianForm } from "./UjianForm";
 import { UjianExportButton } from "./UjianExportButton";
 import { deleteUjian, type UjianRow } from "@/server/actions/jadwal-ujian/ujian";
 import type { KelasRow } from "@/server/actions/jadwal-ujian/kelas";
+import type { PengawasRow } from "@/server/actions/jadwal-ujian/pengawas";
+import type { MateriRow } from "@/server/actions/jadwal-ujian/materi";
 
 interface UjianTableProps {
   initialData: UjianRow[];
   kelasList: Pick<KelasRow, "id" | "namaKelas" | "program">[];
+  pengawasList: Pick<PengawasRow, "id" | "nama">[];
+  materiList: Pick<MateriRow, "id" | "nama" | "program">[];
   canManage: boolean;
   programOptions: string[];
 }
@@ -50,7 +54,7 @@ type FormState =
   | { open: true; mode: "create" }
   | { open: true; mode: "edit"; row: UjianRow };
 
-export function UjianTable({ initialData, kelasList, canManage, programOptions }: UjianTableProps) {
+export function UjianTable({ initialData, kelasList, pengawasList, materiList, canManage, programOptions }: UjianTableProps) {
   const router = useRouter();
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [deleteTarget, setDeleteTarget] = useState<UjianRow | null>(null);
@@ -58,15 +62,24 @@ export function UjianTable({ initialData, kelasList, canManage, programOptions }
   const [filterProgram, setFilterProgram] = useState("__all__");
   const [filterTanggalMulai, setFilterTanggalMulai] = useState("");
   const [filterTanggalSelesai, setFilterTanggalSelesai] = useState("");
+  const [showPastExams, setShowPastExams] = useState(false);
+
+  const today = useMemo(() => new Date().toISOString().split("T")[0]!, []);
+
+  const archivedCount = useMemo(
+    () => initialData.filter((u) => u.tanggalUjian < today).length,
+    [initialData, today],
+  );
 
   const filteredData = useMemo(() => {
     return initialData.filter((u) => {
+      if (!showPastExams && u.tanggalUjian < today) return false;
       if (filterProgram !== "__all__" && u.program !== filterProgram) return false;
       if (filterTanggalMulai && u.tanggalUjian < filterTanggalMulai) return false;
       if (filterTanggalSelesai && u.tanggalUjian > filterTanggalSelesai) return false;
       return true;
     });
-  }, [initialData, filterProgram, filterTanggalMulai, filterTanggalSelesai]);
+  }, [initialData, showPastExams, today, filterProgram, filterTanggalMulai, filterTanggalSelesai]);
 
   const columns = useMemo<ColumnDef<UjianRow>[]>(() => {
     const base: ColumnDef<UjianRow>[] = [
@@ -93,8 +106,14 @@ export function UjianTable({ initialData, kelasList, canManage, programOptions }
       },
       {
         accessorKey: "mataPelajaran",
-        header: "Mata Pelajaran",
-        cell: ({ row }) => <span className="font-medium">{row.original.mataPelajaran}</span>,
+        header: "Mata Ujian",
+        cell: ({ row }) => (
+          <div className="flex flex-col gap-0.5">
+            {row.original.mataPelajaran.map((m, i) => (
+              <span key={i} className="font-medium text-sm">{m}</span>
+            ))}
+          </div>
+        ),
       },
       {
         accessorKey: "namaKelas",
@@ -191,6 +210,13 @@ export function UjianTable({ initialData, kelasList, canManage, programOptions }
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant={showPastExams ? "secondary" : "outline"}
+                onClick={() => setShowPastExams((v) => !v)}
+              >
+                <Archive className="h-4 w-4" />
+                {showPastExams ? "Sembunyikan Arsip" : `Lihat Arsip (${archivedCount})`}
+              </Button>
               <UjianExportButton filter={exportFilter} />
               {canManage && (
                 <Button onClick={() => setFormState({ open: true, mode: "create" })}>
@@ -258,6 +284,8 @@ export function UjianTable({ initialData, kelasList, canManage, programOptions }
         mode={formState.open ? formState.mode : "create"}
         initialData={formState.open && formState.mode === "edit" ? formState.row : null}
         kelasList={kelasList}
+        pengawasList={pengawasList}
+        materiList={materiList}
       />
 
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null); }}>
@@ -266,7 +294,7 @@ export function UjianTable({ initialData, kelasList, canManage, programOptions }
             <DialogTitle>Hapus Jadwal Ujian?</DialogTitle>
             <DialogDescription>
               Ujian{" "}
-              <span className="font-medium text-foreground">{deleteTarget?.mataPelajaran}</span>{" "}
+              <span className="font-medium text-foreground">{deleteTarget?.mataPelajaran.join(" & ")}</span>{" "}
               pada{" "}
               <span className="font-medium text-foreground">{deleteTarget?.tanggalUjian}</span>{" "}
               beserta semua penugasan pengawasnya akan dihapus permanen.

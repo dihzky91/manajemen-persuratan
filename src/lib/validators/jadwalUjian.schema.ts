@@ -3,6 +3,21 @@ import { z } from "zod";
 const jamRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const jamSchema = z.string().regex(jamRegex, "Format jam tidak valid (HH:MM)");
 
+// ─── MATERI UJIAN ────────────────────────────────────────────────────────────
+
+export const materiCreateSchema = z.object({
+  nama: z.string().trim().min(2, "Nama minimal 2 karakter").max(200),
+  program: z.string().trim().min(1, "Program wajib dipilih").max(100),
+  urutan: z.number().int().min(0).optional(),
+});
+
+export const materiUpdateSchema = materiCreateSchema.extend({
+  id: z.string().min(1),
+});
+
+export type MateriCreateInput = z.infer<typeof materiCreateSchema>;
+export type MateriUpdateInput = z.infer<typeof materiUpdateSchema>;
+
 // ─── PENGAWAS ────────────────────────────────────────────────────────────────
 
 export const pengawasCreateSchema = z.object({
@@ -39,7 +54,10 @@ export type KelasUpdateInput = z.infer<typeof kelasUpdateSchema>;
 
 const ujianBaseSchema = z.object({
   kelasId: z.string().min(1, "Kelas wajib dipilih"),
-  mataPelajaran: z.string().trim().min(2, "Mata pelajaran minimal 2 karakter").max(200),
+  mataPelajaran: z
+    .array(z.string().trim().min(1))
+    .min(1, "Pilih minimal 1 mata ujian")
+    .max(2, "Maksimal 2 mata ujian"),
   tanggalUjian: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal tidak valid (YYYY-MM-DD)"),
   jamMulai: jamSchema,
   jamSelesai: jamSchema,
