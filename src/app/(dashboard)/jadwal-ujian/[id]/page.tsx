@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { PenugasanManager } from "@/components/jadwal-ujian/PenugasanManager";
 import { getSession } from "@/server/actions/auth";
-import { getUjianById } from "@/server/actions/jadwal-ujian/ujian";
+import { getUjianById, listUjian } from "@/server/actions/jadwal-ujian/ujian";
 import { getPenugasanByUjian } from "@/server/actions/jadwal-ujian/penugasan";
 import { listPengawas } from "@/server/actions/jadwal-ujian/pengawas";
 
@@ -18,29 +18,31 @@ type PageProps = {
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
 
-  const [session, ujian, penugasanList, pengawasList] = await Promise.all([
+  const [session, ujian, penugasanList, pengawasList, ujianList] = await Promise.all([
     getSession(),
     getUjianById(id),
     getPenugasanByUjian(id),
     listPengawas(),
+    listUjian({ page: 1, pageSize: 5000 }),
   ]);
 
-  if (!ujian) notFound();
+  const resolvedUjian = ujian ?? ujianList.rows.find((row) => row.id === id) ?? null;
+  if (!resolvedUjian) notFound();
 
   const role = (session?.user as { role?: string } | undefined)?.role;
   const canManage = role === "admin" || role === "staff";
 
   return (
     <PageWrapper
-      title={ujian.mataPelajaran.join(" & ")}
-      description={`${ujian.namaKelas} · ${ujian.tanggalUjian} · ${ujian.jamMulai}–${ujian.jamSelesai}`}
+      title={resolvedUjian.mataPelajaran.join(" & ")}
+      description={`${resolvedUjian.namaKelas} - ${resolvedUjian.tanggalUjian} - ${resolvedUjian.jamMulai}-${resolvedUjian.jamSelesai}`}
     >
       <PenugasanManager
-        ujianId={ujian.id}
-        mataPelajaran={ujian.mataPelajaran.join(" & ")}
-        tanggalUjian={ujian.tanggalUjian}
-        jamMulai={ujian.jamMulai}
-        jamSelesai={ujian.jamSelesai}
+        ujianId={resolvedUjian.id}
+        mataPelajaran={resolvedUjian.mataPelajaran.join(" & ")}
+        tanggalUjian={resolvedUjian.tanggalUjian}
+        jamMulai={resolvedUjian.jamMulai}
+        jamSelesai={resolvedUjian.jamSelesai}
         initialPenugasan={penugasanList}
         pengawasList={pengawasList.map((p) => ({ id: p.id, nama: p.nama }))}
         canManage={canManage}

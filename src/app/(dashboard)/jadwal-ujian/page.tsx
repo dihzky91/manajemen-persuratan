@@ -7,19 +7,21 @@ import { listKelas } from "@/server/actions/jadwal-ujian/kelas";
 import { listPengawas } from "@/server/actions/jadwal-ujian/pengawas";
 import { listMateri } from "@/server/actions/jadwal-ujian/materi";
 import { getAllKonfig } from "@/server/actions/jadwal-ujian/config";
+import { getSystemSettings } from "@/server/actions/systemSettings";
 
 export const metadata: Metadata = {
   title: "Jadwal Ujian | Manajemen Surat IAI Jakarta",
 };
 
 export default async function Page() {
-  const [session, ujianResult, kelasList, pengawasList, materiList, konfig] = await Promise.all([
+  const [session, ujianResult, kelasList, pengawasList, materiList, konfig, systemSettings] = await Promise.all([
     getSession(),
     listUjian(),
     listKelas(),
     listPengawas(),
     listMateri(),
     getAllKonfig(),
+    getSystemSettings(),
   ]);
 
   const role = (session?.user as { role?: string } | undefined)?.role;
@@ -33,10 +35,14 @@ export default async function Page() {
       <UjianTable
         initialData={ujianResult.rows}
         kelasList={kelasList.map((k) => ({ id: k.id, namaKelas: k.namaKelas, program: k.program }))}
-        pengawasList={pengawasList.map((p) => ({ id: p.id, nama: p.nama }))}
+        pengawasList={pengawasList.map((p) => ({ id: p.id, nama: p.nama, jumlahTugas: p.jumlahTugas }))}
         materiList={materiList.map((m) => ({ id: m.id, nama: m.nama, program: m.program }))}
         canManage={canManage}
         programOptions={konfig.program}
+        systemIdentity={{
+          namaSistem: systemSettings.namaSistem,
+          logoUrl: systemSettings.logoUrl,
+        }}
       />
     </PageWrapper>
   );
