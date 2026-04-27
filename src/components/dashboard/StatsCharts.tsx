@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -26,6 +26,17 @@ interface StatsChartsProps {
 }
 
 export function StatsCharts({ stats }: StatsChartsProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const update = () => setIsMobile(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
   const monthlyData = useMemo(() => {
     return stats.suratKeluarMonthly.map((sk, i) => ({
       month: sk.month,
@@ -48,38 +59,48 @@ export function StatsCharts({ stats }: StatsChartsProps) {
       .map((s) => ({
         name: formatJenis(s.jenis),
         value: s.count,
-      }));
+    }));
   }, [stats.suratByJenis]);
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      {/* Monthly Trend */}
-      <Card className="col-span-2">
-        <CardHeader>
+    <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
+      <Card className="md:col-span-2">
+        <CardHeader className="pb-0">
           <CardTitle className="text-base">Trend Surat Bulanan</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-72">
+        <CardContent className="pt-4">
+          <div className="h-64 sm:h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyData}>
+              <LineChart
+                data={monthlyData}
+                margin={{ top: 8, right: isMobile ? 8 : 20, left: isMobile ? -20 : 0, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" />
+                <YAxis className="text-xs" width={isMobile ? 26 : 36} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
+                    border: "1px solid var(--border)",
                     borderRadius: "8px",
                   }}
                 />
-                <Legend />
+                <Legend
+                  verticalAlign="top"
+                  align="left"
+                  iconType="circle"
+                  wrapperStyle={{
+                    fontSize: isMobile ? "12px" : "13px",
+                    paddingBottom: isMobile ? "8px" : "12px",
+                  }}
+                />
                 <Line
                   type="monotone"
                   dataKey="keluar"
                   name="Surat Keluar"
                   stroke="#3b82f6"
                   strokeWidth={2}
-                  dot={{ r: 4 }}
+                  dot={{ r: isMobile ? 2.5 : 4 }}
                 />
                 <Line
                   type="monotone"
@@ -87,7 +108,7 @@ export function StatsCharts({ stats }: StatsChartsProps) {
                   name="Surat Masuk"
                   stroke="#10b981"
                   strokeWidth={2}
-                  dot={{ r: 4 }}
+                  dot={{ r: isMobile ? 2.5 : 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -95,21 +116,20 @@ export function StatsCharts({ stats }: StatsChartsProps) {
         </CardContent>
       </Card>
 
-      {/* Surat Keluar by Status */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-0">
           <CardTitle className="text-base">Status Surat Keluar</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-64">
+        <CardContent className="pt-4">
+          <div className="h-72 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={statusKeluarData}
                   cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
+                  cy={isMobile ? "42%" : "50%"}
+                  innerRadius={isMobile ? 42 : 60}
+                  outerRadius={isMobile ? 62 : 80}
                   paddingAngle={5}
                   dataKey="value"
                 >
@@ -120,33 +140,49 @@ export function StatsCharts({ stats }: StatsChartsProps) {
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
+                    border: "1px solid var(--border)",
                     borderRadius: "8px",
                   }}
                 />
-                <Legend />
+                <Legend
+                  verticalAlign="bottom"
+                  align="center"
+                  iconType="circle"
+                  wrapperStyle={{
+                    fontSize: isMobile ? "12px" : "13px",
+                    lineHeight: 1.4,
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
 
-      {/* Jenis Surat */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-0">
           <CardTitle className="text-base">Distribusi Jenis Surat</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-64">
+        <CardContent className="pt-4">
+          <div className="h-72 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={jenisSuratData} layout="vertical">
+              <BarChart
+                data={jenisSuratData}
+                layout="vertical"
+                margin={{ top: 4, right: isMobile ? 8 : 16, left: isMobile ? 12 : 24, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" className="text-xs" />
-                <YAxis dataKey="name" type="category" width={100} className="text-xs" />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={isMobile ? 74 : 100}
+                  className="text-xs"
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
+                    border: "1px solid var(--border)",
                     borderRadius: "8px",
                   }}
                 />
@@ -195,7 +231,7 @@ function formatJenis(jenis: string): string {
 
 export function StatsSummary({ stats }: StatsChartsProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard
         title="Total Surat Keluar"
         value={stats.totalSuratKeluar}
@@ -230,12 +266,12 @@ function StatCard({
   description: string;
 }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card className="gap-4 rounded-[24px]">
+      <CardHeader className="pb-0">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold">{value.toLocaleString()}</div>
+      <CardContent className="pt-0">
+        <div className="text-2xl font-bold sm:text-3xl">{value.toLocaleString()}</div>
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </CardContent>
     </Card>

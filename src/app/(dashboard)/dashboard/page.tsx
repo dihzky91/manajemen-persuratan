@@ -79,8 +79,8 @@ export default async function DashboardPage() {
     .slice(0, 6);
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-5 sm:space-y-6">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Surat Masuk Baru"
           value={String(suratMasukBaru.length)}
@@ -111,15 +111,15 @@ export default async function DashboardPage() {
         />
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <UjianDashboardWidget data={statistikUjian} />
       </section>
 
       <StatsSummary stats={stats} />
       <StatsCharts stats={stats} />
 
-      <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="rounded-[24px] border border-border bg-card p-6 shadow-sm">
+      <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
@@ -129,7 +129,7 @@ export default async function DashboardPage() {
                 Ringkasan antrean operasional dari surat masuk, disposisi, dan surat keluar.
               </p>
             </div>
-            <Button asChild>
+            <Button asChild className="w-full sm:w-auto">
               <Link href="/surat-masuk">
                 Input Surat Masuk
                 <ArrowUpRight className="h-4 w-4" />
@@ -137,7 +137,7 @@ export default async function DashboardPage() {
             </Button>
           </div>
 
-          <div className="mt-6 grid gap-3">
+          <div className="mt-5 grid gap-3 sm:mt-6">
             <WorkItem
               title="Surat masuk baru"
               description="Periksa surat yang baru diterima, lengkapi detail, lalu teruskan ke disposisi bila perlu."
@@ -173,13 +173,13 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-border bg-card p-6 shadow-sm">
+        <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
           <h2 className="text-lg font-semibold text-foreground">Aksi Cepat</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Jalur singkat ke pekerjaan yang paling sering dipakai.
           </p>
 
-          <div className="mt-6 grid gap-3">
+          <div className="mt-5 grid gap-3 sm:mt-6">
             <QuickAction href="/surat-masuk" label="Catat surat masuk" icon={Inbox} />
             <QuickAction href="/surat-keluar" label="Buat surat keluar" icon={Send} />
             <QuickAction href="/disposisi" label="Buka disposisi" icon={Mail} />
@@ -189,7 +189,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Aktivitas Terbaru</h2>
@@ -222,7 +222,7 @@ export default async function DashboardPage() {
                   </p>
                   <p className="mt-1 truncate text-xs text-muted-foreground">{item.meta}</p>
                 </div>
-                <Badge variant="outline" className="w-fit rounded-full">
+                <Badge variant="outline" className="w-fit shrink-0 rounded-full">
                   {item.status}
                 </Badge>
               </Link>
@@ -254,17 +254,17 @@ function MetricCard({
   return (
     <Link
       href={href}
-      className="rounded-[24px] border border-border bg-card p-5 shadow-sm transition-colors hover:bg-muted/35"
+      className="rounded-[24px] border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/35 sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
             {label}
           </p>
-          <p className="mt-3 text-3xl font-semibold text-foreground">{value}</p>
+          <p className="mt-3 text-2xl font-semibold text-foreground sm:text-3xl">{value}</p>
           <p className="mt-2 text-sm leading-5 text-muted-foreground">{hint}</p>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:h-11 sm:w-11">
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -301,7 +301,7 @@ function WorkItem({
         </div>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
       </div>
-      <Button asChild variant="outline" size="sm">
+      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
         <Link href={href}>{action}</Link>
       </Button>
     </div>
@@ -318,7 +318,7 @@ function QuickAction({
   icon: typeof Inbox;
 }) {
   return (
-    <Button asChild variant="outline" className="justify-start">
+    <Button asChild variant="outline" className="h-auto justify-start px-4 py-3 text-left">
       <Link href={href}>
         <Icon className="h-4 w-4" />
         {label}

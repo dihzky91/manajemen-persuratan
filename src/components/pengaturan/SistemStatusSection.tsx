@@ -137,7 +137,7 @@ export function SistemStatusSection({
         <TestConnectionCard isAdmin={isAdmin} />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
           icon={HardDrive}
           label="Storage"
@@ -248,16 +248,16 @@ function SummaryCard({
   status: string;
 }) {
   return (
-    <Card className="rounded-[24px]">
+    <Card className="gap-4 rounded-[24px]">
       <CardContent className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
             {label}
           </p>
-          <p className="mt-3 text-2xl font-semibold text-foreground">{value}</p>
+          <p className="mt-3 text-2xl font-semibold text-foreground sm:text-3xl">{value}</p>
           <p className="mt-2 text-sm text-muted-foreground">{status}</p>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:h-11 sm:w-11">
           <Icon className="h-5 w-5" />
         </div>
       </CardContent>

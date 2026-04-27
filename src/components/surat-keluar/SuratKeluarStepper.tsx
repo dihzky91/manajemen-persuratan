@@ -443,13 +443,13 @@ export function SuratKeluarStepper({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-4 sm:max-w-2xl sm:p-6">
         <DialogHeader>
           <DialogTitle>Detail Surat Keluar</DialogTitle>
           <DialogDescription>{row.perihal}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border bg-muted/30 p-4 text-sm">
+        <div className="grid gap-x-4 gap-y-3 rounded-lg border bg-muted/30 p-3 text-sm sm:grid-cols-2 sm:p-4">
           <div>
             <span className="text-muted-foreground">Tujuan</span>
             <p className="font-medium">{row.tujuan}</p>
@@ -550,7 +550,7 @@ export function SuratKeluarStepper({
         ) : null}
 
         {!isCancelled ? (
-          <div className="relative flex items-start justify-between gap-2">
+          <div className="relative grid grid-cols-2 gap-3 sm:flex sm:items-start sm:justify-between sm:gap-2">
             {STEPS.map((step, idx) => {
               const isDone = currentStep > idx;
               const isCurrent = currentStep === idx;
@@ -559,12 +559,12 @@ export function SuratKeluarStepper({
               return (
                 <div
                   key={step.key}
-                  className="relative flex flex-1 flex-col items-center gap-1"
+                  className="relative flex flex-col items-center gap-1 sm:flex-1"
                 >
                   {idx < STEPS.length - 1 ? (
                     <div
                       className={cn(
-                        "absolute left-1/2 top-4 h-0.5 w-full",
+                        "absolute left-1/2 top-4 hidden h-0.5 w-full sm:block",
                         isDone ? "bg-primary" : "bg-border",
                       )}
                     />
@@ -606,13 +606,13 @@ export function SuratKeluarStepper({
           </div>
         )}
 
-        <div className="space-y-3 rounded-lg border bg-card p-4">
+        <div className="space-y-3 rounded-lg border bg-card p-3 sm:p-4">
           <p className="text-sm font-medium text-muted-foreground">
             Aksi tersedia
           </p>
 
           {status === "draft" && (
-            <div className="flex flex-wrap gap-2">
+            <div className="grid gap-2 sm:flex sm:flex-wrap">
               <Button
                 size="sm"
                 variant="outline"
@@ -620,6 +620,7 @@ export function SuratKeluarStepper({
                   onOpenChange(false);
                   onEditClick();
                 }}
+                className="w-full sm:w-auto"
               >
                 Edit Surat
               </Button>
@@ -629,13 +630,14 @@ export function SuratKeluarStepper({
                   dokumen sudah tersedia sebelum diajukan.
                 </p>
               ) : null}
-              <Button
-                size="sm"
-                onClick={() => runAction(() => ajukanPersetujuan({ id: row.id }))}
-                disabled={isPending}
-              >
-                <Send className="mr-1.5 h-3.5 w-3.5" />
-                Ajukan Persetujuan
+                <Button
+                  size="sm"
+                  onClick={() => runAction(() => ajukanPersetujuan({ id: row.id }))}
+                  disabled={isPending}
+                  className="w-full sm:w-auto"
+                >
+                  <Send className="mr-1.5 h-3.5 w-3.5" />
+                  Ajukan Persetujuan
               </Button>
               {isAdmin ? (
                 <Button
@@ -643,6 +645,7 @@ export function SuratKeluarStepper({
                   variant="destructive"
                   onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
                   disabled={isPending}
+                  className="w-full sm:w-auto"
                 >
                   Tandai Tidak Berlaku
                 </Button>
@@ -651,12 +654,13 @@ export function SuratKeluarStepper({
           )}
 
           {status === "permohonan_persetujuan" && (
-            <div className="flex flex-wrap gap-2">
+            <div className="grid gap-2 sm:flex sm:flex-wrap">
               {isPejabat ? (
                 <Button
                   size="sm"
                   onClick={() => runAction(() => mulaiReviu({ id: row.id }))}
                   disabled={isPending}
+                  className="w-full sm:w-auto"
                 >
                   <Eye className="mr-1.5 h-3.5 w-3.5" />
                   Mulai Reviu
@@ -672,6 +676,7 @@ export function SuratKeluarStepper({
                   variant="destructive"
                   onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
                   disabled={isPending}
+                  className="w-full sm:w-auto"
                 >
                   Tandai Tidak Berlaku
                 </Button>
@@ -684,7 +689,7 @@ export function SuratKeluarStepper({
               {isPejabat ? (
                 <>
                   {!showTolakForm ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid gap-2 sm:flex sm:flex-wrap">
                       <Button
                         size="sm"
                         onClick={() => runAction(() => setujuiSurat({ id: row.id }))}
@@ -699,6 +704,7 @@ export function SuratKeluarStepper({
                         variant="destructive"
                         onClick={() => setShowTolakForm(true)}
                         disabled={isPending}
+                        className="w-full sm:w-auto"
                       >
                         Tolak / Minta Revisi
                       </Button>
@@ -720,12 +726,13 @@ export function SuratKeluarStepper({
                         value={catatanReviu}
                         onChange={(e) => setCatatanReviu(e.target.value)}
                       />
-                      <div className="flex gap-2">
+                      <div className="grid gap-2 sm:flex">
                         <Button
                           size="sm"
                           variant="destructive"
                           onClick={handleTolak}
                           disabled={isPending}
+                          className="w-full sm:w-auto"
                         >
                           Kirim Penolakan
                         </Button>
@@ -736,6 +743,7 @@ export function SuratKeluarStepper({
                             setShowTolakForm(false);
                             setCatatanReviu("");
                           }}
+                          className="w-full sm:w-auto"
                         >
                           Batal
                         </Button>
@@ -764,7 +772,7 @@ export function SuratKeluarStepper({
                     </div>
                     {row.nomorSurat ? (
                       <>
-                      <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
                         <Hash className="h-4 w-4 text-primary" />
                         <span className="font-mono text-sm font-semibold">
                           {row.nomorSurat}
@@ -785,7 +793,7 @@ export function SuratKeluarStepper({
                           onChange={(event) => setManualNomorSurat(event.target.value)}
                           placeholder="Isi manual nomor surat untuk backdate/koreksi"
                         />
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid gap-2 sm:flex sm:flex-wrap">
                           <Button
                             size="sm"
                             variant="outline"
@@ -796,6 +804,7 @@ export function SuratKeluarStepper({
                               nomorAvailability.state === "duplicate" ||
                               nomorAvailability.state === "checking"
                             }
+                            className="w-full sm:w-auto"
                           >
                             Gunakan Nomor Manual
                           </Button>
@@ -836,12 +845,13 @@ export function SuratKeluarStepper({
                         onChange={(event) => setManualNomorSurat(event.target.value)}
                         placeholder="Isi manual nomor surat jika tidak ingin generate otomatis"
                       />
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid gap-2 sm:flex sm:flex-wrap">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={handleGenerateNomor}
                           disabled={isPending}
+                          className="w-full sm:w-auto"
                         >
                           <Hash className="mr-1.5 h-3.5 w-3.5" />
                           Generate Otomatis
@@ -856,6 +866,7 @@ export function SuratKeluarStepper({
                             nomorAvailability.state === "duplicate" ||
                             nomorAvailability.state === "checking"
                           }
+                          className="w-full sm:w-auto"
                         >
                           Gunakan Nomor Manual
                         </Button>
@@ -894,7 +905,7 @@ export function SuratKeluarStepper({
                       </div>
                       <p className="text-sm font-medium text-foreground">QR Verifikasi</p>
                     </div>
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           QR akan mengarah ke halaman verifikasi publik surat.
@@ -913,12 +924,13 @@ export function SuratKeluarStepper({
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid gap-2 sm:flex sm:flex-wrap">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={handleGenerateQr}
                         disabled={isPending}
+                        className="w-full sm:w-auto"
                       >
                         <QrCode className="mr-1.5 h-3.5 w-3.5" />
                         {row.qrCodeUrl ? "Generate Ulang QR" : "Generate QR"}
@@ -927,6 +939,7 @@ export function SuratKeluarStepper({
                         size="sm"
                         variant="outline"
                         onClick={() => window.open(verificationUrl, "_blank", "noopener,noreferrer")}
+                        className="w-full sm:w-auto"
                       >
                         <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                         Preview Halaman Verifikasi
@@ -935,6 +948,7 @@ export function SuratKeluarStepper({
                         size="sm"
                         variant="outline"
                         onClick={handleCopyVerificationLink}
+                        className="w-full sm:w-auto"
                       >
                         <Copy className="mr-1.5 h-3.5 w-3.5" />
                         Salin Link Verifikasi
@@ -944,6 +958,7 @@ export function SuratKeluarStepper({
                         variant="outline"
                         onClick={() => setShowQrPreview(true)}
                         disabled={!row.qrCodeUrl}
+                        className="w-full sm:w-auto"
                       >
                         <ScanQrCode className="mr-1.5 h-3.5 w-3.5" />
                         Preview QR
@@ -953,6 +968,7 @@ export function SuratKeluarStepper({
                         variant="outline"
                         onClick={handleDownloadQr}
                         disabled={!row.qrCodeUrl}
+                        className="w-full sm:w-auto"
                       >
                         <Download className="mr-1.5 h-3.5 w-3.5" />
                         Download QR PNG
@@ -979,12 +995,13 @@ export function SuratKeluarStepper({
                         File dipilih: {finalFile.name}
                       </p>
                     ) : null}
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid gap-2 sm:flex sm:flex-wrap">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={handleUploadFinal}
                         disabled={isPending || !finalFile}
+                        className="w-full sm:w-auto"
                       >
                         Upload File Final
                       </Button>
@@ -993,6 +1010,7 @@ export function SuratKeluarStepper({
                         variant="outline"
                         onClick={handleStampQrPdf}
                         disabled={isPending || !finalFile || !isPdfFile(finalFile) || !row.qrCodeUrl}
+                        className="w-full sm:w-auto"
                       >
                         Tempel QR ke PDF & Upload
                       </Button>
@@ -1053,7 +1071,7 @@ export function SuratKeluarStepper({
                     size="sm"
                     onClick={() => runAction(() => selesaikanSurat({ id: row.id }))}
                     disabled={isPending || !isArchiveChecklistComplete}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="w-full bg-green-600 hover:bg-green-700 sm:w-auto"
                     title={
                       !isArchiveChecklistComplete
                         ? "Lengkapi checklist pengarsipan terlebih dahulu"
@@ -1069,6 +1087,7 @@ export function SuratKeluarStepper({
                       variant="destructive"
                       onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
                       disabled={isPending}
+                      className="w-full sm:w-auto"
                     >
                       Tandai Tidak Berlaku
                     </Button>
@@ -1085,6 +1104,7 @@ export function SuratKeluarStepper({
                       variant="destructive"
                       onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
                       disabled={isPending}
+                      className="w-full sm:w-auto"
                     >
                       Tandai Tidak Berlaku
                     </Button>
@@ -1106,11 +1126,12 @@ export function SuratKeluarStepper({
                 <p className="text-xs font-medium text-muted-foreground">
                   Verifikasi Publik
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid gap-2 sm:flex sm:flex-wrap">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={handlePreviewVerificationPage}
+                    className="w-full sm:w-auto"
                   >
                     <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                     Preview Halaman Verifikasi
@@ -1119,6 +1140,7 @@ export function SuratKeluarStepper({
                     size="sm"
                     variant="outline"
                     onClick={handleCopyVerificationLink}
+                    className="w-full sm:w-auto"
                   >
                     <Copy className="mr-1.5 h-3.5 w-3.5" />
                     Salin Link Verifikasi
@@ -1134,6 +1156,7 @@ export function SuratKeluarStepper({
                   variant="destructive"
                   onClick={() => runAction(() => batalkanSurat({ id: row.id }))}
                   disabled={isPending}
+                  className="w-full sm:w-auto"
                 >
                   Tandai Tidak Berlaku
                 </Button>
@@ -1161,31 +1184,32 @@ export function SuratKeluarStepper({
       </Dialog>
 
       <Dialog open={showQrPreview} onOpenChange={setShowQrPreview}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[calc(100vw-1rem)] p-4 sm:max-w-md sm:p-6">
           <DialogHeader>
             <DialogTitle>Preview QR Verifikasi</DialogTitle>
             <DialogDescription>
               Gunakan QR ini untuk ditempel ke dokumen final sebelum diunggah.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-muted/20 p-6">
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-muted/20 p-4 sm:p-6">
             {row.qrCodeUrl ? (
               <img
                 src={row.qrCodeUrl}
                 alt="QR verifikasi surat"
-                className="h-72 w-72 rounded-xl border bg-white p-3 shadow-sm"
+                className="h-auto w-full max-w-72 rounded-xl border bg-white p-3 shadow-sm"
               />
             ) : (
-              <div className="flex h-72 w-72 items-center justify-center rounded-xl border border-dashed text-muted-foreground">
+              <div className="flex h-64 w-full max-w-72 items-center justify-center rounded-xl border border-dashed text-muted-foreground sm:h-72">
                 QR belum tersedia
               </div>
             )}
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="grid w-full gap-2 sm:flex sm:flex-wrap sm:justify-center">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleDownloadQr}
                 disabled={!row.qrCodeUrl}
+                className="w-full sm:w-auto"
               >
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download QR PNG
@@ -1194,6 +1218,7 @@ export function SuratKeluarStepper({
                 type="button"
                 variant="outline"
                 onClick={handleCopyVerificationLink}
+                className="w-full sm:w-auto"
               >
                 <Copy className="mr-1.5 h-3.5 w-3.5" />
                 Salin Link Verifikasi

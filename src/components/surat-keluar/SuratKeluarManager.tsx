@@ -462,26 +462,31 @@ export function SuratKeluarManager({
               </CardDescription>
             </div>
             {canCreate ? (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={handleExportCsv}>
+              <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                <Button variant="outline" onClick={handleExportCsv} className="w-full sm:w-auto">
                   <Download className="h-4 w-4" />
                   Export CSV
                 </Button>
                 {canGenerate && bulkAssignableRows.length ? (
-                  <Button variant="outline" onClick={() => setBulkAssignOpen(true)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setBulkAssignOpen(true)}
+                    className="w-full sm:w-auto"
+                  >
                     <Files className="h-4 w-4" />
                     Generate Nomor Massal ({bulkAssignableRows.length})
                   </Button>
                 ) : null}
                 <Button
                   onClick={() => setFormState({ open: true, mode: "create" })}
+                  className="w-full sm:w-auto"
                 >
                   <Plus className="h-4 w-4" />
                   Buat Surat Keluar
                 </Button>
               </div>
             ) : (
-              <Button variant="outline" onClick={handleExportCsv}>
+              <Button variant="outline" onClick={handleExportCsv} className="w-full sm:w-auto">
                 <Download className="h-4 w-4" />
                 Export CSV
               </Button>
@@ -574,7 +579,7 @@ export function SuratKeluarManager({
           if (!isBulkAssigning) setBulkAssignOpen(open);
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="max-w-[calc(100vw-1rem)] p-4 sm:max-w-2xl sm:p-6">
           <DialogHeader>
             <DialogTitle>Generate Nomor Surat Massal?</DialogTitle>
             <DialogDescription>
@@ -609,10 +614,15 @@ export function SuratKeluarManager({
               variant="outline"
               onClick={() => setBulkAssignOpen(false)}
               disabled={isBulkAssigning}
+              className="w-full sm:w-auto"
             >
               Batal
             </Button>
-            <Button onClick={handleBulkAssignNomor} disabled={isBulkAssigning}>
+            <Button
+              onClick={handleBulkAssignNomor}
+              disabled={isBulkAssigning}
+              className="w-full sm:w-auto"
+            >
               <Hash className="h-4 w-4" />
               {isBulkAssigning ? "Memproses..." : "Generate Sekarang"}
             </Button>

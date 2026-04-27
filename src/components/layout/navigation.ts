@@ -182,6 +182,13 @@ export const navigationSections: NavigationSection[] = [
         allowedRoles: ["admin", "staff"],
       },
       {
+        href: "/jadwal-ujian/admin-jaga",
+        label: "Admin Jaga",
+        icon: ShieldCheck,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+      },
+      {
         href: "/jadwal-ujian/penugasan",
         label: "Jadwal Pengawas",
         icon: UserCheck,

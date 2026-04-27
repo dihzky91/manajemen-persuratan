@@ -296,11 +296,11 @@ Gunakan tanda `[x]` untuk item yang sudah selesai.
 
 ### Fase 4 - Halaman Prioritas Tinggi
 
-- [ ] Dashboard
-- [ ] Surat Masuk
-- [ ] Surat Keluar
-- [ ] Jadwal Ujian
-- [ ] Pengaturan
+- [x] Dashboard
+- [x] Surat Masuk
+- [x] Surat Keluar
+- [x] Jadwal Ujian
+- [x] Pengaturan
 
 ### Fase 5 - Chart, Tabel, dan Data Density Review
 
@@ -326,3 +326,8 @@ Gunakan tanda `[x]` untuk item yang sudah selesai.
 - Untuk tabel yang sangat padat, tidak semua kasus harus dipaksa menjadi full table di mobile; beberapa bisa memakai pendekatan card list atau detail drawer.
 - Dokumentasi ini bisa diperbarui selama pengerjaan berlangsung dengan menandai checklist progres dan menambahkan keputusan teknis penting.
 - Eksekusi awal sudah mencakup `DashboardShell` client wrapper, sidebar mobile drawer, header mobile dengan hamburger trigger, perapihan `PageWrapper`, dan penguatan `DataTable` untuk layar sempit.
+- Dashboard sudah dioptimasi untuk mobile pada area metric cards, widget ujian, summary cards, chart, work queue, quick action, dan recent activity list.
+- Surat Masuk sudah dioptimasi pada summary cards, toolbar manager, dialog detail, workspace 2 kolom, timeline disposisi, dan tombol aksi utama.
+- Surat Keluar sudah dioptimasi pada toolbar manager, dialog bulk action, stepper detail, panel aksi workflow, preview QR, dan tombol-tombol pengarsipan di mobile.
+- Jadwal Ujian sudah dioptimasi pada toolbar utama, area filter, manager master data, dan dialog aksi agar lebih nyaman di layar kecil.
+- Pengaturan sudah dioptimasi pada tabs mobile, card settings, area upload/avatar, toggle preferensi, summary system cards, dan tombol aksi form.

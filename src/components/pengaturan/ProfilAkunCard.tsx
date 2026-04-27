@@ -142,7 +142,7 @@ export function ProfilAkunCard({ initial }: Props) {
             {/* Avatar */}
             <div className="space-y-2">
               <Label>Foto Profil (Avatar)</Label>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/30">
                   {avatarPreview ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -159,7 +159,7 @@ export function ProfilAkunCard({ initial }: Props) {
                   type="file"
                   name="avatar"
                   accept="image/png,image/jpeg,image/webp"
-                  className="text-sm"
+                  className="w-full text-sm"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) setAvatarPreview(URL.createObjectURL(file));
@@ -172,7 +172,7 @@ export function ProfilAkunCard({ initial }: Props) {
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={isPendingProfile}>
+              <Button type="submit" disabled={isPendingProfile} className="w-full sm:w-auto">
                 {isPendingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Simpan Profil
               </Button>
@@ -233,7 +233,7 @@ export function ProfilAkunCard({ initial }: Props) {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={isPendingPassword}>
+              <Button type="submit" disabled={isPendingPassword} className="w-full sm:w-auto">
                 {isPendingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Ubah Password
               </Button>

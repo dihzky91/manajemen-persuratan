@@ -134,7 +134,7 @@ export function PengawasManager({ initialData, canManage }: PengawasManagerProps
               </CardDescription>
             </div>
             {canManage && (
-              <Button onClick={() => setFormState({ open: true, mode: "create" })}>
+              <Button onClick={() => setFormState({ open: true, mode: "create" })} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
                 Tambah Pengawas
               </Button>
@@ -170,10 +170,10 @@ export function PengawasManager({ initialData, canManage }: PengawasManagerProps
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full sm:w-auto">
               Batal
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting} className="w-full sm:w-auto">
               {isDeleting ? "Menghapus..." : "Hapus"}
             </Button>
           </DialogFooter>

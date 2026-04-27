@@ -270,8 +270,8 @@ export function SuratMasukManager({
 
   return (
     <>
-      <div className="space-y-6">
-        <section className="grid gap-4 xl:grid-cols-4">
+      <div className="space-y-5 sm:space-y-6">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
             label="Total Surat Masuk"
             value={String(initialData.length)}
@@ -307,18 +307,25 @@ export function SuratMasukManager({
                 </CardDescription>
               </div>
               {canManage ? (
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={handleExportCsv}>
+                <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                  <Button
+                    variant="outline"
+                    onClick={handleExportCsv}
+                    className="w-full sm:w-auto"
+                  >
                     <Download className="h-4 w-4" />
                     Export CSV
                   </Button>
-                  <Button onClick={() => setFormState({ open: true, mode: "create" })}>
+                  <Button
+                    onClick={() => setFormState({ open: true, mode: "create" })}
+                    className="w-full sm:w-auto"
+                  >
                     <Plus className="h-4 w-4" />
                     Input Surat Masuk
                   </Button>
                 </div>
               ) : (
-                <Button variant="outline" onClick={handleExportCsv}>
+                <Button variant="outline" onClick={handleExportCsv} className="w-full sm:w-auto">
                   <Download className="h-4 w-4" />
                   Export CSV
                 </Button>
@@ -359,7 +366,7 @@ export function SuratMasukManager({
           open={detailState.open}
           onOpenChange={(open) => !open && setDetailState({ open: false })}
         >
-          <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-4 sm:max-w-5xl sm:p-6">
             <DialogHeader>
               <DialogTitle>Detail Surat Masuk</DialogTitle>
               <DialogDescription>
@@ -423,12 +430,12 @@ function SummaryCard({
   hint: string;
 }) {
   return (
-    <Card className="rounded-[24px] py-5">
+    <Card className="gap-4 rounded-[24px] py-4 sm:py-5">
       <CardContent className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           {label}
         </p>
-        <p className="text-3xl font-semibold text-foreground">{value}</p>
+        <p className="text-2xl font-semibold text-foreground sm:text-3xl">{value}</p>
         <p className="text-sm text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>

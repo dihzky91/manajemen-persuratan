@@ -81,7 +81,7 @@ export function KonfigurasiSistemCard({ initial, isAdmin }: Props) {
                     Math.max(0, Math.min(365, Number(e.target.value) || 0)),
                   )
                 }
-                className="max-w-[200px]"
+                className="w-full max-w-[200px]"
               />
               <p className="text-xs text-muted-foreground">
                 Jumlah hari default yang disarankan saat membuat disposisi tanpa
@@ -91,7 +91,7 @@ export function KonfigurasiSistemCard({ initial, isAdmin }: Props) {
 
             <Separator />
 
-            <div className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-muted/25 px-4 py-3">
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/25 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <Label className="text-sm font-medium">
                   Notifikasi Email Global
@@ -119,7 +119,7 @@ export function KonfigurasiSistemCard({ initial, isAdmin }: Props) {
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Simpan Konfigurasi
               </Button>

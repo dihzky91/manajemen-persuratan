@@ -64,11 +64,11 @@ export function Sidebar({
       <Dialog open={mobileOpen} onOpenChange={onMobileOpenChange}>
         <DialogContent
           showCloseButton={false}
-          className="left-0 top-0 h-dvh w-[min(22rem,100vw-1rem)] max-w-none translate-x-0 translate-y-0 rounded-none border-y-0 border-l-0 p-0 sm:max-w-none"
+          className="left-0 top-0 h-dvh w-[min(22rem,100vw-1rem)] max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-y-0 border-l-0 p-0 sm:max-w-none"
           aria-describedby={undefined}
         >
           <DialogTitle className="sr-only">Navigasi utama</DialogTitle>
-          <div className="flex h-full flex-col bg-card">
+          <div className="flex h-full min-h-0 flex-col bg-card">
             <div className="flex items-center justify-end border-b border-border px-3 py-3">
               <button
                 type="button"
@@ -140,7 +140,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
         <div className="space-y-5">
           {visibleSections.map((section) => (
             <section key={section.title} className="min-w-0">

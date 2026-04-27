@@ -41,14 +41,14 @@ export function UjianDashboardWidget({ data }: UjianDashboardWidgetProps) {
   return (
     <>
       {items.map((item) => (
-        <Card key={item.label} className="rounded-[28px]">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between">
+        <Card key={item.label} className="gap-4 rounded-[24px]">
+          <CardContent className="pt-5 sm:pt-6">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm text-muted-foreground">{item.label}</p>
-                <p className="text-3xl font-bold tabular-nums mt-1">{item.value}</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums sm:text-3xl">{item.value}</p>
               </div>
-              <div className={`rounded-xl p-2.5 ${item.bg}`}>
+              <div className={`rounded-xl p-2.5 sm:p-3 ${item.bg}`}>
                 <item.icon className={`h-5 w-5 ${item.color}`} />
               </div>
             </div>

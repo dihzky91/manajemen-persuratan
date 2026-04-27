@@ -181,7 +181,7 @@ export function NotifikasiPreferencesCard({ initial }: Props) {
                   Math.max(0, Math.min(30, Number(e.target.value) || 0)) as never,
                 )
               }
-              className="max-w-[180px]"
+              className="w-full max-w-[180px]"
             />
             <p className="text-xs text-muted-foreground">
               Berapa hari sebelum deadline disposisi Anda mendapat pengingat. Atur 0
@@ -190,7 +190,7 @@ export function NotifikasiPreferencesCard({ initial }: Props) {
           </div>
 
           <div className="flex justify-end">
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Simpan Preferensi
             </Button>
@@ -211,7 +211,7 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex w-20 cursor-pointer items-center justify-center gap-2">
+    <label className="flex w-full cursor-pointer items-center justify-between gap-2 sm:w-20 sm:justify-center">
       <span className="text-xs text-muted-foreground sm:hidden">{label}</span>
       <button
         type="button"

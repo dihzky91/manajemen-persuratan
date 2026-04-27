@@ -247,12 +247,12 @@ export function SuratMasukDetailWorkspace({
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-6">
-          <Card className="rounded-[24px] py-5">
+      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:gap-6">
+        <div className="space-y-5 lg:space-y-6">
+          <Card className="gap-4 rounded-[24px] py-4 sm:py-5">
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-lg font-semibold text-foreground">
                     {localRow.perihal}
                   </p>
@@ -303,9 +303,9 @@ export function SuratMasukDetailWorkspace({
                 multiline
               />
 
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2 sm:flex sm:flex-wrap">
                 {showPageLink ? (
-                  <Button asChild variant="outline">
+                  <Button asChild variant="outline" className="w-full sm:w-auto">
                     <Link href={`/surat-masuk/${localRow.id}`}>
                       <Eye className="h-4 w-4" />
                       Buka Halaman Detail
@@ -313,7 +313,7 @@ export function SuratMasukDetailWorkspace({
                   </Button>
                 ) : null}
                 {localRow.fileUrl ? (
-                  <Button asChild variant="outline">
+                  <Button asChild variant="outline" className="w-full sm:w-auto">
                     <a href={localRow.fileUrl} target="_blank" rel="noreferrer">
                       <FileText className="h-4 w-4" />
                       Buka File
@@ -321,7 +321,11 @@ export function SuratMasukDetailWorkspace({
                   </Button>
                 ) : null}
                 {canManage ? (
-                  <Button variant="outline" onClick={() => setFormOpen(true)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setFormOpen(true)}
+                    className="w-full sm:w-auto"
+                  >
                     <Pencil className="h-4 w-4" />
                     Ubah Surat
                   </Button>
@@ -330,6 +334,7 @@ export function SuratMasukDetailWorkspace({
                   variant="outline"
                   onClick={() => handleStatusChange("diproses")}
                   disabled={isStatusPending}
+                  className="w-full sm:w-auto"
                 >
                   Tandai Diproses
                 </Button>
@@ -337,6 +342,7 @@ export function SuratMasukDetailWorkspace({
                   variant="outline"
                   onClick={() => handleStatusChange("diarsip")}
                   disabled={isStatusPending}
+                  className="w-full sm:w-auto"
                 >
                   Tandai Diarsip
                 </Button>
@@ -344,7 +350,7 @@ export function SuratMasukDetailWorkspace({
             </CardContent>
           </Card>
 
-          <Card className="rounded-[24px] py-5">
+          <Card className="gap-4 rounded-[24px] py-4 sm:py-5">
             <CardHeader className="pb-0">
               <CardTitle>Timeline Disposisi</CardTitle>
               <CardDescription>
@@ -356,11 +362,11 @@ export function SuratMasukDetailWorkspace({
                 localTimeline.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-2xl border border-border bg-muted/20 p-4"
+                    className="rounded-2xl border border-border bg-muted/20 p-3 sm:p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-foreground">
+                      <div className="min-w-0">
+                        <p className="break-words font-medium text-foreground">
                           {item.dariNama ?? "Pengirim"}{" "}
                           <ArrowRight className="mx-1 inline h-3.5 w-3.5" />
                           {item.kepadaNama ?? "Penerima"}
@@ -381,6 +387,7 @@ export function SuratMasukDetailWorkspace({
                               setParentDisposisiId(item.id);
                               setSelectedTimelineId(item.id);
                             }}
+                            className="shrink-0"
                           >
                             <MailPlus className="h-4 w-4" />
                             Teruskan
@@ -424,7 +431,7 @@ export function SuratMasukDetailWorkspace({
           </Card>
         </div>
 
-        <Card className="rounded-[24px] py-5">
+        <Card className="gap-4 rounded-[24px] py-4 sm:py-5">
           <CardHeader className="pb-0">
             <CardTitle>Buat Disposisi</CardTitle>
             <CardDescription>
@@ -477,7 +484,7 @@ export function SuratMasukDetailWorkspace({
                 </div>
 
                 {selectedTimelineId ? (
-                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3 sm:p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
                       Parent Terpilih
                     </p>
@@ -525,7 +532,11 @@ export function SuratMasukDetailWorkspace({
                   />
                 </div>
 
-                <Button onClick={handleCreateDisposisi} disabled={isSubmitPending}>
+                <Button
+                  onClick={handleCreateDisposisi}
+                  disabled={isSubmitPending}
+                  className="w-full sm:w-auto"
+                >
                   <MailPlus className="h-4 w-4" />
                   {isSubmitPending ? "Mengirim..." : "Kirim Disposisi"}
                 </Button>

@@ -173,7 +173,7 @@ export function KelasManager({ initialData, canManage, programOptions, tipeOptio
               </CardDescription>
             </div>
             {canManage && (
-              <Button onClick={() => setFormState({ open: true, mode: "create" })}>
+              <Button onClick={() => setFormState({ open: true, mode: "create" })} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
                 Tambah Kelas
               </Button>
@@ -181,10 +181,10 @@ export function KelasManager({ initialData, canManage, programOptions, tipeOptio
           </div>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
-          <div className="flex items-center gap-3">
+          <div className="grid gap-2 sm:flex sm:items-center sm:gap-3">
             <span className="text-sm text-muted-foreground">Filter program:</span>
             <Select value={filterProgram} onValueChange={setFilterProgram}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -227,10 +227,10 @@ export function KelasManager({ initialData, canManage, programOptions, tipeOptio
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full sm:w-auto">
               Batal
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting} className="w-full sm:w-auto">
               {isDeleting ? "Menghapus..." : "Hapus"}
             </Button>
           </DialogFooter>

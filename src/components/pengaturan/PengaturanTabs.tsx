@@ -23,20 +23,20 @@ export function PengaturanTabs({
 }: PengaturanTabsProps) {
   return (
     <Tabs defaultValue="profil" className="w-full">
-      <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
-        <TabsTrigger value="profil" className="gap-2">
+      <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:flex sm:w-fit sm:flex-wrap">
+        <TabsTrigger value="profil" className="justify-start gap-2 sm:justify-center">
           <UserCircle2 className="h-4 w-4" />
           <span>Profil & Akun</span>
         </TabsTrigger>
-        <TabsTrigger value="notifikasi" className="gap-2">
+        <TabsTrigger value="notifikasi" className="justify-start gap-2 sm:justify-center">
           <Bell className="h-4 w-4" />
           <span>Notifikasi</span>
         </TabsTrigger>
-        <TabsTrigger value="identitas" className="gap-2">
+        <TabsTrigger value="identitas" className="justify-start gap-2 sm:justify-center">
           <Building2 className="h-4 w-4" />
           <span>Identitas Sistem</span>
         </TabsTrigger>
-        <TabsTrigger value="sistem" className="gap-2">
+        <TabsTrigger value="sistem" className="justify-start gap-2 sm:justify-center">
           <ServerCog className="h-4 w-4" />
           <span>Sistem & Integrasi</span>
         </TabsTrigger>
