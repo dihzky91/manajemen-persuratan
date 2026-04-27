@@ -8,7 +8,9 @@ import { jadwalAdminJaga, kelasUjian, pengawas, auditLog } from "@/server/db/sch
 import { requireRole, requireSession } from "@/server/actions/auth";
 import {
   jadwalAdminJagaCreateSchema,
+  jadwalAdminJagaUpdateSchema,
   type JadwalAdminJagaCreateInput,
+  type JadwalAdminJagaUpdateInput,
   type JadwalAdminJagaFilter,
 } from "@/lib/validators/jadwalUjian.schema";
 
@@ -18,6 +20,8 @@ export type JadwalAdminJagaRow = {
   namaKelas: string;
   program: string;
   tanggal: string;
+  jamMulai: string | null;
+  jamSelesai: string | null;
   materi: string;
   pengawasId: string;
   namaPengawas: string;
@@ -48,6 +52,8 @@ export async function listJadwalAdminJaga(
       namaKelas: kelasUjian.namaKelas,
       program: kelasUjian.program,
       tanggal: jadwalAdminJaga.tanggal,
+      jamMulai: jadwalAdminJaga.jamMulai,
+      jamSelesai: jadwalAdminJaga.jamSelesai,
       materi: jadwalAdminJaga.materi,
       pengawasId: jadwalAdminJaga.pengawasId,
       namaPengawas: pengawas.nama,
@@ -58,7 +64,7 @@ export async function listJadwalAdminJaga(
     .leftJoin(kelasUjian, eq(jadwalAdminJaga.kelasId, kelasUjian.id))
     .leftJoin(pengawas, eq(jadwalAdminJaga.pengawasId, pengawas.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(asc(jadwalAdminJaga.tanggal), asc(pengawas.nama));
+    .orderBy(asc(jadwalAdminJaga.tanggal), asc(jadwalAdminJaga.jamMulai), asc(pengawas.nama));
 
   return rows as JadwalAdminJagaRow[];
 }
@@ -87,6 +93,8 @@ export async function createJadwalAdminJaga(data: JadwalAdminJagaCreateInput) {
     id,
     kelasId: parsed.kelasId,
     tanggal: parsed.tanggal,
+    jamMulai: parsed.jamMulai,
+    jamSelesai: parsed.jamSelesai,
     materi: parsed.materi,
     pengawasId: parsed.pengawasId,
     catatan: parsed.catatan || null,
@@ -97,11 +105,59 @@ export async function createJadwalAdminJaga(data: JadwalAdminJagaCreateInput) {
     aksi: "CREATE_JADWAL_ADMIN_JAGA",
     entitasType: "jadwal_admin_jaga",
     entitasId: id,
-    detail: { tanggal: parsed.tanggal, materi: parsed.materi, pengawasId: parsed.pengawasId },
+    detail: {
+      tanggal: parsed.tanggal,
+      jamMulai: parsed.jamMulai,
+      jamSelesai: parsed.jamSelesai,
+      materi: parsed.materi,
+      pengawasId: parsed.pengawasId,
+    },
   });
 
   revalidatePath("/jadwal-ujian/admin-jaga");
   return { ok: true as const, id };
+}
+
+export async function updateJadwalAdminJaga(data: JadwalAdminJagaUpdateInput) {
+  const parsed = jadwalAdminJagaUpdateSchema.parse(data);
+  const session = await requireRole(["admin", "staff"]);
+
+  const existing = await db
+    .select({ id: jadwalAdminJaga.id })
+    .from(jadwalAdminJaga)
+    .where(eq(jadwalAdminJaga.id, parsed.id));
+  if (!existing[0]) return { ok: false as const, error: "Data tidak ditemukan." };
+
+  await db
+    .update(jadwalAdminJaga)
+    .set({
+      kelasId: parsed.kelasId,
+      tanggal: parsed.tanggal,
+      jamMulai: parsed.jamMulai,
+      jamSelesai: parsed.jamSelesai,
+      materi: parsed.materi,
+      pengawasId: parsed.pengawasId,
+      catatan: parsed.catatan || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(jadwalAdminJaga.id, parsed.id));
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "UPDATE_JADWAL_ADMIN_JAGA",
+    entitasType: "jadwal_admin_jaga",
+    entitasId: parsed.id,
+    detail: {
+      tanggal: parsed.tanggal,
+      jamMulai: parsed.jamMulai,
+      jamSelesai: parsed.jamSelesai,
+      materi: parsed.materi,
+      pengawasId: parsed.pengawasId,
+    },
+  });
+
+  revalidatePath("/jadwal-ujian/admin-jaga");
+  return { ok: true as const };
 }
 
 export async function deleteJadwalAdminJaga(id: string) {
@@ -127,9 +183,36 @@ export async function deleteJadwalAdminJaga(id: string) {
   return { ok: true as const };
 }
 
+export async function deleteJadwalAdminJagaByKelas(kelasId: string) {
+  if (!kelasId) return { ok: false as const, error: "Kelas wajib dipilih." };
+
+  const session = await requireRole(["admin", "staff"]);
+  const deleted = await db
+    .delete(jadwalAdminJaga)
+    .where(eq(jadwalAdminJaga.kelasId, kelasId))
+    .returning({ id: jadwalAdminJaga.id });
+
+  if (deleted.length === 0) {
+    return { ok: false as const, error: "Tidak ada jadwal untuk kelas ini." };
+  }
+
+  await db.insert(auditLog).values({
+    userId: session.user.id,
+    aksi: "DELETE_JADWAL_ADMIN_JAGA_BY_KELAS",
+    entitasType: "jadwal_admin_jaga",
+    entitasId: kelasId,
+    detail: { kelasId, jumlah: deleted.length },
+  });
+
+  revalidatePath("/jadwal-ujian/admin-jaga");
+  return { ok: true as const, deleted: deleted.length };
+}
+
 export type ImportJadwalAdminJagaRow = {
   kelasId: string;
   tanggal: string;
+  jamMulai: string;
+  jamSelesai: string;
   materi: string;
   pengawasId: string;
   catatan?: string;
@@ -141,10 +224,14 @@ export async function importJadwalAdminJaga(rows: ImportJadwalAdminJagaRow[]) {
 
   const session = await requireRole(["admin", "staff"]);
 
-  const values = rows.map((r) => ({
+  const parsedRows = rows.map((row) => jadwalAdminJagaCreateSchema.parse(row));
+
+  const values = parsedRows.map((r) => ({
     id: nanoid(),
     kelasId: r.kelasId,
     tanggal: r.tanggal,
+    jamMulai: r.jamMulai,
+    jamSelesai: r.jamSelesai,
     materi: r.materi.trim(),
     pengawasId: r.pengawasId,
     catatan: r.catatan?.trim() || null,

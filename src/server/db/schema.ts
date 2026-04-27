@@ -811,6 +811,8 @@ export const jadwalAdminJaga = pgTable("jadwal_admin_jaga", {
     .notNull()
     .references(() => kelasUjian.id, { onDelete: "cascade" }),
   tanggal: date("tanggal").notNull(),
+  jamMulai: varchar("jam_mulai", { length: 5 }).default("17:15").notNull(),
+  jamSelesai: varchar("jam_selesai", { length: 5 }).default("21:30").notNull(),
   materi: varchar("materi", { length: 300 }).notNull(),
   pengawasId: text("pengawas_id")
     .notNull()

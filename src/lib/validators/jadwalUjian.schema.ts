@@ -118,15 +118,30 @@ export type AdminJagaFilter = z.infer<typeof adminJagaFilterSchema>;
 
 // ─── JADWAL ADMIN JAGA (STANDALONE) ──────────────────────────────────────────
 
-export const jadwalAdminJagaCreateSchema = z.object({
+const jadwalAdminJagaBaseSchema = z.object({
   kelasId: z.string().min(1),
   tanggal: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
+  jamMulai: jamSchema,
+  jamSelesai: jamSchema,
   materi: z.string().trim().min(1).max(300),
   pengawasId: z.string().min(1),
   catatan: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
+export const jadwalAdminJagaCreateSchema = jadwalAdminJagaBaseSchema.refine(
+  (d) => d.jamSelesai > d.jamMulai,
+  { message: "Jam selesai harus setelah jam mulai", path: ["jamSelesai"] },
+);
+
+export const jadwalAdminJagaUpdateSchema = jadwalAdminJagaBaseSchema
+  .extend({ id: z.string().min(1) })
+  .refine(
+    (d) => d.jamSelesai > d.jamMulai,
+    { message: "Jam selesai harus setelah jam mulai", path: ["jamSelesai"] },
+  );
+
 export type JadwalAdminJagaCreateInput = z.infer<typeof jadwalAdminJagaCreateSchema>;
+export type JadwalAdminJagaUpdateInput = z.infer<typeof jadwalAdminJagaUpdateSchema>;
 
 export const jadwalAdminJagaFilterSchema = z.object({
   kelasId: z.string().optional(),

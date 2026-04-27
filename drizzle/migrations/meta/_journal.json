@@ -120,6 +120,13 @@
       "when": 1745884800000,
       "tag": "0016_jadwal_admin_jaga",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1745971200000,
+      "tag": "0017_jadwal_admin_jaga_waktu",
+      "breakpoints": true
     }
   ]
 }

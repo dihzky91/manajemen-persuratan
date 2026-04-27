@@ -1,19 +1,20 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Download,
   FileSpreadsheet,
   FileText,
+  Pencil,
   Plus,
   Trash2,
   Upload,
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-import { format, parseISO, parse } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,8 +51,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createJadwalAdminJaga,
+  updateJadwalAdminJaga,
+  deleteJadwalAdminJagaByKelas,
   deleteJadwalAdminJaga,
   importJadwalAdminJaga,
 } from "@/server/actions/jadwal-ujian/jadwalAdminJaga";
@@ -62,6 +66,9 @@ import type {
 
 type KelasOption = { id: string; namaKelas: string; program: string };
 type PengawasOption = { id: string; nama: string };
+
+const DEFAULT_JAM_MULAI = "17:15";
+const DEFAULT_JAM_SELESAI = "21:30";
 
 interface AdminJagaViewProps {
   rows: JadwalAdminJagaRow[];
@@ -76,6 +83,8 @@ type ImportPreviewRow = {
   namaKelas: string;
   tanggalRaw: string;
   tanggalParsed: string | null;
+  jamMulai: string;
+  jamSelesai: string;
   materi: string;
   namaAdmin: string;
   catatan: string;
@@ -89,6 +98,121 @@ function formatTanggal(dateStr: string) {
 }
 function formatHari(dateStr: string) {
   return format(parseISO(dateStr), "EEEE", { locale: localeId });
+}
+
+function formatWaktu(jamMulai: string | null, jamSelesai: string | null) {
+  if (!jamMulai || !jamSelesai) return "-";
+  return `${jamMulai} - ${jamSelesai}`;
+}
+
+function formatDateParts(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseTanggalText(value: string) {
+  const raw = value.trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const localMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const match = isoMatch ?? localMatch;
+  if (!match) return null;
+
+  const year = Number(isoMatch ? match[1] : match[3]);
+  const month = Number(match[2]);
+  const day = Number(isoMatch ? match[3] : match[1]);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return formatDateParts(year, month, day);
+}
+
+function parseImportedTanggal(
+  rawValue: unknown,
+  displayValue: string | undefined,
+  parseExcelSerial: (serial: number) => { y: number; m: number; d: number } | null,
+) {
+  const tanggalRaw =
+    typeof displayValue === "string" && displayValue.trim()
+      ? displayValue.trim()
+      : String(rawValue ?? "").trim();
+
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    const parsed = parseExcelSerial(rawValue);
+    if (parsed) {
+      return {
+        tanggalRaw,
+        tanggalParsed: formatDateParts(parsed.y, parsed.m, parsed.d),
+      };
+    }
+  }
+
+  const textValues = [
+    typeof displayValue === "string" ? displayValue : "",
+    typeof rawValue === "string" ? rawValue : "",
+  ];
+  for (const text of textValues) {
+    const parsed = parseTanggalText(text);
+    if (parsed) return { tanggalRaw, tanggalParsed: parsed };
+  }
+
+  if (rawValue instanceof Date) {
+    return {
+      tanggalRaw,
+      tanggalParsed: formatDateParts(rawValue.getFullYear(), rawValue.getMonth() + 1, rawValue.getDate()),
+    };
+  }
+
+  return { tanggalRaw, tanggalParsed: null };
+}
+
+function normalizeJam(value: string) {
+  const raw = value.trim().replace(".", ":");
+  const match = raw.match(/^(\d{1,2}):([0-5]\d)$/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  if (hour > 23) return null;
+
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
+}
+
+function parseImportedJam(rawValue: unknown, displayValue: string | undefined, fallback: string) {
+  const jamRaw =
+    typeof displayValue === "string" && displayValue.trim()
+      ? displayValue.trim()
+      : String(rawValue ?? "").trim();
+
+  if (!jamRaw) return { jamRaw: fallback, jamParsed: fallback };
+
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    if (rawValue >= 0 && rawValue < 1) {
+      const totalMinutes = Math.round(rawValue * 24 * 60);
+      const hour = Math.floor(totalMinutes / 60) % 24;
+      const minute = totalMinutes % 60;
+      return {
+        jamRaw,
+        jamParsed: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+      };
+    }
+  }
+
+  const textValues = [
+    typeof displayValue === "string" ? displayValue : "",
+    typeof rawValue === "string" ? rawValue : "",
+    jamRaw,
+  ];
+  for (const text of textValues) {
+    const parsed = normalizeJam(text);
+    if (parsed) return { jamRaw, jamParsed: parsed };
+  }
+
+  return { jamRaw, jamParsed: null };
 }
 
 async function buildLogoDataUrl(logoUrl: string): Promise<string> {
@@ -138,29 +262,96 @@ export function AdminJagaView({
   const [addOpen, setAddOpen] = useState(false);
   const [addKelasId, setAddKelasId] = useState("");
   const [addTanggal, setAddTanggal] = useState("");
+  const [addJamMulai, setAddJamMulai] = useState(DEFAULT_JAM_MULAI);
+  const [addJamSelesai, setAddJamSelesai] = useState(DEFAULT_JAM_SELESAI);
   const [addMateri, setAddMateri] = useState("");
   const [addPengawasId, setAddPengawasId] = useState("");
   const [addCatatan, setAddCatatan] = useState("");
+
+  // Edit dialog
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState("");
+  const [editKelasId, setEditKelasId] = useState("");
+  const [editTanggal, setEditTanggal] = useState("");
+  const [editJamMulai, setEditJamMulai] = useState(DEFAULT_JAM_MULAI);
+  const [editJamSelesai, setEditJamSelesai] = useState(DEFAULT_JAM_SELESAI);
+  const [editMateri, setEditMateri] = useState("");
+  const [editPengawasId, setEditPengawasId] = useState("");
+  const [editCatatan, setEditCatatan] = useState("");
 
   // Import dialog
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importFileName, setImportFileName] = useState("");
+  const [deleteKelasOpen, setDeleteKelasOpen] = useState(false);
 
-  const filtered = useMemo(() => {
+  const filteredWithoutKelas = useMemo(() => {
     return rows.filter((r) => {
-      if (filterKelasId !== "__all__" && r.kelasId !== filterKelasId) return false;
       if (filterPengawasId !== "__all__" && r.pengawasId !== filterPengawasId) return false;
       if (filterTanggalMulai && r.tanggal < filterTanggalMulai) return false;
       if (filterTanggalSelesai && r.tanggal > filterTanggalSelesai) return false;
       return true;
     });
-  }, [rows, filterKelasId, filterPengawasId, filterTanggalMulai, filterTanggalSelesai]);
+  }, [rows, filterPengawasId, filterTanggalMulai, filterTanggalSelesai]);
+
+  const kelasTabs = useMemo(() => {
+    const tabMap = new Map<string, { id: string; namaKelas: string; program: string; jumlah: number }>();
+
+    filteredWithoutKelas.forEach((r) => {
+      const existing = tabMap.get(r.kelasId);
+      if (existing) {
+        existing.jumlah += 1;
+      } else {
+        tabMap.set(r.kelasId, {
+          id: r.kelasId,
+          namaKelas: r.namaKelas,
+          program: r.program,
+          jumlah: 1,
+        });
+      }
+    });
+
+    const ordered = kelasOptions
+      .map((kelas) => tabMap.get(kelas.id))
+      .filter((kelas): kelas is { id: string; namaKelas: string; program: string; jumlah: number } => Boolean(kelas));
+    const knownKelasIds = new Set(kelasOptions.map((kelas) => kelas.id));
+    const extra = Array.from(tabMap.values())
+      .filter((kelas) => !knownKelasIds.has(kelas.id))
+      .sort((a, b) => a.namaKelas.localeCompare(b.namaKelas, "id"));
+
+    return [...ordered, ...extra];
+  }, [filteredWithoutKelas, kelasOptions]);
+
+  useEffect(() => {
+    if (filterKelasId !== "__all__" && !kelasTabs.some((kelas) => kelas.id === filterKelasId)) {
+      setFilterKelasId("__all__");
+    }
+  }, [filterKelasId, kelasTabs]);
+
+  const filtered = useMemo(() => {
+    if (filterKelasId === "__all__") return filteredWithoutKelas;
+    return filteredWithoutKelas.filter((r) => r.kelasId === filterKelasId);
+  }, [filteredWithoutKelas, filterKelasId]);
+
+  const selectedKelas = useMemo(() => {
+    if (filterKelasId === "__all__") return null;
+    const option = kelasOptions.find((kelas) => kelas.id === filterKelasId);
+    if (option) return option;
+    const row = rows.find((item) => item.kelasId === filterKelasId);
+    return row ? { id: row.kelasId, namaKelas: row.namaKelas, program: row.program } : null;
+  }, [filterKelasId, kelasOptions, rows]);
+
+  const selectedKelasTotal = useMemo(() => {
+    if (filterKelasId === "__all__") return 0;
+    return rows.filter((row) => row.kelasId === filterKelasId).length;
+  }, [filterKelasId, rows]);
 
   // ── Add single ───────────────────────────────────────────────────────────────
   function openAdd() {
     setAddKelasId("");
     setAddTanggal("");
+    setAddJamMulai(DEFAULT_JAM_MULAI);
+    setAddJamSelesai(DEFAULT_JAM_SELESAI);
     setAddMateri("");
     setAddPengawasId("");
     setAddCatatan("");
@@ -168,14 +359,20 @@ export function AdminJagaView({
   }
 
   function handleAdd() {
-    if (!addKelasId || !addTanggal || !addMateri.trim() || !addPengawasId) {
+    if (!addKelasId || !addTanggal || !addJamMulai || !addJamSelesai || !addMateri.trim() || !addPengawasId) {
       toast.error("Lengkapi semua field wajib.");
+      return;
+    }
+    if (addJamSelesai <= addJamMulai) {
+      toast.error("Jam selesai harus setelah jam mulai.");
       return;
     }
     startTransition(async () => {
       const res = await createJadwalAdminJaga({
         kelasId: addKelasId,
         tanggal: addTanggal,
+        jamMulai: addJamMulai,
+        jamSelesai: addJamSelesai,
         materi: addMateri,
         pengawasId: addPengawasId,
         catatan: addCatatan || undefined,
@@ -186,6 +383,49 @@ export function AdminJagaView({
         router.refresh();
       } else {
         toast.error("Gagal menyimpan.");
+      }
+    });
+  }
+
+  // ── Edit ─────────────────────────────────────────────────────────────────────
+  function openEdit(row: JadwalAdminJagaRow) {
+    setEditId(row.id);
+    setEditKelasId(row.kelasId);
+    setEditTanggal(row.tanggal);
+    setEditJamMulai(row.jamMulai ?? DEFAULT_JAM_MULAI);
+    setEditJamSelesai(row.jamSelesai ?? DEFAULT_JAM_SELESAI);
+    setEditMateri(row.materi);
+    setEditPengawasId(row.pengawasId);
+    setEditCatatan(row.catatan ?? "");
+    setEditOpen(true);
+  }
+
+  function handleEdit() {
+    if (!editKelasId || !editTanggal || !editJamMulai || !editJamSelesai || !editMateri.trim() || !editPengawasId) {
+      toast.error("Lengkapi semua field wajib.");
+      return;
+    }
+    if (editJamSelesai <= editJamMulai) {
+      toast.error("Jam selesai harus setelah jam mulai.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await updateJadwalAdminJaga({
+        id: editId,
+        kelasId: editKelasId,
+        tanggal: editTanggal,
+        jamMulai: editJamMulai,
+        jamSelesai: editJamSelesai,
+        materi: editMateri,
+        pengawasId: editPengawasId,
+        catatan: editCatatan || undefined,
+      });
+      if (res.ok) {
+        toast.success("Penugasan admin jaga diperbarui.");
+        setEditOpen(false);
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Gagal menyimpan.");
       }
     });
   }
@@ -203,6 +443,25 @@ export function AdminJagaView({
     });
   }
 
+  function handleDeleteSelectedKelas() {
+    if (!selectedKelas) {
+      toast.error("Pilih kelas yang ingin dihapus.");
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await deleteJadwalAdminJagaByKelas(selectedKelas.id);
+      if (res.ok) {
+        toast.success(`${res.deleted} jadwal kelas ${selectedKelas.namaKelas} dihapus.`);
+        setDeleteKelasOpen(false);
+        setFilterKelasId("__all__");
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Gagal menghapus jadwal kelas.");
+      }
+    });
+  }
+
   // ── Template download ─────────────────────────────────────────────────────────
   function handleDownloadTemplate() {
     startTransition(async () => {
@@ -211,11 +470,11 @@ export function AdminJagaView({
 
       // Sheet 1: Data (template untuk diisi)
       const dataSheet = XLSX.utils.aoa_to_sheet([
-        ["Nama Kelas", "Tanggal (dd/mm/yyyy)", "Materi", "Nama Admin", "Catatan (opsional)"],
-        ["Brevet AB 232", "13/01/2026", "KUP A", "Lidya", ""],
-        ["Brevet AB 232", "15/01/2026", "KUP A", "Vani", ""],
+        ["Nama Kelas", "Tanggal (dd/mm/yyyy)", "Jam Mulai", "Jam Selesai", "Materi", "Nama Admin", "Catatan (opsional)"],
+        ["Brevet AB 232", "13/01/2026", DEFAULT_JAM_MULAI, DEFAULT_JAM_SELESAI, "KUP A", "Lidya", ""],
+        ["Brevet AB 232", "15/01/2026", DEFAULT_JAM_MULAI, DEFAULT_JAM_SELESAI, "KUP A", "Vani", ""],
       ]);
-      dataSheet["!cols"] = [{ wch: 24 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 30 }];
+      dataSheet["!cols"] = [{ wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 30 }];
       XLSX.utils.book_append_sheet(wb, dataSheet, "Data");
 
       // Sheet 2: Referensi Kelas
@@ -244,24 +503,56 @@ export function AdminJagaView({
     startTransition(async () => {
       const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+      const wb = XLSX.read(buffer, { type: "array", cellDates: false });
       const ws = wb.Sheets[wb.SheetNames[0]!];
       if (!ws) { toast.error("Sheet tidak ditemukan."); return; }
 
-      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 1, defval: "" });
+      const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" });
       if (raw.length < 2) { toast.error("File kosong atau tidak ada data."); return; }
 
       const kelasMap = new Map(kelasOptions.map((k) => [k.namaKelas.trim().toLowerCase(), k.id]));
       const adminMap = new Map(pengawasOptions.map((p) => [p.nama.trim().toLowerCase(), p.id]));
+      const useDate1904 = Boolean(wb.Workbook?.WBProps?.date1904);
+      const headerRow = raw[0] ?? [];
+      const headerText = headerRow.map((cell) => String(cell ?? "").trim().toLowerCase());
+      const hasWaktuColumns = headerText.some((text) => text.includes("jam mulai") || text.includes("waktu mulai"));
+      const materiIndex = hasWaktuColumns ? 4 : 2;
+      const adminIndex = hasWaktuColumns ? 5 : 3;
+      const catatanIndex = hasWaktuColumns ? 6 : 4;
 
       const preview: ImportPreviewRow[] = [];
       for (let i = 1; i < raw.length; i++) {
-        const row = raw[i] as unknown[];
+        const row = raw[i];
+        if (!row) continue;
         const namaKelas = String(row[0] ?? "").trim();
-        const tanggalRaw = String(row[1] ?? "").trim();
-        const materi = String(row[2] ?? "").trim();
-        const namaAdmin = String(row[3] ?? "").trim();
-        const catatan = String(row[4] ?? "").trim();
+        const tanggalCell = ws[XLSX.utils.encode_cell({ r: i, c: 1 })];
+        const tanggalDisplay = typeof tanggalCell?.w === "string" ? tanggalCell.w : undefined;
+        const { tanggalRaw, tanggalParsed } = parseImportedTanggal(
+          row[1],
+          tanggalDisplay,
+          (serial) => {
+            const parsed = XLSX.SSF.parse_date_code(serial, { date1904: useDate1904 });
+            if (!parsed) return null;
+            return { y: parsed.y, m: parsed.m, d: parsed.d };
+          },
+        );
+        const jamMulaiCell = hasWaktuColumns ? ws[XLSX.utils.encode_cell({ r: i, c: 2 })] : undefined;
+        const jamSelesaiCell = hasWaktuColumns ? ws[XLSX.utils.encode_cell({ r: i, c: 3 })] : undefined;
+        const jamMulaiDisplay = typeof jamMulaiCell?.w === "string" ? jamMulaiCell.w : undefined;
+        const jamSelesaiDisplay = typeof jamSelesaiCell?.w === "string" ? jamSelesaiCell.w : undefined;
+        const { jamRaw: jamMulaiRaw, jamParsed: jamMulai } = parseImportedJam(
+          hasWaktuColumns ? row[2] : "",
+          jamMulaiDisplay,
+          DEFAULT_JAM_MULAI,
+        );
+        const { jamRaw: jamSelesaiRaw, jamParsed: jamSelesai } = parseImportedJam(
+          hasWaktuColumns ? row[3] : "",
+          jamSelesaiDisplay,
+          DEFAULT_JAM_SELESAI,
+        );
+        const materi = String(row[materiIndex] ?? "").trim();
+        const namaAdmin = String(row[adminIndex] ?? "").trim();
+        const catatan = String(row[catatanIndex] ?? "").trim();
 
         if (!namaKelas && !tanggalRaw && !materi && !namaAdmin) continue;
 
@@ -277,23 +568,15 @@ export function AdminJagaView({
         if (!namaAdmin) errors.push("Nama Admin kosong");
         else if (!pengawasId) errors.push(`Admin "${namaAdmin}" tidak ditemukan`);
 
-        // Parse tanggal: support dd/mm/yyyy and YYYY-MM-DD and JS Date serial
-        let tanggalParsed: string | null = null;
-        if (tanggalRaw) {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(tanggalRaw)) {
-            tanggalParsed = tanggalRaw;
-          } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(tanggalRaw)) {
-            try {
-              const parsed = parse(tanggalRaw, "dd/MM/yyyy", new Date());
-              tanggalParsed = format(parsed, "yyyy-MM-dd");
-            } catch { errors.push("Format tanggal tidak valid (gunakan dd/mm/yyyy)"); }
-          } else if (typeof row[1] === "object" && row[1] instanceof Date) {
-            tanggalParsed = format(row[1], "yyyy-MM-dd");
-          } else {
-            errors.push("Format tanggal tidak valid (gunakan dd/mm/yyyy)");
-          }
-        } else {
+        if (!tanggalRaw) {
           errors.push("Tanggal kosong");
+        } else if (!tanggalParsed) {
+          errors.push("Format tanggal tidak valid (gunakan dd/mm/yyyy)");
+        }
+        if (!jamMulai) errors.push(`Jam mulai tidak valid (${jamMulaiRaw || "kosong"})`);
+        if (!jamSelesai) errors.push(`Jam selesai tidak valid (${jamSelesaiRaw || "kosong"})`);
+        if (jamMulai && jamSelesai && jamSelesai <= jamMulai) {
+          errors.push("Jam selesai harus setelah jam mulai");
         }
 
         preview.push({
@@ -301,6 +584,8 @@ export function AdminJagaView({
           namaKelas,
           tanggalRaw,
           tanggalParsed,
+          jamMulai: jamMulai ?? jamMulaiRaw,
+          jamSelesai: jamSelesai ?? jamSelesaiRaw,
           materi,
           namaAdmin,
           catatan,
@@ -333,6 +618,8 @@ export function AdminJagaView({
         valid.map((r) => ({
           kelasId: r.kelasId!,
           tanggal: r.tanggalParsed!,
+          jamMulai: r.jamMulai,
+          jamSelesai: r.jamSelesai,
           materi: r.materi,
           pengawasId: r.pengawasId!,
           catatan: r.catatan || undefined,
@@ -356,11 +643,12 @@ export function AdminJagaView({
         if (filtered.length === 0) { toast.info("Tidak ada data untuk diekspor."); return; }
         const XLSX = await import("xlsx");
         const wsData = [
-          ["No", "Hari", "Tanggal", "Kelas", "Materi", "Admin Jaga", "Catatan"],
+          ["No", "Hari", "Tanggal", "Waktu", "Kelas", "Materi", "Admin Jaga", "Catatan"],
           ...filtered.map((r, i) => [
             i + 1,
             formatHari(r.tanggal),
             formatTanggal(r.tanggal),
+            formatWaktu(r.jamMulai, r.jamSelesai),
             r.namaKelas,
             r.materi,
             r.namaPengawas,
@@ -369,8 +657,8 @@ export function AdminJagaView({
         ];
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         ws["!cols"] = [
-          { wch: 4 }, { wch: 12 }, { wch: 14 }, { wch: 24 },
-          { wch: 36 }, { wch: 24 }, { wch: 30 },
+          { wch: 4 }, { wch: 12 }, { wch: 14 }, { wch: 16 },
+          { wch: 24 }, { wch: 36 }, { wch: 24 }, { wch: 30 },
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Admin Jaga");
@@ -436,7 +724,7 @@ export function AdminJagaView({
         grouped.forEach((group, namaKelas) => {
           body.push([{
             content: namaKelas,
-            colSpan: 5,
+            colSpan: 6,
             styles: { fillColor: [219, 234, 254], textColor: [29, 78, 216], fontStyle: "bold", halign: "left" },
           }]);
           group.forEach((r) => {
@@ -444,6 +732,7 @@ export function AdminJagaView({
               String(rowNumber++),
               formatHari(r.tanggal),
               formatTanggal(r.tanggal),
+              formatWaktu(r.jamMulai, r.jamSelesai),
               r.materi,
               r.namaPengawas,
             ]);
@@ -452,7 +741,7 @@ export function AdminJagaView({
 
         autoTable(doc, {
           startY: currentY,
-          head: [["No", "Hari", "Tanggal", "Materi", "Admin Jaga"]],
+          head: [["No", "Hari", "Tanggal", "Waktu", "Materi", "Admin Jaga"]],
           body,
           theme: "grid",
           styles: {
@@ -469,10 +758,11 @@ export function AdminJagaView({
             0: { cellWidth: 10, halign: "center" },
             1: { cellWidth: 18 },
             2: { cellWidth: 24 },
-            3: { cellWidth: "auto" },
-            4: { cellWidth: 28 },
+            3: { cellWidth: 24, halign: "center" },
+            4: { cellWidth: "auto" },
+            5: { cellWidth: 28 },
           },
-          margin: { top: currentY, right: marginX, bottom: 14, left: marginX },
+          margin: { top: 14, right: marginX, bottom: 14, left: marginX },
           didDrawPage: (data) => {
             doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(51, 65, 85);
             doc.text(printDate, marginX, 7);
@@ -537,24 +827,32 @@ export function AdminJagaView({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Tanggal</p>
                 <Input type="date" value={addTanggal} onChange={(e) => setAddTanggal(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium">Admin Jaga</p>
-                <Select value={addPengawasId} onValueChange={setAddPengawasId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih admin..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pengawasOptions.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nama}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <p className="text-sm font-medium">Jam Mulai</p>
+                <Input type="time" value={addJamMulai} onChange={(e) => setAddJamMulai(e.target.value)} />
               </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Jam Selesai</p>
+                <Input type="time" value={addJamSelesai} onChange={(e) => setAddJamSelesai(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Admin Jaga</p>
+              <Select value={addPengawasId} onValueChange={setAddPengawasId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih admin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {pengawasOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nama}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium">Materi</p>
@@ -578,7 +876,109 @@ export function AdminJagaView({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)} disabled={isPending}>Batal</Button>
-            <Button onClick={handleAdd} disabled={isPending || !addKelasId || !addTanggal || !addMateri.trim() || !addPengawasId}>
+            <Button
+              onClick={handleAdd}
+              disabled={
+                isPending ||
+                !addKelasId ||
+                !addTanggal ||
+                !addJamMulai ||
+                !addJamSelesai ||
+                !addMateri.trim() ||
+                !addPengawasId
+              }
+            >
+              {isPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Penugasan Admin Jaga</DialogTitle>
+            <DialogDescription>Ubah data piket admin untuk sesi ini.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Kelas</p>
+              <Select value={editKelasId} onValueChange={setEditKelasId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih kelas..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {kelasOptions.map((k) => (
+                    <SelectItem key={k.id} value={k.id}>
+                      {k.namaKelas}
+                      <span className="ml-1.5 text-muted-foreground text-xs">({k.program})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Tanggal</p>
+                <Input type="date" value={editTanggal} onChange={(e) => setEditTanggal(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Jam Mulai</p>
+                <Input type="time" value={editJamMulai} onChange={(e) => setEditJamMulai(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Jam Selesai</p>
+                <Input type="time" value={editJamSelesai} onChange={(e) => setEditJamSelesai(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Admin Jaga</p>
+              <Select value={editPengawasId} onValueChange={setEditPengawasId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih admin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {pengawasOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nama}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Materi</p>
+              <Input
+                placeholder="Nama materi / topik sesi ini..."
+                value={editMateri}
+                onChange={(e) => setEditMateri(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                Catatan <span className="text-muted-foreground font-normal">(opsional)</span>
+              </p>
+              <Textarea
+                rows={2}
+                placeholder="Catatan tambahan..."
+                value={editCatatan}
+                onChange={(e) => setEditCatatan(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isPending}>Batal</Button>
+            <Button
+              onClick={handleEdit}
+              disabled={
+                isPending ||
+                !editKelasId ||
+                !editTanggal ||
+                !editJamMulai ||
+                !editJamSelesai ||
+                !editMateri.trim() ||
+                !editPengawasId
+              }
+            >
               {isPending ? "Menyimpan..." : "Simpan"}
             </Button>
           </DialogFooter>
@@ -607,6 +1007,7 @@ export function AdminJagaView({
                     <TableHead className="w-10">#</TableHead>
                     <TableHead>Kelas</TableHead>
                     <TableHead>Tanggal</TableHead>
+                    <TableHead>Waktu</TableHead>
                     <TableHead>Materi</TableHead>
                     <TableHead>Admin</TableHead>
                     <TableHead>Status</TableHead>
@@ -618,6 +1019,7 @@ export function AdminJagaView({
                       <TableCell className="text-xs text-muted-foreground">{r.rowNum}</TableCell>
                       <TableCell className="text-sm">{r.namaKelas || <span className="text-muted-foreground italic">kosong</span>}</TableCell>
                       <TableCell className="text-sm whitespace-nowrap">{r.tanggalParsed ? formatTanggal(r.tanggalParsed) : <span className="text-red-500">{r.tanggalRaw || "kosong"}</span>}</TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">{formatWaktu(r.jamMulai, r.jamSelesai)}</TableCell>
                       <TableCell className="text-sm">{r.materi || <span className="text-muted-foreground italic">kosong</span>}</TableCell>
                       <TableCell className="text-sm">{r.namaAdmin || <span className="text-muted-foreground italic">kosong</span>}</TableCell>
                       <TableCell>
@@ -652,6 +1054,44 @@ export function AdminJagaView({
             </Button>
             <Button onClick={handleConfirmImport} disabled={isPending || importValidCount === 0}>
               {isPending ? "Mengimpor..." : `Import ${importValidCount} Baris`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteKelasOpen} onOpenChange={setDeleteKelasOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Hapus Jadwal Kelas?</DialogTitle>
+            <DialogDescription>
+              {selectedKelas ? (
+                <>
+                  Seluruh jadwal admin jaga untuk kelas <span className="font-medium text-foreground">{selectedKelas.namaKelas}</span> akan dihapus.
+                  Aksi ini tidak menghapus jadwal kelas lain.
+                </>
+              ) : (
+                "Pilih salah satu tab kelas terlebih dahulu."
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+            <div className="flex gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                {selectedKelasTotal} jadwal akan dihapus permanen. Filter admin dan tanggal tidak membatasi aksi ini.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteKelasOpen(false)} disabled={isPending}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSelectedKelas}
+              disabled={isPending || !selectedKelas || selectedKelasTotal === 0}
+            >
+              {isPending ? "Menghapus..." : "Hapus Jadwal Kelas"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -692,6 +1132,17 @@ export function AdminJagaView({
                 <Plus className="h-4 w-4" />
                 Tambah
               </Button>
+              {selectedKelas && (
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteKelasOpen(true)}
+                  disabled={isPending || selectedKelasTotal === 0}
+                  className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Hapus Kelas
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" disabled={isPending} className="w-full sm:w-auto">
@@ -734,17 +1185,6 @@ export function AdminJagaView({
         <CardContent className="space-y-4 pt-6">
           {/* Filters */}
           <div className="flex flex-wrap gap-3">
-            <Select value={filterKelasId} onValueChange={setFilterKelasId}>
-              <SelectTrigger className="w-full sm:w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Semua Kelas</SelectItem>
-                {kelasOptions.map((k) => (
-                  <SelectItem key={k.id} value={k.id}>{k.namaKelas}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={filterPengawasId} onValueChange={setFilterPengawasId}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
@@ -782,11 +1222,43 @@ export function AdminJagaView({
             </div>
           </div>
 
+          <Tabs value={filterKelasId} onValueChange={setFilterKelasId} className="w-full gap-0">
+            <div className="overflow-x-auto pb-1">
+              <TabsList
+                variant="line"
+                className="h-auto w-max flex-nowrap justify-start gap-1.5 rounded-none p-0"
+              >
+                <TabsTrigger
+                  value="__all__"
+                  className="h-7 flex-none shrink-0 rounded-md border border-border bg-background px-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5"
+                >
+                  Semua
+                  <Badge variant="secondary" className="px-1 py-0 text-[10px] leading-4">
+                    {filteredWithoutKelas.length}
+                  </Badge>
+                </TabsTrigger>
+                {kelasTabs.map((kelas) => (
+                  <TabsTrigger
+                    key={kelas.id}
+                    value={kelas.id}
+                    className="h-7 flex-none shrink-0 rounded-md border border-border bg-background px-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5"
+                  >
+                    <span className="block max-w-36 truncate">{kelas.namaKelas}</span>
+                    <Badge variant="secondary" className="px-1 py-0 text-[10px] leading-4">
+                      {kelas.jumlah}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          </Tabs>
+
           <div className="overflow-hidden rounded-md border bg-card">
             <Table className="min-w-208">
               <TableHeader>
                 <TableRow>
                   <TableHead>Tanggal</TableHead>
+                  <TableHead>Waktu</TableHead>
                   <TableHead>Kelas</TableHead>
                   <TableHead>Materi</TableHead>
                   <TableHead>Admin Jaga</TableHead>
@@ -804,6 +1276,7 @@ export function AdminJagaView({
                           <span className="text-xs text-muted-foreground">{formatHari(row.tanggal)}</span>
                         </div>
                       </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">{formatWaktu(row.jamMulai, row.jamSelesai)}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
                           <span className="text-sm">{row.namaKelas}</span>
@@ -816,21 +1289,32 @@ export function AdminJagaView({
                         {row.catatan ?? "—"}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          disabled={isPending}
-                          onClick={() => handleDelete(row.id, row.namaPengawas)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            disabled={isPending}
+                            onClick={() => openEdit(row)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            disabled={isPending}
+                            onClick={() => handleDelete(row.id, row.namaPengawas)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
                       Belum ada penugasan admin jaga.
                     </TableCell>
                   </TableRow>
