@@ -70,7 +70,7 @@ export function StatsCharts({ stats }: StatsChartsProps) {
         </CardHeader>
         <CardContent className="pt-4">
           <div className="h-64 sm:h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <LineChart
                 data={monthlyData}
                 margin={{ top: 8, right: isMobile ? 8 : 20, left: isMobile ? -20 : 0, bottom: 0 }}
@@ -122,7 +122,7 @@ export function StatsCharts({ stats }: StatsChartsProps) {
         </CardHeader>
         <CardContent className="pt-4">
           <div className="h-72 sm:h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <PieChart>
                 <Pie
                   data={statusKeluarData}
@@ -165,7 +165,7 @@ export function StatsCharts({ stats }: StatsChartsProps) {
         </CardHeader>
         <CardContent className="pt-4">
           <div className="h-72 sm:h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <BarChart
                 data={jenisSuratData}
                 layout="vertical"

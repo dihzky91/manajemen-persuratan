@@ -43,8 +43,9 @@ export function AnalyticsCharts({
           <CardHeader>
             <CardTitle>Tren Peserta 12 Bulan</CardTitle>
           </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <CardContent>
+            <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <AreaChart data={analytics.trends}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
@@ -53,6 +54,7 @@ export function AnalyticsCharts({
                 <Area type="monotone" dataKey="count" stroke="#2563eb" fill="#dbeafe" />
               </AreaChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -60,8 +62,9 @@ export function AnalyticsCharts({
           <CardHeader>
             <CardTitle>Distribusi Kategori</CardTitle>
           </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <CardContent>
+            <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <PieChart>
                 <Pie
                   data={analytics.categories}
@@ -79,6 +82,7 @@ export function AnalyticsCharts({
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -86,8 +90,9 @@ export function AnalyticsCharts({
           <CardHeader>
             <CardTitle>Top 5 Kegiatan</CardTitle>
           </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <CardContent>
+            <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <BarChart data={analytics.topEvents} layout="vertical" margin={{ left: 32 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" allowDecimals={false} />
@@ -96,6 +101,7 @@ export function AnalyticsCharts({
                 <Bar dataKey="participants" fill="#059669" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </section>
