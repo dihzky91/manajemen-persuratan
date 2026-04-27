@@ -98,6 +98,45 @@ export const assignPengawasSchema = z.object({
 
 export type AssignPengawasInput = z.infer<typeof assignPengawasSchema>;
 
+// ─── ADMIN JAGA ───────────────────────────────────────────────────────────────
+
+export const adminJagaAssignSchema = z.object({
+  ujianId: z.string().min(1),
+  pengawasId: z.string().min(1),
+  catatan: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+export type AdminJagaAssignInput = z.infer<typeof adminJagaAssignSchema>;
+
+export const adminJagaFilterSchema = z.object({
+  pengawasId: z.string().optional(),
+  tanggalMulai: z.string().optional(),
+  tanggalSelesai: z.string().optional(),
+});
+
+export type AdminJagaFilter = z.infer<typeof adminJagaFilterSchema>;
+
+// ─── JADWAL ADMIN JAGA (STANDALONE) ──────────────────────────────────────────
+
+export const jadwalAdminJagaCreateSchema = z.object({
+  kelasId: z.string().min(1),
+  tanggal: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
+  materi: z.string().trim().min(1).max(300),
+  pengawasId: z.string().min(1),
+  catatan: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+export type JadwalAdminJagaCreateInput = z.infer<typeof jadwalAdminJagaCreateSchema>;
+
+export const jadwalAdminJagaFilterSchema = z.object({
+  kelasId: z.string().optional(),
+  pengawasId: z.string().optional(),
+  tanggalMulai: z.string().optional(),
+  tanggalSelesai: z.string().optional(),
+});
+
+export type JadwalAdminJagaFilter = z.infer<typeof jadwalAdminJagaFilterSchema>;
+
 // ─── BEBAN KERJA FILTER ───────────────────────────────────────────────────────
 
 export const bebanKerjaFilterSchema = z.object({

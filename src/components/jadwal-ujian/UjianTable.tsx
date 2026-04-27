@@ -1,13 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { type ColumnDef } from "@tanstack/react-table";
 import { Archive, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -32,6 +29,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConflictBadge } from "./ConflictBadge";
 import { UjianForm } from "./UjianForm";
 import { UjianExportButton } from "./UjianExportButton";
@@ -43,10 +48,14 @@ import type { MateriRow } from "@/server/actions/jadwal-ujian/materi";
 interface UjianTableProps {
   initialData: UjianRow[];
   kelasList: Pick<KelasRow, "id" | "namaKelas" | "program">[];
-  pengawasList: Pick<PengawasRow, "id" | "nama">[];
+  pengawasList: Pick<PengawasRow, "id" | "nama" | "jumlahTugas">[];
   materiList: Pick<MateriRow, "id" | "nama" | "program">[];
   canManage: boolean;
   programOptions: string[];
+  systemIdentity: {
+    namaSistem: string;
+    logoUrl: string | null;
+  };
 }
 
 type FormState =
@@ -54,7 +63,15 @@ type FormState =
   | { open: true; mode: "create" }
   | { open: true; mode: "edit"; row: UjianRow };
 
-export function UjianTable({ initialData, kelasList, pengawasList, materiList, canManage, programOptions }: UjianTableProps) {
+export function UjianTable({
+  initialData,
+  kelasList,
+  pengawasList,
+  materiList,
+  canManage,
+  programOptions,
+  systemIdentity,
+}: UjianTableProps) {
   const router = useRouter();
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [deleteTarget, setDeleteTarget] = useState<UjianRow | null>(null);
@@ -63,6 +80,7 @@ export function UjianTable({ initialData, kelasList, pengawasList, materiList, c
   const [filterTanggalMulai, setFilterTanggalMulai] = useState("");
   const [filterTanggalSelesai, setFilterTanggalSelesai] = useState("");
   const [showPastExams, setShowPastExams] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const today = useMemo(() => new Date().toISOString().split("T")[0]!, []);
 
@@ -77,107 +95,50 @@ export function UjianTable({ initialData, kelasList, pengawasList, materiList, c
       if (filterProgram !== "__all__" && u.program !== filterProgram) return false;
       if (filterTanggalMulai && u.tanggalUjian < filterTanggalMulai) return false;
       if (filterTanggalSelesai && u.tanggalUjian > filterTanggalSelesai) return false;
+
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSubject = u.mataPelajaran.some((mata) => mata.toLowerCase().includes(query));
+        const matchesClass = u.namaKelas.toLowerCase().includes(query);
+        const matchesProgram = u.program.toLowerCase().includes(query);
+        if (!matchesSubject && !matchesClass && !matchesProgram) return false;
+      }
+
       return true;
     });
-  }, [initialData, showPastExams, today, filterProgram, filterTanggalMulai, filterTanggalSelesai]);
+  }, [
+    initialData,
+    showPastExams,
+    today,
+    filterProgram,
+    filterTanggalMulai,
+    filterTanggalSelesai,
+    searchQuery,
+  ]);
 
-  const columns = useMemo<ColumnDef<UjianRow>[]>(() => {
-    const base: ColumnDef<UjianRow>[] = [
-      {
-        accessorKey: "tanggalUjian",
-        header: "Tanggal",
-        cell: ({ row }) => {
-          const d = new Date(row.original.tanggalUjian + "T00:00:00");
-          return (
-            <span className="tabular-nums text-sm whitespace-nowrap">
-              {d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
-            </span>
-          );
-        },
-      },
-      {
-        id: "jam",
-        header: "Waktu",
-        cell: ({ row }) => (
-          <span className="tabular-nums text-sm text-muted-foreground whitespace-nowrap">
-            {row.original.jamMulai} – {row.original.jamSelesai}
-          </span>
-        ),
-      },
-      {
-        accessorKey: "mataPelajaran",
-        header: "Mata Ujian",
-        cell: ({ row }) => (
-          <div className="flex flex-col gap-0.5">
-            {row.original.mataPelajaran.map((m, i) => (
-              <span key={i} className="font-medium text-sm">{m}</span>
-            ))}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "namaKelas",
-        header: "Kelas",
-        cell: ({ row }) => (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm">{row.original.namaKelas}</span>
-            <span className="text-xs text-muted-foreground">{row.original.program} · {row.original.mode}</span>
-          </div>
-        ),
-      },
-      {
-        id: "pengawas",
-        header: "Pengawas",
-        cell: ({ row }) => (
-          <div className="flex items-center gap-2">
-            <span className="tabular-nums text-sm">{row.original.jumlahPengawas} orang</span>
-            {row.original.adaKonflik && <ConflictBadge />}
-          </div>
-        ),
-      },
-      {
-        id: "actions",
-        header: "",
-        cell: ({ row }) => (
-          <div className="flex justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-sm">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Aksi</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push(`/jadwal-ujian/${row.original.id}`)}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Lihat Detail
-                </DropdownMenuItem>
-                {canManage && (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() => setFormState({ open: true, mode: "edit", row: row.original })}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Ubah
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => setDeleteTarget(row.original)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Hapus
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ),
-      },
-    ];
-    return base;
-  }, [canManage, router]);
+  const groupedData = useMemo(() => {
+    const sorted = [...filteredData].sort((a, b) => {
+      const classCompare = a.namaKelas.localeCompare(b.namaKelas, "id");
+      if (classCompare !== 0) return classCompare;
+
+      const dateCompare = a.tanggalUjian.localeCompare(b.tanggalUjian);
+      if (dateCompare !== 0) return dateCompare;
+
+      return a.jamMulai.localeCompare(b.jamMulai);
+    });
+
+    const groups = new Map<string, UjianRow[]>();
+    sorted.forEach((row) => {
+      const existing = groups.get(row.namaKelas);
+      if (existing) {
+        existing.push(row);
+        return;
+      }
+      groups.set(row.namaKelas, [row]);
+    });
+
+    return Array.from(groups.entries());
+  }, [filteredData]);
 
   function handleDeleteConfirm() {
     if (!deleteTarget) return;
@@ -209,17 +170,26 @@ export function UjianTable({ initialData, kelasList, pengawasList, materiList, c
                 Daftar seluruh jadwal ujian, pengawas, dan status konflik penugasan.
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
               <Button
                 variant={showPastExams ? "secondary" : "outline"}
                 onClick={() => setShowPastExams((v) => !v)}
+                className="w-full sm:w-auto"
               >
                 <Archive className="h-4 w-4" />
                 {showPastExams ? "Sembunyikan Arsip" : `Lihat Arsip (${archivedCount})`}
               </Button>
-              <UjianExportButton filter={exportFilter} />
+              <UjianExportButton
+                filter={exportFilter}
+                includePastExams={showPastExams}
+                today={today}
+                systemIdentity={systemIdentity}
+              />
               {canManage && (
-                <Button onClick={() => setFormState({ open: true, mode: "create" })}>
+                <Button
+                  onClick={() => setFormState({ open: true, mode: "create" })}
+                  className="w-full sm:w-auto"
+                >
                   <Plus className="h-4 w-4" />
                   Tambah Ujian
                 </Button>
@@ -227,31 +197,33 @@ export function UjianTable({ initialData, kelasList, pengawasList, materiList, c
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6 space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
+        <CardContent className="space-y-4 pt-6">
+          <div className="grid gap-3 lg:grid-cols-[auto_1fr]">
             <Select value={filterProgram} onValueChange={setFilterProgram}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Semua Program</SelectItem>
                 {programOptions.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2">
+            <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
               <Input
                 type="date"
-                className="w-37.5"
+                className="w-full sm:w-40"
                 value={filterTanggalMulai}
                 onChange={(e) => setFilterTanggalMulai(e.target.value)}
                 placeholder="Dari tanggal"
               />
-              <span className="text-muted-foreground text-sm">s/d</span>
+              <span className="text-sm text-muted-foreground sm:px-1">s/d</span>
               <Input
                 type="date"
-                className="w-37.5"
+                className="w-full sm:w-40"
                 value={filterTanggalSelesai}
                 onChange={(e) => setFilterTanggalSelesai(e.target.value)}
                 placeholder="Sampai tanggal"
@@ -260,7 +232,11 @@ export function UjianTable({ initialData, kelasList, pengawasList, materiList, c
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setFilterTanggalMulai(""); setFilterTanggalSelesai(""); }}
+                  onClick={() => {
+                    setFilterTanggalMulai("");
+                    setFilterTanggalSelesai("");
+                  }}
+                  className="w-full sm:w-auto"
                 >
                   Reset
                 </Button>
@@ -268,13 +244,130 @@ export function UjianTable({ initialData, kelasList, pengawasList, materiList, c
             </div>
           </div>
 
-          <DataTable
-            columns={columns}
-            data={filteredData}
-            searchColumnId="mataPelajaran"
-            searchPlaceholder="Cari mata pelajaran..."
-            emptyMessage="Belum ada jadwal ujian. Klik 'Tambah Ujian' untuk memulai."
-          />
+          <div className="space-y-3">
+            <div className="w-full max-w-sm">
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari mata pelajaran atau kelas..."
+              />
+            </div>
+
+            <div className="overflow-hidden rounded-md border bg-card">
+              <Table className="min-w-[56rem]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Waktu</TableHead>
+                    <TableHead>Mata Ujian</TableHead>
+                    <TableHead>Kelas</TableHead>
+                    <TableHead>Pengawas</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groupedData.length > 0 ? (
+                    groupedData.map(([kelasName, rows]) => (
+                      <Fragment key={kelasName}>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableCell colSpan={7} className="py-3 font-semibold text-primary">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span>{kelasName}</span>
+                              <span className="text-xs font-normal text-muted-foreground">
+                                {rows[0]?.program} - {rows[0]?.mode}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {rows.map((row) => {
+                          const d = new Date(`${row.tanggalUjian}T00:00:00`);
+                          return (
+                            <TableRow key={row.id}>
+                              <TableCell className="whitespace-nowrap text-sm">
+                                {d.toLocaleDateString("id-ID", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                                {row.jamMulai} - {row.jamSelesai}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-0.5">
+                                  {row.mataPelajaran.map((m, i) => (
+                                    <span key={i} className="text-sm font-medium">
+                                      {m}
+                                    </span>
+                                  ))}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-sm">{row.namaKelas}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {row.program} - {row.mode}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{row.jumlahPengawas} orang</span>
+                                  {row.adaKonflik && <ConflictBadge />}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon-sm">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                      <span className="sr-only">Aksi</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => router.push(`/jadwal-ujian/${row.id}`)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Lihat Detail
+                                    </DropdownMenuItem>
+                                    {canManage && (
+                                      <>
+                                        <DropdownMenuItem
+                                          onClick={() => setFormState({ open: true, mode: "edit", row })}
+                                        >
+                                          <Pencil className="mr-2 h-4 w-4" />
+                                          Ubah
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          variant="destructive"
+                                          onClick={() => setDeleteTarget(row)}
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Hapus
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </Fragment>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
+                        Belum ada jadwal ujian. Klik &quot;Tambah Ujian&quot; untuk memulai.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="text-sm text-muted-foreground">{filteredData.length} baris</div>
+          </div>
         </CardContent>
       </Card>
 
@@ -288,23 +381,37 @@ export function UjianTable({ initialData, kelasList, pengawasList, materiList, c
         materiList={materiList}
       />
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null); }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteTarget(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Hapus Jadwal Ujian?</DialogTitle>
             <DialogDescription>
               Ujian{" "}
               <span className="font-medium text-foreground">{deleteTarget?.mataPelajaran.join(" & ")}</span>{" "}
-              pada{" "}
-              <span className="font-medium text-foreground">{deleteTarget?.tanggalUjian}</span>{" "}
-              beserta semua penugasan pengawasnya akan dihapus permanen.
+              pada <span className="font-medium text-foreground">{deleteTarget?.tanggalUjian}</span> beserta semua
+              penugasan pengawasnya akan dihapus permanen.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isDeleting}
+              className="w-full sm:w-auto"
+            >
               Batal
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="w-full sm:w-auto"
+            >
               {isDeleting ? "Menghapus..." : "Hapus"}
             </Button>
           </DialogFooter>

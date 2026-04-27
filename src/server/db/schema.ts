@@ -788,6 +788,38 @@ export const penugasanPengawas = pgTable(
   (t) => [uniqueIndex("uniq_ujian_pengawas").on(t.ujianId, t.pengawasId)],
 );
 
+export const adminJaga = pgTable(
+  "admin_jaga",
+  {
+    id: text("id").primaryKey(),
+    ujianId: text("ujian_id")
+      .notNull()
+      .references(() => jadwalUjian.id, { onDelete: "cascade" }),
+    pengawasId: text("pengawas_id")
+      .notNull()
+      .references(() => pengawas.id, { onDelete: "cascade" }),
+    catatan: text("catatan"),
+    konflik: boolean("konflik").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("uniq_admin_jaga_ujian_pengawas").on(t.ujianId, t.pengawasId)],
+);
+
+export const jadwalAdminJaga = pgTable("jadwal_admin_jaga", {
+  id: text("id").primaryKey(),
+  kelasId: text("kelas_id")
+    .notNull()
+    .references(() => kelasUjian.id, { onDelete: "cascade" }),
+  tanggal: date("tanggal").notNull(),
+  materi: varchar("materi", { length: 300 }).notNull(),
+  pengawasId: text("pengawas_id")
+    .notNull()
+    .references(() => pengawas.id, { onDelete: "cascade" }),
+  catatan: text("catatan"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ─── TYPE EXPORTS ────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -834,6 +866,10 @@ export type PenugasanPengawas = typeof penugasanPengawas.$inferSelect;
 export type NewPenugasanPengawas = typeof penugasanPengawas.$inferInsert;
 export type JadwalUjianConfig = typeof jadwalUjianConfig.$inferSelect;
 export type NewJadwalUjianConfig = typeof jadwalUjianConfig.$inferInsert;
+export type AdminJaga = typeof adminJaga.$inferSelect;
+export type NewAdminJaga = typeof adminJaga.$inferInsert;
+export type JadwalAdminJaga = typeof jadwalAdminJaga.$inferSelect;
+export type NewJadwalAdminJaga = typeof jadwalAdminJaga.$inferInsert;
 
 // ─── PENOMORAN SERTIFIKAT (Certificate Hub) ──────────────────────────────────
 // Sub-modul terpisah dari modul sertifikat kegiatan/event.

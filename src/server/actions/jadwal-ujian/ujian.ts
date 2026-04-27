@@ -9,8 +9,36 @@ import {
   kelasUjian,
   penugasanPengawas,
   pengawas,
+  adminJaga,
   auditLog,
 } from "@/server/db/schema";
+
+async function buildAdminJagaKonflikMap(
+  pengawasIds: string[],
+  tanggalUjian: string,
+  jamMulai: string,
+  jamSelesai: string,
+  excludeUjianId: string,
+): Promise<Record<string, boolean>> {
+  const result: Record<string, boolean> = {};
+  for (const pgId of pengawasIds) {
+    const existing = await db
+      .select({
+        ujianId: adminJaga.ujianId,
+        jamMulai: jadwalUjian.jamMulai,
+        jamSelesai: jadwalUjian.jamSelesai,
+      })
+      .from(adminJaga)
+      .leftJoin(jadwalUjian, eq(adminJaga.ujianId, jadwalUjian.id))
+      .where(and(eq(adminJaga.pengawasId, pgId), eq(jadwalUjian.tanggalUjian, tanggalUjian)));
+    result[pgId] = existing.some((e) => {
+      if (e.ujianId === excludeUjianId) return false;
+      if (!e.jamMulai || !e.jamSelesai) return false;
+      return jamMulai < e.jamSelesai && jamSelesai > e.jamMulai;
+    });
+  }
+  return result;
+}
 
 async function buildKonflikMap(
   pengawasIds: string[],
@@ -61,6 +89,8 @@ export type UjianRow = {
   catatan: string | null;
   jumlahPengawas: number;
   adaKonflik: boolean;
+  jumlahAdminJaga: number;
+  adaKonflikAdminJaga: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -70,6 +100,14 @@ export type UjianDetail = UjianRow & {
     id: string;
     pengawasId: string;
     namaPengawas: string;
+    konflik: boolean;
+    createdAt: Date;
+  }[];
+  adminJagaList: {
+    id: string;
+    pengawasId: string;
+    namaPengawas: string;
+    catatan: string | null;
     konflik: boolean;
     createdAt: Date;
   }[];
@@ -98,6 +136,17 @@ export async function listUjian(filter: UjianFilter = {}): Promise<UjianListResu
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
+  const ajAlias = db.$with("aj_counts").as(
+    db
+      .select({
+        ujianId: adminJaga.ujianId,
+        jumlah: sql<number>`count(*)::int`.as("jumlah"),
+        adaKonflik: sql<boolean>`bool_or(${adminJaga.konflik})`.as("ada_konflik"),
+      })
+      .from(adminJaga)
+      .groupBy(adminJaga.ujianId),
+  );
+
   const [totalResult, rows] = await Promise.all([
     db
       .select({ total: sql<number>`count(distinct ${jadwalUjian.id})::int` })
@@ -105,6 +154,7 @@ export async function listUjian(filter: UjianFilter = {}): Promise<UjianListResu
       .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
       .where(where),
     db
+      .with(ajAlias)
       .select({
         id: jadwalUjian.id,
         kelasId: jadwalUjian.kelasId,
@@ -118,16 +168,18 @@ export async function listUjian(filter: UjianFilter = {}): Promise<UjianListResu
         jamSelesai: jadwalUjian.jamSelesai,
         catatan: jadwalUjian.catatan,
         jumlahPengawas: sql<number>`count(${penugasanPengawas.id})::int`.as("jumlah_pengawas"),
-        adaKonflik:
-          sql<boolean>`bool_or(${penugasanPengawas.konflik})`.as("ada_konflik"),
+        adaKonflik: sql<boolean>`bool_or(${penugasanPengawas.konflik})`.as("ada_konflik"),
+        jumlahAdminJaga: sql<number>`coalesce(${ajAlias.jumlah}, 0)::int`.as("jumlah_admin_jaga"),
+        adaKonflikAdminJaga: sql<boolean>`coalesce(${ajAlias.adaKonflik}, false)`.as("ada_konflik_admin_jaga"),
         createdAt: jadwalUjian.createdAt,
         updatedAt: jadwalUjian.updatedAt,
       })
       .from(jadwalUjian)
       .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
       .leftJoin(penugasanPengawas, eq(penugasanPengawas.ujianId, jadwalUjian.id))
+      .leftJoin(ajAlias, eq(ajAlias.ujianId, jadwalUjian.id))
       .where(where)
-      .groupBy(jadwalUjian.id, kelasUjian.id)
+      .groupBy(jadwalUjian.id, kelasUjian.id, ajAlias.jumlah, ajAlias.adaKonflik)
       .orderBy(desc(jadwalUjian.tanggalUjian), asc(jadwalUjian.jamMulai))
       .limit(pageSize)
       .offset(offset),
@@ -182,20 +234,40 @@ export async function getUjianById(id: string): Promise<UjianDetail | null> {
     .where(eq(penugasanPengawas.ujianId, id))
     .orderBy(asc(pengawas.nama));
 
+  const adminJagaRows = await db
+    .select({
+      id: adminJaga.id,
+      pengawasId: adminJaga.pengawasId,
+      namaPengawas: pengawas.nama,
+      catatan: adminJaga.catatan,
+      konflik: adminJaga.konflik,
+      createdAt: adminJaga.createdAt,
+    })
+    .from(adminJaga)
+    .leftJoin(pengawas, eq(adminJaga.pengawasId, pengawas.id))
+    .where(eq(adminJaga.ujianId, id))
+    .orderBy(asc(pengawas.nama));
+
   const jumlahPengawas = penugasanRows.length;
   const adaKonflik = penugasanRows.some((p) => p.konflik);
+  const jumlahAdminJaga = adminJagaRows.length;
+  const adaKonflikAdminJaga = adminJagaRows.some((a) => a.konflik);
 
   return {
-    ...(ujian as Omit<UjianRow, "jumlahPengawas" | "adaKonflik">),
+    ...(ujian as Omit<UjianRow, "jumlahPengawas" | "adaKonflik" | "jumlahAdminJaga" | "adaKonflikAdminJaga">),
     jumlahPengawas,
     adaKonflik,
+    jumlahAdminJaga,
+    adaKonflikAdminJaga,
     penugasan: penugasanRows as UjianDetail["penugasan"],
+    adminJagaList: adminJagaRows as UjianDetail["adminJagaList"],
   };
 }
 
-export async function createUjian(data: UjianCreateInput & { pengawasIds?: string[] }) {
+export async function createUjian(data: UjianCreateInput & { pengawasIds?: string[]; adminJagaIds?: string[] }) {
   const parsed = ujianCreateSchema.parse(data);
   const pengawasIds = data.pengawasIds ?? [];
+  const adminJagaIds = [...new Set(data.adminJagaIds ?? [])];
   const session = await requireRole(["admin", "staff"]);
 
   const id = nanoid();
@@ -228,6 +300,20 @@ export async function createUjian(data: UjianCreateInput & { pengawasIds?: strin
     konflikIds.push(...pengawasIds.filter((pgId) => konflikMap[pgId]));
   }
 
+  const konflikAdminJagaIds: string[] = [];
+  if (adminJagaIds.length > 0) {
+    const konflikMap = await buildAdminJagaKonflikMap(adminJagaIds, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai, id);
+    await db.insert(adminJaga).values(
+      adminJagaIds.map((pgId) => ({
+        id: nanoid(),
+        ujianId: id,
+        pengawasId: pgId,
+        konflik: konflikMap[pgId] ?? false,
+      })),
+    );
+    konflikAdminJagaIds.push(...adminJagaIds.filter((pgId) => konflikMap[pgId]));
+  }
+
   await db.insert(auditLog).values({
     userId: session.user.id,
     aksi: "CREATE_JADWAL_UJIAN",
@@ -239,14 +325,16 @@ export async function createUjian(data: UjianCreateInput & { pengawasIds?: strin
       jamMulai: parsed.jamMulai,
       jamSelesai: parsed.jamSelesai,
       jumlahPengawas: pengawasIds.length,
+      jumlahAdminJaga: adminJagaIds.length,
     },
   });
 
   revalidatePath("/jadwal-ujian");
-  return { ok: true as const, data: row, konflikPengawasIds: konflikIds };
+  revalidatePath("/jadwal-ujian/admin-jaga");
+  return { ok: true as const, data: row, konflikPengawasIds: konflikIds, konflikAdminJagaIds };
 }
 
-export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: string[] }) {
+export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: string[]; adminJagaIds?: string[] }) {
   const parsed = ujianUpdateSchema.parse(data);
   const session = await requireRole(["admin", "staff"]);
 
@@ -283,6 +371,24 @@ export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: strin
     }
   }
 
+  const konflikAdminJagaIds: string[] = [];
+  if (data.adminJagaIds !== undefined) {
+    const adminJagaIds = [...new Set(data.adminJagaIds)];
+    await db.delete(adminJaga).where(eq(adminJaga.ujianId, parsed.id));
+    if (adminJagaIds.length > 0) {
+      const konflikMap = await buildAdminJagaKonflikMap(adminJagaIds, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai, parsed.id);
+      await db.insert(adminJaga).values(
+        adminJagaIds.map((pgId) => ({
+          id: nanoid(),
+          ujianId: parsed.id,
+          pengawasId: pgId,
+          konflik: konflikMap[pgId] ?? false,
+        })),
+      );
+      konflikAdminJagaIds.push(...adminJagaIds.filter((pgId) => konflikMap[pgId]));
+    }
+  }
+
   await db.insert(auditLog).values({
     userId: session.user.id,
     aksi: "UPDATE_JADWAL_UJIAN",
@@ -298,7 +404,8 @@ export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: strin
 
   revalidatePath("/jadwal-ujian");
   revalidatePath(`/jadwal-ujian/${parsed.id}`);
-  return { ok: true as const, data: row, konflikPengawasIds: konflikIds };
+  revalidatePath("/jadwal-ujian/admin-jaga");
+  return { ok: true as const, data: row, konflikPengawasIds: konflikIds, konflikAdminJagaIds };
 }
 
 export async function deleteUjian(id: string) {
@@ -336,6 +443,7 @@ export type UjianExportRow = {
   mode: string;
   mataPelajaran: string[];
   pengawas: string;
+  adminJaga: string;
   catatan: string | null;
 };
 
@@ -348,7 +456,19 @@ export async function getUjianForExport(filter: UjianFilter = {}): Promise<Ujian
   if (filter.kelasId) conditions.push(eq(jadwalUjian.kelasId, filter.kelasId));
   if (filter.program) conditions.push(eq(kelasUjian.program, filter.program));
 
+  const ajSubquery = db.$with("aj_export").as(
+    db
+      .select({
+        ujianId: adminJaga.ujianId,
+        namaList: sql<string>`string_agg(${pengawas.nama}, ', ' order by ${pengawas.nama})`.as("nama_list"),
+      })
+      .from(adminJaga)
+      .leftJoin(pengawas, eq(adminJaga.pengawasId, pengawas.id))
+      .groupBy(adminJaga.ujianId),
+  );
+
   const rows = await db
+    .with(ajSubquery)
     .select({
       tanggalUjian: jadwalUjian.tanggalUjian,
       jamMulai: jadwalUjian.jamMulai,
@@ -359,14 +479,16 @@ export async function getUjianForExport(filter: UjianFilter = {}): Promise<Ujian
       mode: kelasUjian.mode,
       mataPelajaran: jadwalUjian.mataPelajaran,
       pengawas: sql<string>`coalesce(string_agg(${pengawas.nama}, ', ' order by ${pengawas.nama}), '-')`.as("pengawas"),
+      adminJaga: sql<string>`coalesce(${ajSubquery.namaList}, '-')`.as("admin_jaga"),
       catatan: jadwalUjian.catatan,
     })
     .from(jadwalUjian)
     .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
     .leftJoin(penugasanPengawas, eq(penugasanPengawas.ujianId, jadwalUjian.id))
     .leftJoin(pengawas, eq(penugasanPengawas.pengawasId, pengawas.id))
+    .leftJoin(ajSubquery, eq(ajSubquery.ujianId, jadwalUjian.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .groupBy(jadwalUjian.id, kelasUjian.id)
+    .groupBy(jadwalUjian.id, kelasUjian.id, ajSubquery.namaList)
     .orderBy(asc(jadwalUjian.tanggalUjian), asc(jadwalUjian.jamMulai));
 
   return rows as UjianExportRow[];

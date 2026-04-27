@@ -40,13 +40,20 @@ import type { KelasRow } from "@/server/actions/jadwal-ujian/kelas";
 import type { PengawasRow } from "@/server/actions/jadwal-ujian/pengawas";
 import type { MateriRow } from "@/server/actions/jadwal-ujian/materi";
 
+function getBebanInfo(jumlahTugas: number): { label: string; className: string } {
+  if (jumlahTugas === 0) return { label: "Belum ada", className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+  if (jumlahTugas <= 3) return { label: `${jumlahTugas} tugas`, className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+  if (jumlahTugas <= 7) return { label: `${jumlahTugas} tugas`, className: "bg-amber-100 text-amber-700 border-amber-200" };
+  return { label: `${jumlahTugas} tugas`, className: "bg-red-100 text-red-700 border-red-200" };
+}
+
 interface UjianFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
   initialData?: UjianRow | null;
   kelasList: Pick<KelasRow, "id" | "namaKelas" | "program">[];
-  pengawasList: Pick<PengawasRow, "id" | "nama">[];
+  pengawasList: Pick<PengawasRow, "id" | "nama" | "jumlahTugas">[];
   materiList: Pick<MateriRow, "id" | "nama" | "program">[];
 }
 
@@ -136,11 +143,15 @@ export function UjianForm({ open, onOpenChange, mode, initialData, kelasList, pe
         return;
       }
 
+      const warnings: string[] = [];
       if (res.konflikPengawasIds && res.konflikPengawasIds.length > 0) {
         const namaKonflik = res.konflikPengawasIds
           .map((id) => pengawasList.find((p) => p.id === id)?.nama ?? id)
           .join(", ");
-        toast.warning(`Jadwal disimpan, namun terdeteksi konflik untuk: ${namaKonflik}`);
+        warnings.push(`Konflik pengawas: ${namaKonflik}`);
+      }
+      if (warnings.length > 0) {
+        toast.warning(`Jadwal disimpan, namun terdeteksi konflik. ${warnings.join(" | ")}`);
       } else {
         toast.success(mode === "edit" ? "Jadwal ujian diperbarui." : "Jadwal ujian berhasil dibuat.");
       }
@@ -148,7 +159,14 @@ export function UjianForm({ open, onOpenChange, mode, initialData, kelasList, pe
     });
   }
 
-  const sortedPengawas = [...pengawasList].sort((a, b) => a.nama.localeCompare(b.nama, "id"));
+  // Sort by jumlahTugas (ringan ke berat), lalu alfabetis jika sama
+  const sortedPengawas = [...pengawasList].sort((a, b) => {
+    if (a.jumlahTugas !== b.jumlahTugas) return a.jumlahTugas - b.jumlahTugas;
+    return a.nama.localeCompare(b.nama, "id");
+  });
+
+  // Pengawas dengan beban teringan (untuk badge rekomendasi)
+  const minBeban = sortedPengawas.length > 0 ? sortedPengawas[0]!.jumlahTugas : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -306,22 +324,45 @@ export function UjianForm({ open, onOpenChange, mode, initialData, kelasList, pe
               {sortedPengawas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Belum ada data pengawas.</p>
               ) : (
-                <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
-                  {sortedPengawas.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`pg-${p.id}`}
-                        checked={selectedIds.has(p.id)}
-                        onCheckedChange={() => togglePengawas(p.id)}
-                      />
-                      <label
-                        htmlFor={`pg-${p.id}`}
-                        className="text-sm leading-none cursor-pointer select-none"
-                      >
-                        {p.nama}
-                      </label>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 gap-1.5 rounded-md border p-3">
+                    {sortedPengawas.map((p) => {
+                      const beban = getBebanInfo(p.jumlahTugas);
+                      const isRecommended = p.jumlahTugas === minBeban;
+                      return (
+                        <div
+                          key={p.id}
+                          className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors ${
+                            selectedIds.has(p.id) ? "bg-primary/5" : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Checkbox
+                              id={`pg-${p.id}`}
+                              checked={selectedIds.has(p.id)}
+                              onCheckedChange={() => togglePengawas(p.id)}
+                            />
+                            <label
+                              htmlFor={`pg-${p.id}`}
+                              className="text-sm leading-none cursor-pointer select-none truncate"
+                            >
+                              {p.nama}
+                            </label>
+                            {isRecommended && !selectedIds.has(p.id) && (
+                              <span className="shrink-0 text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5 leading-none">
+                                Disarankan
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={`shrink-0 text-[10px] font-medium border rounded-full px-1.5 py-0.5 leading-none ${
+                              beban.className
+                            }`}
+                          >
+                            {beban.label}
+                          </span>
+                        </div>
+                      );
+                    })}
                 </div>
               )}
               {selectedIds.size > 0 && (
