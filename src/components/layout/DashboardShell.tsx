@@ -1,0 +1,48 @@
+"use client";
+
+import { useState } from "react";
+import { Header } from "@/components/layout/Header";
+import { Sidebar } from "@/components/layout/Sidebar";
+import type { NavRole } from "@/components/layout/navigation";
+
+interface DashboardShellProps {
+  children: React.ReactNode;
+  unreadDisposisiCount: number;
+  systemIdentity: { namaSistem: string; logoUrl: string | null };
+  userRole: NavRole | null;
+  userName?: string | null;
+  userId?: string;
+}
+
+export function DashboardShell({
+  children,
+  unreadDisposisiCount,
+  systemIdentity,
+  userRole,
+  userName,
+  userId,
+}: DashboardShellProps) {
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-background lg:flex">
+      <Sidebar
+        unreadDisposisiCount={unreadDisposisiCount}
+        systemIdentity={systemIdentity}
+        userRole={userRole}
+        mobileOpen={mobileSidebarOpen}
+        onMobileOpenChange={setMobileSidebarOpen}
+      />
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <Header
+          userName={userName}
+          userId={userId}
+          onOpenSidebar={() => setMobileSidebarOpen(true)}
+        />
+        <main className="flex-1 bg-linear-to-b from-background via-muted/30 to-background px-4 py-5 sm:px-5 sm:py-6 lg:px-6">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

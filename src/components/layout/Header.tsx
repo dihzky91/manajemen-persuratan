@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { LogOut, Search } from "lucide-react";
+import { LogOut, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTanggalLengkapJakarta } from "@/lib/utils";
 import { getNavigationItem } from "@/components/layout/navigation";
@@ -12,9 +12,10 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 interface HeaderProps {
   userName?: string | null;
   userId?: string;
+  onOpenSidebar?: () => void;
 }
 
-export function Header({ userName, userId }: HeaderProps) {
+export function Header({ userName, userId, onOpenSidebar }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const pathname = usePathname();
   const currentItem = getNavigationItem(pathname);
@@ -34,23 +35,35 @@ export function Header({ userName, userId }: HeaderProps) {
   }
 
   return (
-    <header className="border-b border-border bg-card/95 px-4 py-4 backdrop-blur lg:px-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">
+    <header className="sticky top-0 z-30 border-b border-border bg-card/95 px-4 py-3 backdrop-blur lg:px-6 lg:py-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="shrink-0 lg:hidden"
+            onClick={onOpenSidebar}
+            aria-label="Buka navigasi"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold text-foreground">
             {currentItem?.label ?? "Workspace"}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{todayLabel}</p>
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">{todayLabel}</p>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 sm:justify-end">
-          <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)}>
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label="Cari">
             <Search className="h-5 w-5" />
           </Button>
           {userId && <NotificationBell userId={userId} />}
-          <div className="h-6 w-px bg-border mx-1" />
-          <p className="text-sm font-medium text-foreground hidden sm:block">{userName || "Pengguna"}</p>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
+          <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
+          <p className="hidden text-sm font-medium text-foreground sm:block">{userName || "Pengguna"}</p>
+          <Button variant="outline" size="sm" onClick={handleLogout} className="shrink-0">
             <LogOut className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Keluar</span>
           </Button>

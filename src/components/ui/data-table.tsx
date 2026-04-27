@@ -64,7 +64,7 @@ export function DataTable<TData, TValue>({
   return (
     <div className="space-y-3">
       {searchCol ? (
-        <div className="relative max-w-sm">
+        <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={(searchCol.getFilterValue() as string) ?? ""}
@@ -75,8 +75,8 @@ export function DataTable<TData, TValue>({
         </div>
       ) : null}
 
-      <div className="rounded-md border bg-card">
-        <Table>
+      <div className="overflow-hidden rounded-md border bg-card">
+        <Table className="min-w-[42rem]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -121,7 +121,7 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="text-muted-foreground">
           {table.getFilteredRowModel().rows.length} baris
           {table.getPageCount() > 1 ? (
@@ -133,7 +133,7 @@ export function DataTable<TData, TValue>({
           ) : null}
         </div>
         {table.getPageCount() > 1 ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <Button
               variant="outline"
               size="sm"
