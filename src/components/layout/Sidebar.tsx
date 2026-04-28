@@ -15,14 +15,18 @@ import {
   navigationSections,
   type NavRole,
 } from "@/components/layout/navigation";
+import type { Capability } from "@/lib/rbac/capabilities";
 
 interface SidebarProps {
   unreadDisposisiCount?: number;
   unreadAnnouncementCount?: number;
   systemIdentity?: { namaSistem: string; logoUrl: string | null };
   userRole?: NavRole | null;
+  userCapabilities?: Capability[];
+  isSuperAdmin?: boolean;
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
+  pathname?: string;
 }
 
 export function Sidebar({
@@ -30,13 +34,18 @@ export function Sidebar({
   unreadAnnouncementCount = 0,
   systemIdentity,
   userRole,
+  userCapabilities = [],
+  isSuperAdmin = false,
   mobileOpen = false,
   onMobileOpenChange,
+  pathname: pathnameProp,
 }: SidebarProps) {
-  const pathname = usePathname();
+  const pathnameFromHook = usePathname();
+  const pathname = pathnameProp ?? pathnameFromHook;
   const appName = systemIdentity?.namaSistem ?? process.env.NEXT_PUBLIC_APP_NAME ?? "IAI Jakarta";
   const logoUrl = systemIdentity?.logoUrl ?? "/iai-logo.png";
   const activeItem = getNavigationItem(pathname);
+  const capabilitySet = new Set(userCapabilities);
 
   // Filter section + item berdasarkan role
   const visibleSections = navigationSections
@@ -44,8 +53,11 @@ export function Sidebar({
       ...section,
       items: section.items.filter(
         (item) =>
-          !item.allowedRoles ||
-          (userRole && item.allowedRoles.includes(userRole)),
+          isSuperAdmin ||
+          (item.requiredCapability
+            ? capabilitySet.has(item.requiredCapability)
+            : !item.allowedRoles ||
+              (userRole && item.allowedRoles.includes(userRole))),
       ),
     }))
     .filter((section) => section.items.length > 0);

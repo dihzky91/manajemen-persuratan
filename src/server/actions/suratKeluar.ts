@@ -148,7 +148,7 @@ export async function listSuratKeluar(): Promise<SuratKeluarRow[]> {
     .leftJoin(divisi, eq(suratKeluar.divisiId, divisi.id))
     .leftJoin(users, eq(suratKeluar.dibuatOleh, users.id))
     .leftJoin(pejabatPenandatangan, eq(suratKeluar.pejabatId, pejabatPenandatangan.id))
-    .orderBy(desc(suratKeluar.createdAt))
+    .orderBy(desc(suratKeluar.tanggalSurat))
     .limit(100);
 }
 

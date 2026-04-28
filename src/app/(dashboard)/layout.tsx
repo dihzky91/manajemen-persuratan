@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/server/actions/auth";
+import { headers } from "next/headers";
+import { getCurrentUserAccess, getSession } from "@/server/actions/auth";
 import { countUnreadAnnouncements } from "@/server/actions/announcements";
 import { countUnreadDisposisi } from "@/server/actions/disposisi";
 import { getSystemSettings } from "@/server/actions/systemSettings";
@@ -11,15 +12,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Defense-in-depth: proxy.ts sudah handle redirect berdasarkan cookie,
-  // tapi layout tetap validasi session ke DB untuk memastikan cookie tidak expired/invalid.
   const session = await getSession();
   if (!session) {
     redirect("/login");
   }
 
+  const access = await getCurrentUserAccess();
   const userRole =
-    (session.user as { role?: string } | undefined)?.role ?? null;
+    access?.role ?? (session.user as { role?: string } | undefined)?.role ?? null;
 
   const [unreadDisposisiCount, unreadAnnouncementCount, systemIdentity] = await Promise.all([
     countUnreadDisposisi(),
@@ -27,14 +27,23 @@ export default async function DashboardLayout({
     getSystemSettings(),
   ]);
 
+  // Ambil pathname dari header agar SSR match dengan client hydration
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname")
+    ?? headersList.get("next-url")
+    ?? "/dashboard";
+
   return (
     <DashboardShell
       unreadDisposisiCount={unreadDisposisiCount}
       unreadAnnouncementCount={unreadAnnouncementCount}
       systemIdentity={systemIdentity}
       userRole={userRole as "admin" | "staff" | "pejabat" | "viewer" | null}
+      userCapabilities={access?.capabilities ?? []}
+      isSuperAdmin={access?.isSuperAdmin ?? false}
       userName={session.user.name}
       userId={session.user.id}
+      pathname={pathname}
     >
       <AnnouncementToastNotifier unreadCount={unreadAnnouncementCount} />
       {children}

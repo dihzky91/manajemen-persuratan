@@ -21,6 +21,9 @@ const eventTypeColors: Record<string, string> = {
   rapat: "bg-purple-500",
   reminder: "bg-green-500",
   other: "bg-gray-500",
+  ujian: "bg-rose-500",
+  ujian_pengawas: "bg-orange-500",
+  admin_jaga: "bg-cyan-500",
 };
 
 const eventTypeLabels: Record<string, string> = {
@@ -29,6 +32,9 @@ const eventTypeLabels: Record<string, string> = {
   rapat: "Rapat",
   reminder: "Pengingat",
   other: "Lainnya",
+  ujian: "Ujian",
+  ujian_pengawas: "Pengawas",
+  admin_jaga: "Admin Jaga",
 };
 
 export function CalendarDashboard({ initialEvents, userId }: CalendarDashboardProps) {

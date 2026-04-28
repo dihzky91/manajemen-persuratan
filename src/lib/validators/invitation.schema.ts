@@ -3,7 +3,7 @@ import { z } from "zod";
 export const inviteUserSchema = z.object({
   email: z.string().email("Email tidak valid."),
   namaLengkap: z.string().min(1, "Nama lengkap wajib diisi."),
-  role: z.enum(["admin", "staff", "pejabat", "viewer"]).default("staff"),
+  roleId: z.number().int().positive("Role wajib dipilih."),
   divisiId: z.number().int().positive().optional(),
   jabatan: z.string().optional(),
 });

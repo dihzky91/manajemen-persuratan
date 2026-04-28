@@ -83,6 +83,16 @@ export const auth = betterAuth({
         defaultValue: "staff",
         input: false, // tidak bisa diisi user sendiri saat register
       },
+      roleId: {
+        type: "number",
+        required: false,
+        input: false,
+      },
+      isSuperAdmin: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+      },
       divisiId: {
         type: "number",
         required: false,

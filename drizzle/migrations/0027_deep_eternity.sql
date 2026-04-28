@@ -1,0 +1,1 @@
+DROP INDEX "calendar_events_entitas_unique";

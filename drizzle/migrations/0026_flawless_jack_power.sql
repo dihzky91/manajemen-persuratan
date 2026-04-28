@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "calendar_events_entitas_unique" ON "calendar_events" USING btree ("entitas_type","entitas_id");

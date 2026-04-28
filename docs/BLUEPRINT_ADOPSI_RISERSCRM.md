@@ -2,30 +2,56 @@
 
 ## Status Implementasi Terkini (28 April 2026)
 
-Ringkasan progres:
+Ringkasan progres setelah eksekusi Fase 0:
 
-1. Fase 0 (`Fondasi Akses`): berjalan/bertahap (belum dinyatakan selesai penuh di dokumen ini).
-2. Fase 1 (`Modul Announcement Internal`): **selesai (MVP + enhancement)**.
-3. Fase 2-4: belum dijalankan penuh.
+| Fase | Status |
+|------|--------|
+| Fase 0 - Fondasi Akses | Selesai secara implementasi codebase |
+| Fase 1 - Announcement | Selesai (MVP + enhancement) |
+| Fase 2 - Invitation Lifecycle | Selesai secara implementasi codebase |
+| Fase 3 - Dashboard Preference | Belum dimulai (di-defer) |
+| Fase 4 - Menu Dinamis + Extension | Selesai (capability-based nav live) |
 
-Rincian Fase 1 yang sudah live di codebase:
+Fase 0 yang sudah live:
 
-1. Halaman `Pengumuman` di dashboard.
-2. Inbox + Kelola Pengumuman (admin).
-3. CRUD pengumuman.
-4. Active window (`startDate`/`endDate`).
-5. Audience targeting (`all`/role/divisi).
-6. Attachment.
-7. Read/unread tracking per user (`announcement_reads`).
-8. Counter unread/butuh aksi di sidebar + notifier.
-9. Pin + draft status.
-10. **Wajib konfirmasi baca (acknowledgement)**:
-    - Flag `requires_ack` pada announcement.
-    - `acknowledged_at` per user.
-    - Tombol konfirmasi "Saya Sudah Membaca".
-    - Monitoring status baca vs konfirmasi pada sisi admin.
+- Tabel `roles` dan `role_capabilities`.
+- Kolom `is_super_admin` dan `role_id` di `users`.
+- Kolom `role_id` di `user_invitations`.
+- Registry capability statis di `src/lib/rbac/capabilities.ts`.
+- Guard `requireCapability` dan `requirePermission` berbasis capability DB.
+- Backward compatibility lewat `users.role` lama dan fallback `PERMISSION_MATRIX` selama transisi data.
+- Super admin melewati semua capability check.
+- UI `Pengaturan > Role` untuk CRUD role dan assign capability.
+- UI `Pengaturan > Manajemen User` untuk invite user dengan dynamic role, edit role/divisi, dan super admin flag.
+- Sidebar mulai difilter menggunakan capability (`requiredCapability`) dengan fallback role lama.
+- Migration `0024_dynamic_roles.sql` untuk seed role sistem (`staff`, `pejabat`, `viewer`), seed capability, dan backfill user lama.
 
-Catatan: enhancement acknowledgement ini menutup kebutuhan compliance untuk pengumuman penting tanpa mengubah pola UI utama.
+Catatan transisi:
+
+- `users.role` masih dipertahankan sebagai compatibility field untuk Better Auth session dan beberapa UI lama.
+- Status akun tetap memakai `isActive` + `activatedAt`; belum diubah menjadi enum 3-state agar tidak membuat breaking migration pada flow login existing.
+
+---
+
+### Detail Fase 4 — Selesai
+
+Yang sudah live:
+
+- `navigation.ts` — semua nav item punya `requiredCapability`.
+- `Sidebar` — filter `capabilitySet.has(requiredCapability)`, super admin bypass semua.
+- `DashboardShell` — terima `userCapabilities[]` + `isSuperAdmin` dari layout.
+- `layout.tsx` — fetch `getCurrentUserAccess()` tiap request, capabilities di-pass ke shell.
+- Fallback hybrid: item tanpa `requiredCapability` fallback ke `allowedRoles` selama transisi.
+
+Yang di-defer (tidak diimplementasi, dianggap tidak perlu saat ini):
+
+- Extension registry (`registerNavItem`, `registerDashboardWidget`, event hooks) — defer karena tidak ada rencana modul plugin eksternal.
+
+---
+
+### Hotfix pasca Fase 0
+
+- `permissionToCapability` di `src/server/actions/auth.ts` diekspor sebagai non-async function di file `"use server"` → Next.js error 500 di semua halaman dashboard. Fix: hapus `export`, jadikan internal helper. (28 April 2026)
 
 ## Tujuan
 

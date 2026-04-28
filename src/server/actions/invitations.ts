@@ -7,6 +7,7 @@ import {
   users,
   account,
   divisi,
+  roles,
   userInvitations,
   auditLog,
 } from "@/server/db/schema";
@@ -22,7 +23,7 @@ import {
   type CancelInviteInput,
   type ToggleUserStatusInput,
 } from "@/lib/validators/invitation.schema";
-import { requirePermission } from "./auth";
+import { requireCapability, requirePermission } from "./auth";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,8 @@ export type InvitationRow = {
   email: string;
   namaLengkap: string;
   role: "admin" | "staff" | "pejabat" | "viewer";
+  roleId: number | null;
+  roleName: string | null;
   divisiId: number | null;
   divisiNama: string | null;
   jabatan: string | null;
@@ -51,6 +54,9 @@ export type UserRow = {
   namaLengkap: string;
   email: string;
   role: "admin" | "staff" | "pejabat" | "viewer" | null;
+  roleId: number | null;
+  roleName: string | null;
+  isSuperAdmin: boolean;
   divisiId: number | null;
   divisiNama: string | null;
   jabatan: string | null;
@@ -74,6 +80,8 @@ export async function listInvitations(): Promise<InvitationRow[]> {
       email: userInvitations.email,
       namaLengkap: userInvitations.namaLengkap,
       role: userInvitations.role,
+      roleId: userInvitations.roleId,
+      roleName: roles.nama,
       divisiId: userInvitations.divisiId,
       divisiNama: divisi.nama,
       jabatan: userInvitations.jabatan,
@@ -84,6 +92,7 @@ export async function listInvitations(): Promise<InvitationRow[]> {
       createdAt: userInvitations.createdAt,
     })
     .from(userInvitations)
+    .leftJoin(roles, eq(userInvitations.roleId, roles.id))
     .leftJoin(divisi, eq(userInvitations.divisiId, divisi.id))
     .leftJoin(inviter, eq(userInvitations.invitedBy, inviter.id))
     .orderBy(desc(userInvitations.createdAt))
@@ -91,6 +100,7 @@ export async function listInvitations(): Promise<InvitationRow[]> {
 
   return rows.map((r) => ({
     ...r,
+    roleName: r.roleName ?? null,
     divisiNama: r.divisiNama ?? null,
     invitedByName: r.invitedByName ?? "Sistem",
   }));
@@ -105,6 +115,9 @@ export async function listUsersForManagement(): Promise<UserRow[]> {
       namaLengkap: users.namaLengkap,
       email: users.email,
       role: users.role,
+      roleId: users.roleId,
+      roleName: roles.nama,
+      isSuperAdmin: users.isSuperAdmin,
       divisiId: users.divisiId,
       divisiNama: divisi.nama,
       jabatan: users.jabatan,
@@ -112,6 +125,7 @@ export async function listUsersForManagement(): Promise<UserRow[]> {
       createdAt: users.createdAt,
     })
     .from(users)
+    .leftJoin(roles, eq(users.roleId, roles.id))
     .leftJoin(divisi, eq(users.divisiId, divisi.id))
     .orderBy(desc(users.createdAt))
     .limit(200);
@@ -119,28 +133,26 @@ export async function listUsersForManagement(): Promise<UserRow[]> {
 
 // ─── Invite ───────────────────────────────────────────────────────────────────
 
-// Hierarchy role: admin > pejabat > staff > viewer
-const ROLE_LEVEL: Record<string, number> = {
-  admin: 4,
-  pejabat: 3,
-  staff: 2,
-  viewer: 1,
-};
-
 export async function inviteUser(data: InviteUserInput) {
   const parsed = inviteUserSchema.parse(data);
-  const session = await requirePermission("manajemenUser", "create");
+  const session = await requireCapability("users:invite");
 
   // Privilege escalation guard — cegah invite role lebih tinggi dari diri sendiri
-  const sessionRole = (session.user as { role?: string }).role ?? "viewer";
-  const inviterLevel = ROLE_LEVEL[sessionRole] ?? 0;
-  const targetLevel = ROLE_LEVEL[parsed.role] ?? 0;
-  if (targetLevel > inviterLevel) {
-    return {
-      ok: false as const,
-      error: `Anda tidak dapat mengundang user dengan role "${parsed.role}" karena melebihi level akses Anda.`,
-    };
+  const [targetRole] = await db
+    .select({ id: roles.id, nama: roles.nama, kode: roles.kode })
+    .from(roles)
+    .where(eq(roles.id, parsed.roleId))
+    .limit(1);
+  if (!targetRole) {
+    return { ok: false as const, error: "Role tidak ditemukan." };
   }
+
+  const legacyRole =
+    targetRole.kode === "pejabat"
+      ? "pejabat"
+      : targetRole.kode === "viewer"
+        ? "viewer"
+        : "staff";
 
   // Cek email duplikat di tabel users
   const existingUser = await db
@@ -174,7 +186,8 @@ export async function inviteUser(data: InviteUserInput) {
     .values({
       email: parsed.email,
       namaLengkap: parsed.namaLengkap,
-      role: parsed.role,
+      role: legacyRole,
+      roleId: parsed.roleId,
       divisiId: parsed.divisiId,
       jabatan: parsed.jabatan,
       token,
@@ -189,7 +202,8 @@ export async function inviteUser(data: InviteUserInput) {
     id: userId,
     namaLengkap: parsed.namaLengkap,
     email: parsed.email,
-    role: parsed.role,
+    role: legacyRole,
+    roleId: parsed.roleId,
     divisiId: parsed.divisiId,
     jabatan: parsed.jabatan,
     isActive: false,
@@ -227,7 +241,8 @@ export async function inviteUser(data: InviteUserInput) {
     detail: {
       email: parsed.email,
       namaLengkap: parsed.namaLengkap,
-      role: parsed.role,
+      roleId: parsed.roleId,
+      roleName: targetRole.nama,
       inviteSent,
     },
   });

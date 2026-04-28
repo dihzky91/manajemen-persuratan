@@ -6,12 +6,18 @@ import { ProfilAkunCard } from "@/components/pengaturan/ProfilAkunCard";
 import { NotifikasiPreferencesCard } from "@/components/pengaturan/NotifikasiPreferencesCard";
 import { SistemStatusSection } from "@/components/pengaturan/SistemStatusSection";
 import { ManajemenUserCard } from "@/components/pengaturan/ManajemenUserCard";
+import { RoleManagementCard } from "@/components/pengaturan/RoleManagementCard";
 import { PengaturanTabs } from "@/components/pengaturan/PengaturanTabs";
 import { getSystemSettings, getSessionRole } from "@/server/actions/systemSettings";
 import { getMyProfile } from "@/server/actions/profile";
 import { getMyNotificationPreferences } from "@/server/actions/notificationPreferences";
 import { listInvitations, listUsersForManagement } from "@/server/actions/invitations";
 import { listDivisi } from "@/server/actions/divisi";
+import {
+  listCapabilityMetadata,
+  listRoleManagementRows,
+  listRoleOptions,
+} from "@/server/actions/roles";
 
 export const metadata: Metadata = {
   title: "Pengaturan | Manajemen Surat IAI Jakarta",
@@ -35,12 +41,18 @@ export default async function PengaturanPage() {
   let invitations: Awaited<ReturnType<typeof listInvitations>> = [];
   let userRows: Awaited<ReturnType<typeof listUsersForManagement>> = [];
   let divisiOptions: Array<{ id: number; nama: string }> = [];
+  let roleOptions: Awaited<ReturnType<typeof listRoleOptions>> = [];
+  let roleRows: Awaited<ReturnType<typeof listRoleManagementRows>> = [];
+  let capabilityMetadata: Awaited<ReturnType<typeof listCapabilityMetadata>> | null = null;
 
   if (isAdmin) {
-    [invitations, userRows, divisiOptions] = await Promise.all([
+    [invitations, userRows, divisiOptions, roleOptions, roleRows, capabilityMetadata] = await Promise.all([
       listInvitations(),
       listUsersForManagement(),
       listDivisi().then((rows) => rows.map((r) => ({ id: r.id, nama: r.nama }))),
+      listRoleOptions(),
+      listRoleManagementRows(),
+      listCapabilityMetadata(),
     ]);
   }
 
@@ -70,6 +82,16 @@ export default async function PengaturanPage() {
               invitations={invitations}
               users={userRows}
               divisiOptions={divisiOptions}
+              roleOptions={roleOptions}
+            />
+          ) : undefined
+        }
+        roleManagement={
+          isAdmin && capabilityMetadata ? (
+            <RoleManagementCard
+              roles={roleRows}
+              capabilityGroups={capabilityMetadata.groups}
+              capabilityLabels={capabilityMetadata.labels}
             />
           ) : undefined
         }

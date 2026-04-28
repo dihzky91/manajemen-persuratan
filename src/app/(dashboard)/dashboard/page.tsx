@@ -20,6 +20,7 @@ import { getStatistikUjian } from "@/server/actions/jadwal-ujian/bebanKerja";
 import { formatTanggalWaktuJakarta } from "@/lib/utils";
 import { StatsCharts, StatsSummary } from "@/components/dashboard/StatsCharts";
 import { UjianDashboardWidget } from "@/components/jadwal-ujian/UjianDashboardWidget";
+import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 
 export const metadata: Metadata = {
   title: "Dashboard | Manajemen Surat IAI Jakarta",
@@ -79,162 +80,171 @@ export default async function DashboardPage() {
     .slice(0, 6);
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Surat Masuk Baru"
-          value={String(suratMasukBaru.length)}
-          hint={`${suratMasukProses.length} sedang diproses`}
-          href="/surat-masuk"
-          icon={Inbox}
-        />
-        <MetricCard
-          label="Disposisi Belum Dibaca"
-          value={String(unreadDisposisiCount)}
-          hint={`${disposisiAktif.length} disposisi aktif`}
-          href="/disposisi"
-          icon={Mail}
-        />
-        <MetricCard
-          label="Perlu Review"
-          value={String(suratKeluarReview.length)}
-          hint="Surat keluar menunggu persetujuan atau reviu"
-          href="/surat-keluar"
-          icon={PenLine}
-        />
-        <MetricCard
-          label="Pengarsipan"
-          value={String(suratKeluarArsip.length)}
-          hint="Siapkan nomor, QR, dan file final"
-          href="/surat-keluar"
-          icon={FileText}
-        />
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <UjianDashboardWidget data={statistikUjian} />
-      </section>
-
-      <StatsSummary stats={stats} />
-      <StatsCharts stats={stats} />
-
-      <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Pekerjaan Perlu Ditindaklanjuti
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ringkasan antrean operasional dari surat masuk, disposisi, dan surat keluar.
-              </p>
-            </div>
-            <Button asChild className="w-full sm:w-auto">
-              <Link href="/surat-masuk">
-                Input Surat Masuk
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-
-          <div className="mt-5 grid gap-3 sm:mt-6">
-            <WorkItem
-              title="Surat masuk baru"
-              description="Periksa surat yang baru diterima, lengkapi detail, lalu teruskan ke disposisi bila perlu."
-              value={suratMasukBaru.length}
+    <DashboardTabs
+      ringkasan={
+        <>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Surat Masuk Baru"
+              value={String(suratMasukBaru.length)}
+              hint={`${suratMasukProses.length} sedang diproses`}
               href="/surat-masuk"
               icon={Inbox}
-              action="Kelola"
             />
-            <WorkItem
-              title="Disposisi aktif"
-              description="Buka instruksi yang belum selesai dan tindak lanjuti sesuai batas waktu."
-              value={disposisiAktif.length}
+            <MetricCard
+              label="Disposisi Belum Dibaca"
+              value={String(unreadDisposisiCount)}
+              hint={`${disposisiAktif.length} disposisi aktif`}
               href="/disposisi"
               icon={Mail}
-              action="Buka inbox"
             />
-            <WorkItem
-              title="Surat keluar perlu review"
-              description="Surat yang menunggu persetujuan atau proses reviu sebelum masuk pengarsipan."
-              value={suratKeluarReview.length}
+            <MetricCard
+              label="Perlu Review"
+              value={String(suratKeluarReview.length)}
+              hint="Surat keluar menunggu persetujuan atau reviu"
               href="/surat-keluar"
-              icon={Send}
-              action="Review"
+              icon={PenLine}
             />
-            <WorkItem
-              title="Surat keluar pengarsipan"
-              description="Pastikan nomor surat, QR verifikasi, dan file final sudah lengkap."
-              value={suratKeluarArsip.length}
+            <MetricCard
+              label="Pengarsipan"
+              value={String(suratKeluarArsip.length)}
+              hint="Siapkan nomor, QR, dan file final"
               href="/surat-keluar"
-              icon={CheckCircle2}
-              action="Lengkapi"
+              icon={FileText}
             />
-          </div>
-        </div>
+          </section>
 
-        <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
-          <h2 className="text-lg font-semibold text-foreground">Aksi Cepat</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Jalur singkat ke pekerjaan yang paling sering dipakai.
-          </p>
-
-          <div className="mt-5 grid gap-3 sm:mt-6">
-            <QuickAction href="/surat-masuk" label="Catat surat masuk" icon={Inbox} />
-            <QuickAction href="/surat-keluar" label="Buat surat keluar" icon={Send} />
-            <QuickAction href="/disposisi" label="Buka disposisi" icon={Mail} />
-            <QuickAction href="/nomor-surat" label="Generate nomor surat" icon={FileText} />
-            <QuickAction href="/pengaturan" label="Cek pengaturan sistem" icon={Timer} />
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Aktivitas Terbaru</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Item terbaru dari modul persuratan yang perlu mudah dipantau.
-            </p>
-          </div>
-          <Badge variant="outline">{recentItems.length} item</Badge>
-        </div>
-
-        <div className="mt-6 divide-y divide-border rounded-2xl border border-border">
-          {recentItems.length ? (
-            recentItems.map((item) => (
-              <Link
-                key={`${item.type}-${item.id}`}
-                href={item.href}
-                className="flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-muted/45 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary" className="rounded-full">
-                      {item.type}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {formatTanggalWaktuJakarta(item.date)}
-                    </span>
-                  </div>
-                  <p className="mt-2 truncate text-sm font-medium text-foreground">
-                    {item.title}
+          <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+            <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Pekerjaan Perlu Ditindaklanjuti
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Ringkasan antrean operasional dari surat masuk, disposisi, dan surat keluar.
                   </p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{item.meta}</p>
                 </div>
-                <Badge variant="outline" className="w-fit shrink-0 rounded-full">
-                  {item.status}
-                </Badge>
-              </Link>
-            ))
-          ) : (
-            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              Belum ada aktivitas persuratan.
+                <Button asChild className="w-full sm:w-auto">
+                  <Link href="/surat-masuk">
+                    Input Surat Masuk
+                    <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:mt-6">
+                <WorkItem
+                  title="Surat masuk baru"
+                  description="Periksa surat yang baru diterima, lengkapi detail, lalu teruskan ke disposisi bila perlu."
+                  value={suratMasukBaru.length}
+                  href="/surat-masuk"
+                  icon={Inbox}
+                  action="Kelola"
+                />
+                <WorkItem
+                  title="Disposisi aktif"
+                  description="Buka instruksi yang belum selesai dan tindak lanjuti sesuai batas waktu."
+                  value={disposisiAktif.length}
+                  href="/disposisi"
+                  icon={Mail}
+                  action="Buka inbox"
+                />
+                <WorkItem
+                  title="Surat keluar perlu review"
+                  description="Surat yang menunggu persetujuan atau proses reviu sebelum masuk pengarsipan."
+                  value={suratKeluarReview.length}
+                  href="/surat-keluar"
+                  icon={Send}
+                  action="Review"
+                />
+                <WorkItem
+                  title="Surat keluar pengarsipan"
+                  description="Pastikan nomor surat, QR verifikasi, dan file final sudah lengkap."
+                  value={suratKeluarArsip.length}
+                  href="/surat-keluar"
+                  icon={CheckCircle2}
+                  action="Lengkapi"
+                />
+              </div>
             </div>
-          )}
-        </div>
-      </section>
-    </div>
+
+            <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="text-lg font-semibold text-foreground">Aksi Cepat</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Jalur singkat ke pekerjaan yang paling sering dipakai.
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:mt-6">
+                <QuickAction href="/surat-masuk" label="Catat surat masuk" icon={Inbox} />
+                <QuickAction href="/surat-keluar" label="Buat surat keluar" icon={Send} />
+                <QuickAction href="/disposisi" label="Buka disposisi" icon={Mail} />
+                <QuickAction href="/nomor-surat" label="Generate nomor surat" icon={FileText} />
+                <QuickAction href="/pengaturan" label="Cek pengaturan sistem" icon={Timer} />
+              </div>
+            </div>
+          </section>
+        </>
+      }
+      analitik={
+        <>
+          <StatsSummary stats={stats} />
+          <StatsCharts stats={stats} />
+        </>
+      }
+      aktivitas={
+        <section className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Aktivitas Terbaru</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Item terbaru dari modul persuratan yang perlu mudah dipantau.
+              </p>
+            </div>
+            <Badge variant="outline">{recentItems.length} item</Badge>
+          </div>
+
+          <div className="mt-6 divide-y divide-border rounded-2xl border border-border">
+            {recentItems.length ? (
+              recentItems.map((item) => (
+                <Link
+                  key={`${item.type}-${item.id}`}
+                  href={item.href}
+                  className="flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-muted/45 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="rounded-full">
+                        {item.type}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatTanggalWaktuJakarta(item.date)}
+                      </span>
+                    </div>
+                    <p className="mt-2 truncate text-sm font-medium text-foreground">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{item.meta}</p>
+                  </div>
+                  <Badge variant="outline" className="w-fit shrink-0 rounded-full">
+                    {item.status}
+                  </Badge>
+                </Link>
+              ))
+            ) : (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                Belum ada aktivitas persuratan.
+              </div>
+            )}
+          </div>
+        </section>
+      }
+      ujian={
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <UjianDashboardWidget data={statistikUjian} />
+        </section>
+      }
+    />
   );
 }
 

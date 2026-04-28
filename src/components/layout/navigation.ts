@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpen,
   Building2,
+  Calendar,
   CalendarDays,
   ClipboardList,
   FileSignature,
@@ -25,6 +26,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import type { Capability } from "@/lib/rbac/capabilities";
 
 export type NavRole = "admin" | "staff" | "pejabat" | "viewer";
 
@@ -36,6 +38,7 @@ export interface NavigationItem {
   statusLabel?: string;
   /** Jika diset, hanya role yang terdaftar di sini yang akan melihat item ini. */
   allowedRoles?: NavRole[];
+  requiredCapability?: Capability;
 }
 
 export interface NavigationSection {
@@ -58,12 +61,14 @@ export const navigationSections: NavigationSection[] = [
         label: "Kalender",
         icon: CalendarDays,
         active: true,
+        requiredCapability: "calendar:view",
       },
       {
         href: "/pengumuman",
         label: "Pengumuman",
         icon: Megaphone,
         active: true,
+        requiredCapability: "announcement:view",
       },
     ],
   },
@@ -76,6 +81,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Users,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "pegawai:view",
       },
       {
         href: "/divisi",
@@ -83,6 +89,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Building2,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "divisi:view",
       },
     ],
   },
@@ -94,6 +101,7 @@ export const navigationSections: NavigationSection[] = [
         label: "Surat Keluar",
         icon: Send,
         active: true,
+        requiredCapability: "surat_keluar:view",
         // semua role yang login bisa lihat arsip
       },
       {
@@ -101,12 +109,14 @@ export const navigationSections: NavigationSection[] = [
         label: "Surat Masuk",
         icon: Inbox,
         active: true,
+        requiredCapability: "surat_masuk:view",
       },
       {
         href: "/disposisi",
         label: "Disposisi",
         icon: Mail,
         active: true,
+        requiredCapability: "disposisi:view",
       },
     ],
   },
@@ -119,6 +129,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Award,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "sertifikat:view",
       },
       {
         href: "/sertifikat/nomor",
@@ -126,6 +137,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Hash,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "sertifikat:manage",
       },
       {
         href: "/sertifikat/nomor/rekap",
@@ -133,6 +145,7 @@ export const navigationSections: NavigationSection[] = [
         icon: BarChart2,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "sertifikat:export",
       },
       {
         href: "/sertifikat/peserta",
@@ -140,6 +153,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Users,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "sertifikat:view",
       },
       {
         href: "/sertifikat/penandatangan",
@@ -147,6 +161,7 @@ export const navigationSections: NavigationSection[] = [
         icon: BadgeCheck,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "sertifikat:manage",
       },
       {
         href: "/sertifikat/template",
@@ -154,6 +169,7 @@ export const navigationSections: NavigationSection[] = [
         icon: FileImage,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "sertifikat:configure",
       },
       {
         href: "/sertifikat/analytics",
@@ -161,6 +177,7 @@ export const navigationSections: NavigationSection[] = [
         icon: BarChart3,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "sertifikat:view",
       },
       {
         href: "/sertifikat/audit-log",
@@ -168,6 +185,7 @@ export const navigationSections: NavigationSection[] = [
         icon: ScrollText,
         active: true,
         allowedRoles: ["staff"],
+        requiredCapability: "audit_log:manage",
       },
       {
         href: "/sertifikat/sampah",
@@ -175,6 +193,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Trash2,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "sertifikat:configure",
       },
     ],
   },
@@ -187,6 +206,7 @@ export const navigationSections: NavigationSection[] = [
         icon: ClipboardList,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:view",
       },
       {
         href: "/jadwal-ujian/admin-jaga",
@@ -194,12 +214,14 @@ export const navigationSections: NavigationSection[] = [
         icon: ShieldCheck,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:manage",
       },
       {
         href: "/jadwal-ujian/penugasan",
         label: "Jadwal Pengawas",
         icon: UserCheck,
         active: true,
+        requiredCapability: "jadwal_ujian:view",
       },
       {
         href: "/jadwal-ujian/beban-kerja",
@@ -207,6 +229,7 @@ export const navigationSections: NavigationSection[] = [
         icon: BarChart2,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:view",
       },
       {
         href: "/jadwal-ujian/pengawas",
@@ -214,6 +237,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Users,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:manage",
       },
       {
         href: "/jadwal-ujian/kelas",
@@ -221,6 +245,7 @@ export const navigationSections: NavigationSection[] = [
         icon: BookOpen,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:manage",
       },
       {
         href: "/jadwal-ujian/materi",
@@ -228,6 +253,7 @@ export const navigationSections: NavigationSection[] = [
         icon: ClipboardList,
         active: true,
         allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:manage",
       },
       {
         href: "/jadwal-ujian/pengaturan",
@@ -235,6 +261,28 @@ export const navigationSections: NavigationSection[] = [
         icon: Settings,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "jadwal_ujian:configure",
+      },
+    ],
+  },
+  {
+    title: "Jadwal Otomatis",
+    items: [
+      {
+        href: "/jadwal-otomatis",
+        label: "Jadwal Brevet",
+        icon: Calendar,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:view",
+      },
+      {
+        href: "/jadwal-otomatis/instruktur",
+        label: "Instruktur",
+        icon: Users,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:manage",
       },
     ],
   },
@@ -247,6 +295,7 @@ export const navigationSections: NavigationSection[] = [
         icon: FileText,
         active: true,
         allowedRoles: ["admin", "pejabat"],
+        requiredCapability: "surat_keputusan:view",
       },
       {
         href: "/surat-mou",
@@ -254,6 +303,7 @@ export const navigationSections: NavigationSection[] = [
         icon: FileSignature,
         active: true,
         allowedRoles: ["admin", "pejabat"],
+        requiredCapability: "surat_mou:view",
       },
       {
         href: "/nomor-surat",
@@ -261,6 +311,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Hash,
         active: true,
         allowedRoles: ["admin", "pejabat"],
+        requiredCapability: "nomor_surat:view",
       },
       {
         href: "/pejabat",
@@ -268,6 +319,7 @@ export const navigationSections: NavigationSection[] = [
         icon: UserCog,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "pejabat:view",
       },
       {
         href: "/pengaturan",
@@ -275,6 +327,7 @@ export const navigationSections: NavigationSection[] = [
         icon: Settings,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "pengaturan:view",
       },
       {
         href: "/audit-log",
@@ -282,6 +335,7 @@ export const navigationSections: NavigationSection[] = [
         icon: ShieldCheck,
         active: true,
         allowedRoles: ["admin"],
+        requiredCapability: "audit_log:view",
       },
     ],
   },

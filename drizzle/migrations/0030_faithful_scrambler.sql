@@ -1,0 +1,1 @@
+ALTER TABLE "kelas_pelatihan" ADD COLUMN "mode" varchar(10) DEFAULT 'offline' NOT NULL;

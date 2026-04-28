@@ -169,6 +169,55 @@
       "when": 1777363800000,
       "tag": "0023_add_activated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1777366800000,
+      "tag": "0024_dynamic_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1777393135881,
+      "tag": "0025_fat_black_bolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1777395278218,
+      "tag": "0026_flawless_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1777395406651,
+      "tag": "0027_deep_eternity",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1777395855953,
+      "tag": "0028_ambiguous_kang",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1777397263109,
+      "tag": "0029_eager_jack_flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1777398682832,
+      "tag": "0030_faithful_scrambler",
+      "breakpoints": true
     }
   ]
 }

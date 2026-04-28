@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { systemSettings, auditLog } from "@/server/db/schema";
 import { systemSettingsUpdateSchema } from "@/lib/validators/systemSettings.schema";
-import { requirePermission, getSession } from "./auth";
+import { getCurrentUserAccess, requirePermission, getSession } from "./auth";
 import { getStorageProvider } from "@/lib/storage";
 import { env } from "@/lib/env";
 
@@ -159,7 +159,9 @@ export async function updateSystemSettings(formData: FormData) {
 
 // Untuk cek role di pengaturan page (server component)
 export async function getSessionRole(): Promise<string | null> {
+  const access = await getCurrentUserAccess();
+  if (access?.isSuperAdmin) return "admin";
+  if (access?.role) return access.role;
   const session = await getSession();
-  if (!session) return null;
-  return (session.user as { role?: string }).role ?? null;
+  return session ? ((session.user as { role?: string }).role ?? null) : null;
 }

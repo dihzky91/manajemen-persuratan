@@ -133,6 +133,35 @@ export const divisi = pgTable("divisi", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Dynamic role foundation. `users.role` tetap disimpan sementara sebagai
+// compatibility field untuk flow lama dan session Better Auth.
+export const roles = pgTable("roles", {
+  id: serial("id").primaryKey(),
+  nama: varchar("nama", { length: 150 }).notNull(),
+  kode: varchar("kode", { length: 50 }).notNull().unique(),
+  isSystem: boolean("is_system").default(false).notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const roleCapabilities = pgTable(
+  "role_capabilities",
+  {
+    roleId: integer("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    capability: varchar("capability", { length: 100 }).notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({
+      columns: [t.roleId, t.capability],
+      name: "role_capabilities_pk",
+    }),
+    capabilityIdx: index("role_capabilities_capability_idx").on(t.capability),
+  }),
+);
+
 // ─── USERS (akun login + data dasar pegawai) ─────────────────────────────────
 
 export const users = pgTable("users", {
@@ -145,6 +174,8 @@ export const users = pgTable("users", {
   emailPribadi: varchar("email_pribadi", { length: 150 }),
   noHp: varchar("no_hp", { length: 20 }),
   role: roleEnum("role").default("staff"),
+  isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
+  roleId: integer("role_id").references(() => roles.id),
   divisiId: integer("divisi_id").references(() => divisi.id),
   jabatan: varchar("jabatan", { length: 150 }),
   levelJabatan: varchar("level_jabatan", { length: 50 }),
@@ -567,6 +598,9 @@ export const calendarEventTypeEnum = pgEnum("calendar_event_type", [
   "rapat",
   "reminder",
   "other",
+  "ujian",
+  "ujian_pengawas",
+  "admin_jaga",
 ]);
 
 export const calendarEvents = pgTable("calendar_events", {
@@ -901,6 +935,7 @@ export const userInvitations = pgTable(
     email: varchar("email", { length: 150 }).notNull(),
     namaLengkap: varchar("nama_lengkap", { length: 200 }).notNull(),
     role: roleEnum("role").default("staff").notNull(),
+    roleId: integer("role_id").references(() => roles.id),
     divisiId: integer("divisi_id").references(() => divisi.id),
     jabatan: varchar("jabatan", { length: 150 }),
     token: text("token").notNull().unique(),
@@ -924,6 +959,10 @@ export const userInvitations = pgTable(
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Divisi = typeof divisi.$inferSelect;
+export type RoleRow = typeof roles.$inferSelect;
+export type NewRole = typeof roles.$inferInsert;
+export type RoleCapability = typeof roleCapabilities.$inferSelect;
+export type NewRoleCapability = typeof roleCapabilities.$inferInsert;
 export type SuratKeluar = typeof suratKeluar.$inferSelect;
 export type NewSuratKeluar = typeof suratKeluar.$inferInsert;
 export type SuratMasuk = typeof suratMasuk.$inferSelect;
@@ -1062,6 +1101,241 @@ export const certificateItems = pgTable(
     index("cert_items_status_idx").on(t.status),
   ],
 );
+
+// ─── JADWAL OTOMATIS BREVET ──────────────────────────────────────────────────
+
+export const programs = pgTable("programs", {
+  id: text("id").primaryKey(),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  totalSessions: integer("total_sessions").notNull(),
+  totalMeetings: integer("total_meetings").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Tipe kelas yang tersedia: weekend_pagi, weekend_siang, weekday_selasa_kamis, weekday_senin_rabu_jumat
+export const classTypes = pgTable("class_types", {
+  id: text("id").primaryKey(),
+  code: varchar("code", { length: 30 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  activeDays: varchar("active_days", { length: 100 }).notNull(), // "Sat,Sun" | "Tue,Thu" | "Mon,Wed,Fri"
+  slot1Start: varchar("slot1_start", { length: 5 }).notNull(),
+  slot1End: varchar("slot1_end", { length: 5 }).notNull(),
+  slot2Start: varchar("slot2_start", { length: 5 }).notNull(),
+  slot2End: varchar("slot2_end", { length: 5 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Template kurikulum per program (seed data)
+export const curriculumTemplate = pgTable(
+  "curriculum_template",
+  {
+    id: text("id").primaryKey(),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    sessionNumber: integer("session_number").notNull(),
+    materiBlock: varchar("materi_block", { length: 100 }).notNull(),
+    materiName: varchar("materi_name", { length: 200 }).notNull(),
+    slot: integer("slot").notNull(), // 1 atau 2
+  },
+  (t) => [
+    index("ct_program_session").on(t.programId, t.sessionNumber),
+  ],
+);
+
+// Definisi titik ujian per program
+export const curriculumExamPoints = pgTable(
+  "curriculum_exam_points",
+  {
+    id: text("id").primaryKey(),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    afterSessionNumber: integer("after_session_number").notNull(),
+    isMixedDay: boolean("is_mixed_day").default(false).notNull(),
+    examSlotCount: integer("exam_slot_count").notNull(), // 1 atau 2
+    examSubjects: text("exam_subjects").array().notNull(),
+    hasExam: boolean("has_exam").default(true).notNull(),
+  },
+  (t) => [
+    index("cep_program_session").on(t.programId, t.afterSessionNumber),
+  ],
+);
+
+// Libur nasional
+export const nationalHolidays = pgTable(
+  "national_holidays",
+  {
+    id: text("id").primaryKey(),
+    date: date("date").notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    year: integer("year").notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_holiday_date").on(t.date),
+    index("holiday_year_idx").on(t.year),
+  ],
+);
+
+// Kelas pelatihan (bukan kelas ujian dari jadwal_ujian module)
+export const kelasPelatihan = pgTable("kelas_pelatihan", {
+  id: text("id").primaryKey(),
+  namaKelas: varchar("nama_kelas", { length: 200 }).notNull(),
+  programId: text("program_id")
+    .notNull()
+    .references(() => programs.id),
+  classTypeId: text("class_type_id")
+    .notNull()
+    .references(() => classTypes.id),
+  mode: varchar("mode", { length: 10 }).notNull().default("offline"), // offline | online
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  lokasi: varchar("lokasi", { length: 300 }),
+  status: varchar("status", { length: 20 }).default("active").notNull(), // active | completed | cancelled
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Tanggal eksklusi per kelas
+export const classExcludedDates = pgTable(
+  "class_excluded_dates",
+  {
+    id: text("id").primaryKey(),
+    kelasId: text("kelas_id")
+      .notNull()
+      .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    reason: varchar("reason", { length: 200 }),
+  },
+  (t) => [
+    uniqueIndex("uniq_kelas_excluded_date").on(t.kelasId, t.date),
+  ],
+);
+
+// Sesi kelas yang di-generate
+export const classSessions = pgTable(
+  "class_sessions",
+  {
+    id: text("id").primaryKey(),
+    kelasId: text("kelas_id")
+      .notNull()
+      .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
+    sessionNumber: integer("session_number"), // null untuk hari ujian
+    isExamDay: boolean("is_exam_day").default(false).notNull(),
+    examSubjects: text("exam_subjects").array(),
+    scheduledDate: date("scheduled_date").notNull(),
+    timeSlotStart: varchar("time_slot_start", { length: 5 }).notNull(),
+    timeSlotEnd: varchar("time_slot_end", { length: 5 }).notNull(),
+    materiName: varchar("materi_name", { length: 200 }),
+    status: varchar("status", { length: 20 }).default("scheduled").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("cs_kelas_date").on(t.kelasId, t.scheduledDate),
+  ],
+);
+
+// ─── INSTRUKTUR (Phase 2) ─────────────────────────────────────────────────────
+
+export const instructors = pgTable("instructors", {
+  id: text("id").primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  email: varchar("email", { length: 150 }),
+  phone: varchar("phone", { length: 30 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Keahlian per instruktur (many-to-many)
+export const instructorExpertise = pgTable(
+  "instructor_expertise",
+  {
+    id: text("id").primaryKey(),
+    instructorId: text("instructor_id")
+      .notNull()
+      .references(() => instructors.id, { onDelete: "cascade" }),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    materiBlock: varchar("materi_block", { length: 100 }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_instructor_expertise").on(t.instructorId, t.programId, t.materiBlock),
+    index("ie_program_block").on(t.programId, t.materiBlock),
+  ],
+);
+
+// Ketidaktersediaan instruktur
+export const instructorUnavailability = pgTable(
+  "instructor_unavailability",
+  {
+    id: text("id").primaryKey(),
+    instructorId: text("instructor_id")
+      .notNull()
+      .references(() => instructors.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    reason: varchar("reason", { length: 200 }),
+  },
+  (t) => [
+    uniqueIndex("uniq_instructor_unavail").on(t.instructorId, t.date),
+    index("iu_date_idx").on(t.date),
+  ],
+);
+
+// Assignment instruktur per sesi
+export const sessionAssignments = pgTable(
+  "session_assignments",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => classSessions.id, { onDelete: "cascade" }),
+    plannedInstructorId: text("planned_instructor_id")
+      .notNull()
+      .references(() => instructors.id),
+    actualInstructorId: text("actual_instructor_id")
+      .references(() => instructors.id),
+    substitutionReason: varchar("substitution_reason", { length: 300 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_session_instructor").on(t.sessionId, t.plannedInstructorId),
+    index("sa_instructor_idx").on(t.plannedInstructorId),
+    index("sa_actual_instructor_idx").on(t.actualInstructorId),
+  ],
+);
+
+// ─── TYPE EXPORTS (Jadwal Otomatis Brevet) ────────────────────────────────────
+
+export type Program = typeof programs.$inferSelect;
+export type NewProgram = typeof programs.$inferInsert;
+export type ClassType = typeof classTypes.$inferSelect;
+export type NewClassType = typeof classTypes.$inferInsert;
+export type CurriculumTemplate = typeof curriculumTemplate.$inferSelect;
+export type NewCurriculumTemplate = typeof curriculumTemplate.$inferInsert;
+export type CurriculumExamPoint = typeof curriculumExamPoints.$inferSelect;
+export type NewCurriculumExamPoint = typeof curriculumExamPoints.$inferInsert;
+export type NationalHoliday = typeof nationalHolidays.$inferSelect;
+export type NewNationalHoliday = typeof nationalHolidays.$inferInsert;
+export type KelasPelatihan = typeof kelasPelatihan.$inferSelect;
+export type NewKelasPelatihan = typeof kelasPelatihan.$inferInsert;
+export type ClassExcludedDate = typeof classExcludedDates.$inferSelect;
+export type NewClassExcludedDate = typeof classExcludedDates.$inferInsert;
+export type ClassSession = typeof classSessions.$inferSelect;
+export type NewClassSession = typeof classSessions.$inferInsert;
+export type Instructor = typeof instructors.$inferSelect;
+export type NewInstructor = typeof instructors.$inferInsert;
+export type InstructorExpertise = typeof instructorExpertise.$inferSelect;
+export type NewInstructorExpertise = typeof instructorExpertise.$inferInsert;
+export type InstructorUnavailability = typeof instructorUnavailability.$inferSelect;
+export type NewInstructorUnavailability = typeof instructorUnavailability.$inferInsert;
+export type SessionAssignment = typeof sessionAssignments.$inferSelect;
+export type NewSessionAssignment = typeof sessionAssignments.$inferInsert;
 
 // ─── TYPE EXPORTS (Penomoran Sertifikat) ─────────────────────────────────────
 

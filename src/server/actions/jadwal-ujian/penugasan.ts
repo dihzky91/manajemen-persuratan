@@ -7,6 +7,10 @@ import { db } from "@/server/db";
 import { penugasanPengawas, jadwalUjian, pengawas, kelasUjian, auditLog } from "@/server/db/schema";
 import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
+  syncPenugasanPengawasEvent,
+  removePenugasanPengawasEvent,
+} from "@/server/actions/calendar";
+import {
   assignPengawasSchema,
   type AssignPengawasInput,
 } from "@/lib/validators/jadwalUjian.schema";
@@ -217,9 +221,24 @@ export async function assignPengawas(data: AssignPengawasInput) {
       },
     });
 
+    // Sync to calendar
+    const [ppKelas] = await db
+      .select({ namaKelas: kelasUjian.namaKelas })
+      .from(kelasUjian)
+      .innerJoin(jadwalUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
+      .where(eq(jadwalUjian.id, parsed.ujianId));
+    const [ppNama] = await db
+      .select({ nama: pengawas.nama })
+      .from(pengawas)
+      .where(eq(pengawas.id, parsed.pengawasId));
+    if (ppKelas && ppNama) {
+      await syncPenugasanPengawasEvent(id, ppNama.nama, ujian.mataPelajaran, ppKelas.namaKelas, ujian.tanggalUjian, ujian.jamMulai, ujian.jamSelesai);
+    }
+
     revalidatePath("/jadwal-ujian");
     revalidatePath(`/jadwal-ujian/${parsed.ujianId}`);
     revalidatePath("/jadwal-ujian/penugasan");
+    revalidatePath("/kalender");
 
     return { ok: true as const, data: row, konflik };
   } catch (err) {
@@ -240,6 +259,7 @@ export async function unassignPengawas(penugasanId: string) {
 
   if (!existing[0]) return { ok: false as const, error: "Penugasan tidak ditemukan." };
 
+  await removePenugasanPengawasEvent(penugasanId);
   await db.delete(penugasanPengawas).where(eq(penugasanPengawas.id, penugasanId));
 
   await db.insert(auditLog).values({
@@ -253,6 +273,7 @@ export async function unassignPengawas(penugasanId: string) {
   revalidatePath("/jadwal-ujian");
   revalidatePath(`/jadwal-ujian/${existing[0].ujianId}`);
   revalidatePath("/jadwal-ujian/penugasan");
+  revalidatePath("/kalender");
 
   return { ok: true as const };
 }

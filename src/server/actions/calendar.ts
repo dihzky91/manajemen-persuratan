@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/server/db";
-import { calendarEvents, type CalendarEvent, disposisi, suratKeluar } from "@/server/db/schema";
-import { eq, and, gte, lte, desc, or } from "drizzle-orm";
+import { calendarEvents, type CalendarEvent, disposisi, suratKeluar, jadwalUjian, kelasUjian, penugasanPengawas, pengawas, adminJaga, jadwalAdminJaga as jadwalAdminJagaTable } from "@/server/db/schema";
+import { eq, and, gte, lte, desc, or, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { startOfMonth, endOfMonth } from "date-fns";
@@ -42,7 +42,6 @@ export async function createCalendarEvent(input: CalendarEventInput): Promise<Ca
     throw new Error("Failed to create calendar event");
   }
 
-  revalidatePath("/kalender");
   return result[0];
 }
 
@@ -132,7 +131,6 @@ export async function updateCalendarEvent(
     throw new Error("Failed to update calendar event");
   }
 
-  revalidatePath("/kalender");
   return result[0];
 }
 
@@ -141,7 +139,6 @@ export async function deleteCalendarEvent(eventId: string, userId: string): Prom
     .delete(calendarEvents)
     .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, userId)));
 
-  revalidatePath("/kalender");
 }
 
 // Sync disposisi deadline to calendar
@@ -234,6 +231,317 @@ export async function syncSuratKeluarEvent(
       userId,
       isPublic: false,
     });
+  }
+}
+
+// ─── UJIAN SYNC ───────────────────────────────────────────────────────────────
+
+export async function syncUjianEvent(
+  ujianId: string,
+  mataPelajaran: string[],
+  namaKelas: string,
+  tanggalUjian: string,
+  jamMulai: string,
+  jamSelesai: string,
+  catatan: string | null,
+  pengawasNama: string[],
+  adminJagaNama: string[],
+): Promise<void> {
+  const title = `Ujian: ${mataPelajaran.join(", ")} - ${namaKelas}`;
+  const startDate = new Date(`${tanggalUjian}T${jamMulai}:00`);
+  const endDate = new Date(`${tanggalUjian}T${jamSelesai}:00`);
+  const descParts: string[] = [];
+  if (catatan) descParts.push(catatan);
+  if (pengawasNama.length > 0) descParts.push(`Pengawas: ${pengawasNama.join(", ")}`);
+  if (adminJagaNama.length > 0) descParts.push(`Admin jaga: ${adminJagaNama.join(", ")}`);
+
+  const existing = await db
+    .select()
+    .from(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.entitasType, "ujian"),
+        eq(calendarEvents.entitasId, ujianId),
+        eq(calendarEvents.eventType, "ujian"),
+      ),
+    );
+
+  if (existing[0]) {
+    await db
+      .update(calendarEvents)
+      .set({ title, startDate, endDate, description: descParts.join(" | ") || undefined, updatedAt: new Date() })
+      .where(eq(calendarEvents.id, existing[0].id));
+  } else {
+    await createCalendarEvent({
+      title,
+      description: descParts.join(" | ") || undefined,
+      eventType: "ujian" as typeof calendarEvents.$inferInsert.eventType,
+      entitasType: "ujian",
+      entitasId: ujianId,
+      startDate,
+      endDate,
+      allDay: false,
+      isPublic: true,
+    });
+  }
+}
+
+export async function removeUjianEvent(ujianId: string): Promise<void> {
+  await db
+    .delete(calendarEvents)
+    .where(
+      and(eq(calendarEvents.entitasType, "ujian"), eq(calendarEvents.entitasId, ujianId)),
+    );
+}
+
+export async function syncPenugasanPengawasEvent(
+  penugasanId: string,
+  pengawasNama: string,
+  mataPelajaran: string[],
+  namaKelas: string,
+  tanggalUjian: string,
+  jamMulai: string,
+  jamSelesai: string,
+): Promise<void> {
+  const title = `Pengawas: ${pengawasNama} — ${mataPelajaran.join(", ")}`;
+  const startDate = new Date(`${tanggalUjian}T${jamMulai}:00`);
+  const endDate = new Date(`${tanggalUjian}T${jamSelesai}:00`);
+
+  const existing = await db
+    .select()
+    .from(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.entitasType, "ujian_pengawas"),
+        eq(calendarEvents.entitasId, penugasanId),
+      ),
+    );
+
+  if (existing[0]) {
+    await db
+      .update(calendarEvents)
+      .set({ title, startDate, endDate, updatedAt: new Date() })
+      .where(eq(calendarEvents.id, existing[0].id));
+  } else {
+    await createCalendarEvent({
+      title,
+      description: `Kelas: ${namaKelas}`,
+      eventType: "ujian_pengawas" as typeof calendarEvents.$inferInsert.eventType,
+      entitasType: "ujian_pengawas",
+      entitasId: penugasanId,
+      startDate,
+      endDate,
+      allDay: false,
+      isPublic: true,
+    });
+  }
+}
+
+export async function removePenugasanPengawasEvent(penugasanId: string): Promise<void> {
+  await db
+    .delete(calendarEvents)
+    .where(
+      and(eq(calendarEvents.entitasType, "ujian_pengawas"), eq(calendarEvents.entitasId, penugasanId)),
+    );
+}
+
+export async function syncAdminJagaEvent(
+  adminJagaId: string,
+  pengawasNama: string,
+  mataPelajaran: string[],
+  namaKelas: string,
+  tanggalUjian: string,
+  jamMulai: string,
+  jamSelesai: string,
+): Promise<void> {
+  const title = `Admin Jaga: ${pengawasNama} — ${mataPelajaran.join(", ")}`;
+  const startDate = new Date(`${tanggalUjian}T${jamMulai}:00`);
+  const endDate = new Date(`${tanggalUjian}T${jamSelesai}:00`);
+
+  const existing = await db
+    .select()
+    .from(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.entitasType, "admin_jaga"),
+        eq(calendarEvents.entitasId, adminJagaId),
+      ),
+    );
+
+  if (existing[0]) {
+    await db
+      .update(calendarEvents)
+      .set({ title, startDate, endDate, updatedAt: new Date() })
+      .where(eq(calendarEvents.id, existing[0].id));
+  } else {
+    await createCalendarEvent({
+      title,
+      description: `Kelas: ${namaKelas}`,
+      eventType: "admin_jaga" as typeof calendarEvents.$inferInsert.eventType,
+      entitasType: "admin_jaga",
+      entitasId: adminJagaId,
+      startDate,
+      endDate,
+      allDay: false,
+      isPublic: true,
+    });
+  }
+}
+
+export async function removeAdminJagaEvent(adminJagaId: string): Promise<void> {
+  await db
+    .delete(calendarEvents)
+    .where(
+      and(eq(calendarEvents.entitasType, "admin_jaga"), eq(calendarEvents.entitasId, adminJagaId)),
+    );
+}
+
+export async function syncJadwalAdminJagaEvent(
+  jadwalId: string,
+  pengawasNama: string,
+  kelasNama: string,
+  tanggal: string,
+  jamMulai: string | null,
+  jamSelesai: string | null,
+  materi: string,
+): Promise<void> {
+  const title = `Admin Jaga: ${pengawasNama} — ${materi}`;
+  const startDate = new Date(`${tanggal}T${jamMulai ?? "17:15"}:00`);
+  const endDate = new Date(`${tanggal}T${jamSelesai ?? "21:30"}:00`);
+
+  const existing = await db
+    .select()
+    .from(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.entitasType, "jadwal_admin_jaga"),
+        eq(calendarEvents.entitasId, jadwalId),
+      ),
+    );
+
+  if (existing[0]) {
+    await db
+      .update(calendarEvents)
+      .set({ title, startDate, endDate, updatedAt: new Date() })
+      .where(eq(calendarEvents.id, existing[0].id));
+  } else {
+    await createCalendarEvent({
+      title,
+      description: `Kelas: ${kelasNama}`,
+      eventType: "admin_jaga" as typeof calendarEvents.$inferInsert.eventType,
+      entitasType: "jadwal_admin_jaga",
+      entitasId: jadwalId,
+      startDate,
+      endDate,
+      allDay: false,
+      isPublic: true,
+    });
+  }
+}
+
+export async function removeJadwalAdminJagaEvent(jadwalId: string): Promise<void> {
+  await db
+    .delete(calendarEvents)
+    .where(
+      and(eq(calendarEvents.entitasType, "jadwal_admin_jaga"), eq(calendarEvents.entitasId, jadwalId)),
+    );
+}
+
+// ─── BACKFILL ─────────────────────────────────────────────────────────────────
+// Sinkronisasi data ujian/pengawas/admin yang sudah ada ke calendar
+
+export async function backfillCalendarEvents(): Promise<void> {
+  // Hapus semua event hasil sync terdahulu (idempotent — delete all, recreate all)
+  await db.delete(calendarEvents).where(
+    inArray(calendarEvents.entitasType, ["ujian", "ujian_pengawas", "admin_jaga", "jadwal_admin_jaga"]),
+  );
+
+  // Backfill jadwalUjian + penugasanPengawas + adminJaga (linked to exam)
+  const allUjian = await db
+    .select({
+      id: jadwalUjian.id,
+      mataPelajaran: jadwalUjian.mataPelajaran,
+      tanggalUjian: jadwalUjian.tanggalUjian,
+      jamMulai: jadwalUjian.jamMulai,
+      jamSelesai: jadwalUjian.jamSelesai,
+      catatan: jadwalUjian.catatan,
+      kelasId: jadwalUjian.kelasId,
+    })
+    .from(jadwalUjian);
+
+  const kelasIds = [...new Set(allUjian.map((u) => u.kelasId))];
+  const kelasMapArr = kelasIds.length > 0
+    ? await db.select({ id: kelasUjian.id, namaKelas: kelasUjian.namaKelas }).from(kelasUjian).where(inArray(kelasUjian.id, kelasIds))
+    : [];
+  const kelasMap = new Map(kelasMapArr.map((k) => [k.id, k.namaKelas]));
+
+  for (const ujian of allUjian) {
+    const namaKelas = kelasMap.get(ujian.kelasId) ?? "";
+
+    const penugasans = await db
+      .select({ id: penugasanPengawas.id, pengawasId: penugasanPengawas.pengawasId })
+      .from(penugasanPengawas)
+      .where(eq(penugasanPengawas.ujianId, ujian.id));
+
+    const pengawasIds = penugasans.map((p) => p.pengawasId);
+    const pengawasList = pengawasIds.length > 0
+      ? await db.select({ id: pengawas.id, nama: pengawas.nama }).from(pengawas).where(inArray(pengawas.id, pengawasIds))
+      : [];
+    const pengawasMap = new Map(pengawasList.map((p) => [p.id, p.nama]));
+    const pengawasNama = pengawasList.map((p) => p.nama);
+
+    const adminJagas = await db
+      .select({ id: adminJaga.id, pengawasId: adminJaga.pengawasId })
+      .from(adminJaga)
+      .where(eq(adminJaga.ujianId, ujian.id));
+
+    const adminJagaIds = adminJagas.map((a) => a.pengawasId);
+    const adminJagaList = adminJagaIds.length > 0
+      ? await db.select({ id: pengawas.id, nama: pengawas.nama }).from(pengawas).where(inArray(pengawas.id, adminJagaIds))
+      : [];
+    const adminJagaMap = new Map(adminJagaList.map((a) => [a.id, a.nama]));
+    const adminJagaNama = adminJagaList.map((a) => a.nama);
+
+    await syncUjianEvent(ujian.id, ujian.mataPelajaran, namaKelas, ujian.tanggalUjian, ujian.jamMulai, ujian.jamSelesai, ujian.catatan, pengawasNama, adminJagaNama);
+
+    for (const p of penugasans) {
+      await syncPenugasanPengawasEvent(p.id, pengawasMap.get(p.pengawasId) ?? "", ujian.mataPelajaran, namaKelas, ujian.tanggalUjian, ujian.jamMulai, ujian.jamSelesai);
+    }
+
+    for (const a of adminJagas) {
+      await syncAdminJagaEvent(a.id, adminJagaMap.get(a.pengawasId) ?? "", ujian.mataPelajaran, namaKelas, ujian.tanggalUjian, ujian.jamMulai, ujian.jamSelesai);
+    }
+  }
+
+  // Backfill jadwalAdminJaga (standalone, not linked to exam)
+  const allJadwalAdminJaga = await db
+    .select({
+      id: jadwalAdminJagaTable.id,
+      kelasId: jadwalAdminJagaTable.kelasId,
+      tanggal: jadwalAdminJagaTable.tanggal,
+      jamMulai: jadwalAdminJagaTable.jamMulai,
+      jamSelesai: jadwalAdminJagaTable.jamSelesai,
+      materi: jadwalAdminJagaTable.materi,
+      pengawasId: jadwalAdminJagaTable.pengawasId,
+    })
+    .from(jadwalAdminJagaTable);
+
+  const jajKelasIds = [...new Set(allJadwalAdminJaga.map((j) => j.kelasId))];
+  const jajKelasMapArr = jajKelasIds.length > 0
+    ? await db.select({ id: kelasUjian.id, namaKelas: kelasUjian.namaKelas }).from(kelasUjian).where(inArray(kelasUjian.id, jajKelasIds))
+    : [];
+  const jajKelasMap = new Map(jajKelasMapArr.map((k) => [k.id, k.namaKelas]));
+
+  for (const j of allJadwalAdminJaga) {
+    const [jajPengawas] = await db
+      .select({ nama: pengawas.nama })
+      .from(pengawas)
+      .where(eq(pengawas.id, j.pengawasId));
+    const jajNamaKelas = jajKelasMap.get(j.kelasId) ?? "";
+
+    if (jajPengawas) {
+      await syncJadwalAdminJagaEvent(j.id, jajPengawas.nama, jajNamaKelas, j.tanggal, j.jamMulai, j.jamSelesai, j.materi);
+    }
   }
 }
 

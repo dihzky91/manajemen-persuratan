@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Edit3,
   KeyRound,
   MailPlus,
   MoreHorizontal,
@@ -49,6 +50,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -73,6 +75,7 @@ import {
   type InvitationRow,
   type UserRow,
 } from "@/server/actions/invitations";
+import { updateUserAccess, type RoleOption } from "@/server/actions/roles";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -80,9 +83,8 @@ interface ManajemenUserCardProps {
   invitations: InvitationRow[];
   users: UserRow[];
   divisiOptions: Array<{ id: number; nama: string }>;
+  roleOptions: RoleOption[];
 }
-
-const ROLE_OPTIONS = ["admin", "staff", "pejabat", "viewer"] as const;
 
 // ─── Status Badge helpers ─────────────────────────────────────────────────────
 
@@ -123,10 +125,12 @@ export function ManajemenUserCard({
   invitations,
   users: userRows,
   divisiOptions,
+  roleOptions,
 }: ManajemenUserCardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("users");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [accessTarget, setAccessTarget] = useState<UserRow | null>(null);
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -136,7 +140,13 @@ export function ManajemenUserCard({
     const q = query.trim().toLowerCase();
     if (!q) return userRows;
     return userRows.filter((u) =>
-      [u.namaLengkap, u.email, u.divisiNama ?? "", u.role ?? "", u.jabatan ?? ""]
+      [
+        u.namaLengkap,
+        u.email,
+        u.divisiNama ?? "",
+        u.roleName ?? u.role ?? "",
+        u.jabatan ?? "",
+      ]
         .join(" ")
         .toLowerCase()
         .includes(q),
@@ -147,7 +157,7 @@ export function ManajemenUserCard({
     const q = query.trim().toLowerCase();
     if (!q) return invitations;
     return invitations.filter((inv) =>
-      [inv.namaLengkap, inv.email, inv.role, inv.divisiNama ?? ""]
+      [inv.namaLengkap, inv.email, inv.roleName ?? inv.role, inv.divisiNama ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(q),
@@ -290,7 +300,11 @@ export function ManajemenUserCard({
                             {user.namaLengkap}
                           </p>
                           <UserStatusBadge isActive={user.isActive} />
-                          <Badge variant="outline">{user.role ?? "staff"}</Badge>
+                          <Badge variant="outline">
+                            {user.isSuperAdmin
+                              ? "Super Admin"
+                              : user.roleName ?? user.role ?? "staff"}
+                          </Badge>
                         </div>
                         <p className="mt-0.5 truncate text-sm text-muted-foreground">
                           {user.email}
@@ -306,6 +320,11 @@ export function ManajemenUserCard({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setAccessTarget(user)}>
+                            <Edit3 className="mr-2 h-4 w-4" />
+                            Ubah Akses
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() =>
                               handleToggleStatus(user.id, user.isActive)
@@ -371,7 +390,9 @@ export function ManajemenUserCard({
                               status={inv.status}
                               expiredAt={inv.expiredAt}
                             />
-                            <Badge variant="outline">{inv.role}</Badge>
+                            <Badge variant="outline">
+                              {inv.roleName ?? inv.role}
+                            </Badge>
                           </div>
                           <p className="mt-0.5 truncate text-sm text-muted-foreground">
                             {inv.email}
@@ -437,6 +458,15 @@ export function ManajemenUserCard({
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         divisiOptions={divisiOptions}
+        roleOptions={roleOptions}
+      />
+      <AccessDialog
+        user={accessTarget}
+        onOpenChange={(open) => {
+          if (!open) setAccessTarget(null);
+        }}
+        divisiOptions={divisiOptions}
+        roleOptions={roleOptions}
       />
     </div>
   );
@@ -448,10 +478,12 @@ function InviteDialog({
   open,
   onOpenChange,
   divisiOptions,
+  roleOptions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   divisiOptions: Array<{ id: number; nama: string }>;
+  roleOptions: RoleOption[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -461,7 +493,7 @@ function InviteDialog({
     defaultValues: {
       namaLengkap: "",
       email: "",
-      role: "staff",
+      roleId: roleOptions[0]?.id ?? 0,
       divisiId: undefined,
       jabatan: "",
     },
@@ -550,20 +582,23 @@ function InviteDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
-                name="role"
+                name="roleId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(value) => field.onChange(Number(value))}
+                      value={field.value ? String(field.value) : ""}
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih role" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {ROLE_OPTIONS.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
+                        {roleOptions.map((role) => (
+                          <SelectItem key={role.id} value={String(role.id)}>
+                            {role.nama}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -644,6 +679,132 @@ function InviteDialog({
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function AccessDialog({
+  user,
+  onOpenChange,
+  divisiOptions,
+  roleOptions,
+}: {
+  user: UserRow | null;
+  onOpenChange: (open: boolean) => void;
+  divisiOptions: Array<{ id: number; nama: string }>;
+  roleOptions: RoleOption[];
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [roleId, setRoleId] = useState<number | null>(null);
+  const [divisiId, setDivisiId] = useState<number | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    setRoleId(user.roleId);
+    setDivisiId(user.divisiId);
+    setIsSuperAdmin(user.isSuperAdmin);
+  }, [user]);
+
+  function handleSubmit() {
+    if (!user) return;
+
+    startTransition(async () => {
+      const result = await updateUserAccess({
+        userId: user.id,
+        roleId: isSuperAdmin ? null : roleId,
+        divisiId,
+        isSuperAdmin,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Akses user diperbarui.");
+      onOpenChange(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <Dialog open={!!user} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Ubah Akses User</DialogTitle>
+          <DialogDescription>{user?.namaLengkap ?? ""}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={isSuperAdmin}
+              onChange={(event) => setIsSuperAdmin(event.target.checked)}
+              className="h-4 w-4"
+            />
+            <span>Super admin</span>
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select
+                disabled={isSuperAdmin}
+                value={roleId ? String(roleId) : ""}
+                onValueChange={(value) => setRoleId(Number(value))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pilih role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleOptions.map((role) => (
+                    <SelectItem key={role.id} value={String(role.id)}>
+                      {role.nama}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Divisi</Label>
+              <Select
+                value={divisiId ? String(divisiId) : "0"}
+                onValueChange={(value) =>
+                  setDivisiId(value === "0" ? null : Number(value))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pilih divisi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Tanpa divisi</SelectItem>
+                  {divisiOptions.map((divisi) => (
+                    <SelectItem key={divisi.id} value={String(divisi.id)}>
+                      {divisi.nama}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => onOpenChange(false)}
+          >
+            Batal
+          </Button>
+          <Button type="button" disabled={isPending} onClick={handleSubmit}>
+            Simpan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (

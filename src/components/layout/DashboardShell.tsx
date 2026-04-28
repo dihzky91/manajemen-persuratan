@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import type { NavRole } from "@/components/layout/navigation";
+import type { Capability } from "@/lib/rbac/capabilities";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -11,8 +12,11 @@ interface DashboardShellProps {
   unreadAnnouncementCount: number;
   systemIdentity: { namaSistem: string; logoUrl: string | null };
   userRole: NavRole | null;
+  userCapabilities: Capability[];
+  isSuperAdmin: boolean;
   userName?: string | null;
   userId?: string;
+  pathname?: string;
 }
 
 export function DashboardShell({
@@ -21,8 +25,11 @@ export function DashboardShell({
   unreadAnnouncementCount,
   systemIdentity,
   userRole,
+  userCapabilities,
+  isSuperAdmin,
   userName,
   userId,
+  pathname,
 }: DashboardShellProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -33,8 +40,11 @@ export function DashboardShell({
         unreadAnnouncementCount={unreadAnnouncementCount}
         systemIdentity={systemIdentity}
         userRole={userRole}
+        userCapabilities={userCapabilities}
+        isSuperAdmin={isSuperAdmin}
         mobileOpen={mobileSidebarOpen}
         onMobileOpenChange={setMobileSidebarOpen}
+        pathname={pathname}
       />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Header

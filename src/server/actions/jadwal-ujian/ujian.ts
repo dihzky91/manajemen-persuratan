@@ -1,6 +1,6 @@
 ﻿"use server";
 
-import { asc, desc, eq, sql, and, gte, lte } from "drizzle-orm";
+import { asc, desc, eq, sql, and, gte, lte, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
@@ -67,6 +67,14 @@ async function buildKonflikMap(
   return result;
 }
 import { requirePermission, requireSession } from "@/server/actions/auth";
+import {
+  syncUjianEvent,
+  removeUjianEvent,
+  syncPenugasanPengawasEvent,
+  removePenugasanPengawasEvent,
+  syncAdminJagaEvent,
+  removeAdminJagaEvent,
+} from "@/server/actions/calendar";
 import {
   ujianCreateSchema,
   ujianUpdateSchema,
@@ -329,8 +337,46 @@ export async function createUjian(data: UjianCreateInput & { pengawasIds?: strin
     },
   });
 
+  // Sync to calendar
+  const [kelas] = await db
+    .select({ namaKelas: kelasUjian.namaKelas })
+    .from(kelasUjian)
+    .where(eq(kelasUjian.id, parsed.kelasId));
+  const namaKelas = kelas?.namaKelas ?? "";
+
+  const pengawasList = pengawasIds.length > 0
+    ? await db.select({ id: pengawas.id, nama: pengawas.nama }).from(pengawas).where(inArray(pengawas.id, pengawasIds))
+    : [];
+  const pengawasNama = pengawasList.map((p) => p.nama);
+  const pengawasMap = new Map(pengawasList.map((p) => [p.id, p.nama]));
+
+  const adminJagaLookup = adminJagaIds.length > 0
+    ? await db.select({ id: pengawas.id, nama: pengawas.nama }).from(pengawas).where(inArray(pengawas.id, adminJagaIds))
+    : [];
+  const adminJagaNama = adminJagaLookup.map((p) => p.nama);
+  const adminJagaMap = new Map(adminJagaLookup.map((p) => [p.id, p.nama]));
+
+  await syncUjianEvent(id, parsed.mataPelajaran, namaKelas, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai, parsed.catatan ?? null, pengawasNama, adminJagaNama);
+
+  const insertedPenugasan = await db
+    .select({ id: penugasanPengawas.id, pengawasId: penugasanPengawas.pengawasId })
+    .from(penugasanPengawas)
+    .where(eq(penugasanPengawas.ujianId, id));
+  for (const p of insertedPenugasan) {
+    await syncPenugasanPengawasEvent(p.id, pengawasMap.get(p.pengawasId) ?? "", parsed.mataPelajaran, namaKelas, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai);
+  }
+
+  const insertedAdminJaga = await db
+    .select({ id: adminJaga.id, pengawasId: adminJaga.pengawasId })
+    .from(adminJaga)
+    .where(eq(adminJaga.ujianId, id));
+  for (const a of insertedAdminJaga) {
+    await syncAdminJagaEvent(a.id, adminJagaMap.get(a.pengawasId) ?? "", parsed.mataPelajaran, namaKelas, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai);
+  }
+
   revalidatePath("/jadwal-ujian");
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const, data: row, konflikPengawasIds: konflikIds, konflikAdminJagaIds };
 }
 
@@ -402,9 +448,48 @@ export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: strin
     },
   });
 
+  // Sync to calendar
+  const [kelas] = await db
+    .select({ namaKelas: kelasUjian.namaKelas })
+    .from(kelasUjian)
+    .where(eq(kelasUjian.id, parsed.kelasId));
+  const namaKelas = kelas?.namaKelas ?? "";
+
+  const currentPenugasan = await db
+    .select({ id: penugasanPengawas.id, pengawasId: penugasanPengawas.pengawasId })
+    .from(penugasanPengawas)
+    .where(eq(penugasanPengawas.ujianId, parsed.id));
+  const ppIds = currentPenugasan.map((p) => p.pengawasId);
+  const ppList = ppIds.length > 0
+    ? await db.select({ id: pengawas.id, nama: pengawas.nama }).from(pengawas).where(inArray(pengawas.id, ppIds))
+    : [];
+  const ppMap = new Map(ppList.map((p) => [p.id, p.nama]));
+  const ppNama = ppList.map((p) => p.nama);
+
+  const currentAdminJaga = await db
+    .select({ id: adminJaga.id, pengawasId: adminJaga.pengawasId })
+    .from(adminJaga)
+    .where(eq(adminJaga.ujianId, parsed.id));
+  const ajIds = currentAdminJaga.map((a) => a.pengawasId);
+  const ajList = ajIds.length > 0
+    ? await db.select({ id: pengawas.id, nama: pengawas.nama }).from(pengawas).where(inArray(pengawas.id, ajIds))
+    : [];
+  const ajMap = new Map(ajList.map((a) => [a.id, a.nama]));
+  const ajNama = ajList.map((a) => a.nama);
+
+  await syncUjianEvent(parsed.id, parsed.mataPelajaran, namaKelas, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai, parsed.catatan ?? null, ppNama, ajNama);
+
+  for (const p of currentPenugasan) {
+    await syncPenugasanPengawasEvent(p.id, ppMap.get(p.pengawasId) ?? "", parsed.mataPelajaran, namaKelas, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai);
+  }
+  for (const a of currentAdminJaga) {
+    await syncAdminJagaEvent(a.id, ajMap.get(a.pengawasId) ?? "", parsed.mataPelajaran, namaKelas, parsed.tanggalUjian, parsed.jamMulai, parsed.jamSelesai);
+  }
+
   revalidatePath("/jadwal-ujian");
   revalidatePath(`/jadwal-ujian/${parsed.id}`);
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const, data: row, konflikPengawasIds: konflikIds, konflikAdminJagaIds };
 }
 
@@ -416,6 +501,23 @@ export async function deleteUjian(id: string) {
     .from(jadwalUjian)
     .where(eq(jadwalUjian.id, id));
   if (!ujianRows[0]) return { ok: false as const, error: "Jadwal ujian tidak ditemukan." };
+
+  // Remove calendar events before cascade delete
+  await removeUjianEvent(id);
+  const penugasanToRemove = await db
+    .select({ id: penugasanPengawas.id })
+    .from(penugasanPengawas)
+    .where(eq(penugasanPengawas.ujianId, id));
+  for (const p of penugasanToRemove) {
+    await removePenugasanPengawasEvent(p.id);
+  }
+  const adminJagaToRemove = await db
+    .select({ id: adminJaga.id })
+    .from(adminJaga)
+    .where(eq(adminJaga.ujianId, id));
+  for (const a of adminJagaToRemove) {
+    await removeAdminJagaEvent(a.id);
+  }
 
   // Cascade delete penugasan_pengawas otomatis via FK
   await db.delete(jadwalUjian).where(eq(jadwalUjian.id, id));
@@ -429,6 +531,7 @@ export async function deleteUjian(id: string) {
   });
 
   revalidatePath("/jadwal-ujian");
+  revalidatePath("/kalender");
   return { ok: true as const };
 }
 

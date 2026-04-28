@@ -7,6 +7,10 @@ import { db } from "@/server/db";
 import { adminJaga, jadwalUjian, kelasUjian, pengawas, auditLog } from "@/server/db/schema";
 import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
+  syncAdminJagaEvent,
+  removeAdminJagaEvent,
+} from "@/server/actions/calendar";
+import {
   adminJagaAssignSchema,
   type AdminJagaAssignInput,
   type AdminJagaFilter,
@@ -155,9 +159,27 @@ export async function assignAdminJaga(
     detail: { pengawasId: parsed.pengawasId, konflik },
   });
 
+  // Sync to calendar
+  const [ajUjian] = await db
+    .select({
+      mataPelajaran: jadwalUjian.mataPelajaran,
+      namaKelas: kelasUjian.namaKelas,
+    })
+    .from(jadwalUjian)
+    .leftJoin(kelasUjian, eq(jadwalUjian.kelasId, kelasUjian.id))
+    .where(eq(jadwalUjian.id, parsed.ujianId));
+  const [ajNama] = await db
+    .select({ nama: pengawas.nama })
+    .from(pengawas)
+    .where(eq(pengawas.id, parsed.pengawasId));
+  if (ajUjian && ajNama) {
+    await syncAdminJagaEvent(id, ajNama.nama, ajUjian.mataPelajaran, ajUjian.namaKelas ?? "", data.tanggalUjian, data.jamMulai, data.jamSelesai);
+  }
+
   revalidatePath("/jadwal-ujian");
   revalidatePath(`/jadwal-ujian/${parsed.ujianId}`);
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const, konflik };
 }
 
@@ -170,6 +192,7 @@ export async function unassignAdminJaga(id: string) {
     .where(eq(adminJaga.id, id));
   if (!rows[0]) return { ok: false as const, error: "Admin jaga tidak ditemukan." };
 
+  await removeAdminJagaEvent(id);
   await db.delete(adminJaga).where(eq(adminJaga.id, id));
 
   await db.insert(auditLog).values({
@@ -183,5 +206,6 @@ export async function unassignAdminJaga(id: string) {
   revalidatePath("/jadwal-ujian");
   revalidatePath(`/jadwal-ujian/${rows[0].ujianId}`);
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const };
 }

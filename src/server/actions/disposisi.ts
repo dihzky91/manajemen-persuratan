@@ -231,6 +231,7 @@ export async function createDisposisi(data: unknown) {
 
   revalidatePath("/surat-masuk");
   revalidatePath("/disposisi");
+  revalidatePath("/kalender");
   return { ok: true as const, data: row! };
 }
 

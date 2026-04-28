@@ -1,11 +1,15 @@
 ﻿"use server";
 
-import { asc, desc, eq, sql, and, gte, lte } from "drizzle-orm";
+import { asc, desc, eq, sql, and, gte, lte, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
 import { jadwalAdminJaga, kelasUjian, pengawas, auditLog } from "@/server/db/schema";
 import { requirePermission, requireSession } from "@/server/actions/auth";
+import {
+  syncJadwalAdminJagaEvent,
+  removeJadwalAdminJagaEvent,
+} from "@/server/actions/calendar";
 import {
   jadwalAdminJagaCreateSchema,
   jadwalAdminJagaUpdateSchema,
@@ -114,7 +118,21 @@ export async function createJadwalAdminJaga(data: JadwalAdminJagaCreateInput) {
     },
   });
 
+  // Sync to calendar
+  const [jajNama] = await db
+    .select({ nama: pengawas.nama })
+    .from(pengawas)
+    .where(eq(pengawas.id, parsed.pengawasId));
+  const [jajKelas] = await db
+    .select({ namaKelas: kelasUjian.namaKelas })
+    .from(kelasUjian)
+    .where(eq(kelasUjian.id, parsed.kelasId));
+  if (jajNama && jajKelas) {
+    await syncJadwalAdminJagaEvent(id, jajNama.nama, jajKelas.namaKelas, parsed.tanggal, parsed.jamMulai, parsed.jamSelesai, parsed.materi);
+  }
+
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const, id };
 }
 
@@ -156,7 +174,21 @@ export async function updateJadwalAdminJaga(data: JadwalAdminJagaUpdateInput) {
     },
   });
 
+  // Sync to calendar
+  const [jajUpdNama] = await db
+    .select({ nama: pengawas.nama })
+    .from(pengawas)
+    .where(eq(pengawas.id, parsed.pengawasId));
+  const [jajUpdKelas] = await db
+    .select({ namaKelas: kelasUjian.namaKelas })
+    .from(kelasUjian)
+    .where(eq(kelasUjian.id, parsed.kelasId));
+  if (jajUpdNama && jajUpdKelas) {
+    await syncJadwalAdminJagaEvent(parsed.id, jajUpdNama.nama, jajUpdKelas.namaKelas, parsed.tanggal, parsed.jamMulai, parsed.jamSelesai, parsed.materi);
+  }
+
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const };
 }
 
@@ -169,6 +201,7 @@ export async function deleteJadwalAdminJaga(id: string) {
     .where(eq(jadwalAdminJaga.id, id));
   if (!rows[0]) return { ok: false as const, error: "Data tidak ditemukan." };
 
+  await removeJadwalAdminJagaEvent(id);
   await db.delete(jadwalAdminJaga).where(eq(jadwalAdminJaga.id, id));
 
   await db.insert(auditLog).values({
@@ -180,6 +213,7 @@ export async function deleteJadwalAdminJaga(id: string) {
   });
 
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const };
 }
 
@@ -187,6 +221,15 @@ export async function deleteJadwalAdminJagaByKelas(kelasId: string) {
   if (!kelasId) return { ok: false as const, error: "Kelas wajib dipilih." };
 
   const session = await requirePermission("jadwalUjian", "manage");
+
+  const toDelete = await db
+    .select({ id: jadwalAdminJaga.id })
+    .from(jadwalAdminJaga)
+    .where(eq(jadwalAdminJaga.kelasId, kelasId));
+  for (const item of toDelete) {
+    await removeJadwalAdminJagaEvent(item.id);
+  }
+
   const deleted = await db
     .delete(jadwalAdminJaga)
     .where(eq(jadwalAdminJaga.kelasId, kelasId))
@@ -205,6 +248,7 @@ export async function deleteJadwalAdminJagaByKelas(kelasId: string) {
   });
 
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const, deleted: deleted.length };
 }
 
@@ -239,6 +283,23 @@ export async function importJadwalAdminJaga(rows: ImportJadwalAdminJagaRow[]) {
 
   await db.insert(jadwalAdminJaga).values(values);
 
+  // Sync all imported records to calendar
+  const allPengawasIds = [...new Set(values.map((v) => v.pengawasId))];
+  const allPengawas = allPengawasIds.length > 0
+    ? await db.select({ id: pengawas.id, nama: pengawas.nama }).from(pengawas).where(inArray(pengawas.id, allPengawasIds))
+    : [];
+  const pengawasNamaMap = new Map(allPengawas.map((p) => [p.id, p.nama]));
+
+  const allKelasIds = [...new Set(values.map((v) => v.kelasId))];
+  const allKelas = allKelasIds.length > 0
+    ? await db.select({ id: kelasUjian.id, namaKelas: kelasUjian.namaKelas }).from(kelasUjian).where(inArray(kelasUjian.id, allKelasIds))
+    : [];
+  const kelasNamaMap = new Map(allKelas.map((k) => [k.id, k.namaKelas]));
+
+  for (const v of values) {
+    await syncJadwalAdminJagaEvent(v.id, pengawasNamaMap.get(v.pengawasId) ?? "", kelasNamaMap.get(v.kelasId) ?? "", v.tanggal, v.jamMulai, v.jamSelesai, v.materi);
+  }
+
   await db.insert(auditLog).values({
     userId: session.user.id,
     aksi: "IMPORT_JADWAL_ADMIN_JAGA",
@@ -248,5 +309,6 @@ export async function importJadwalAdminJaga(rows: ImportJadwalAdminJagaRow[]) {
   });
 
   revalidatePath("/jadwal-ujian/admin-jaga");
+  revalidatePath("/kalender");
   return { ok: true as const, inserted: rows.length };
 }
