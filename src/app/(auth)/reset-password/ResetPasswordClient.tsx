@@ -16,11 +16,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { activateInvitedAccount } from "@/server/actions/invitations";
 
 interface ResetPasswordClientProps {
   token: string;
   isInvite: boolean;
   linkError: string | null;
+  inviteEmail?: string | null;
   systemIdentity: {
     namaSistem: string;
     logoUrl: string | null;
@@ -31,6 +33,7 @@ export function ResetPasswordClient({
   token,
   isInvite,
   linkError,
+  inviteEmail,
   systemIdentity,
 }: ResetPasswordClientProps) {
   const router = useRouter();
@@ -83,6 +86,15 @@ export function ResetPasswordClient({
           "Tautan tidak valid atau sudah kadaluarsa. Hubungi admin.";
         setError(reason);
         return;
+      }
+
+      // Untuk invite: aktifkan akun + mark invitation accepted
+      if (isInvite && inviteEmail) {
+        try {
+          await activateInvitedAccount(inviteEmail);
+        } catch (err) {
+          console.error("[ResetPasswordClient] Gagal aktivasi:", err);
+        }
       }
 
       setSuccess(true);

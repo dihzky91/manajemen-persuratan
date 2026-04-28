@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { systemSettings, auditLog } from "@/server/db/schema";
 import { systemSettingsUpdateSchema } from "@/lib/validators/systemSettings.schema";
-import { requireRole, getSession } from "./auth";
+import { requirePermission, getSession } from "./auth";
 import { getStorageProvider } from "@/lib/storage";
 import { env } from "@/lib/env";
 
@@ -64,7 +64,7 @@ const ALLOWED_FAVICON_TYPES = [
 ];
 
 export async function updateSystemSettings(formData: FormData) {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pengaturan", "update");
 
   const parsed = systemSettingsUpdateSchema.parse({
     namaSistem: formData.get("namaSistem"),

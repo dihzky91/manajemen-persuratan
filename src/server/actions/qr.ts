@@ -9,7 +9,7 @@ import {
   buildVCard,
   buildVerifikasiSuratPayload,
 } from "@/lib/qr/generateQR";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 const qrContactSchema = z.object({ userId: z.string().min(1) });
 
@@ -48,7 +48,7 @@ const qrSuratSchema = z.object({
 
 export async function generateQRSurat(input: unknown) {
   const data = qrSuratSchema.parse(input);
-  await requireRole(["admin", "pejabat"]);
+  await requirePermission("suratKeluar", "generate");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const payload = buildVerifikasiSuratPayload({
     appUrl,

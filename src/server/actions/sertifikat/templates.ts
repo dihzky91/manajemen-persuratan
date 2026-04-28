@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -12,7 +12,7 @@ import {
   certificateTemplates,
   type TemplateFieldMap,
 } from "@/server/db/schema";
-import { requireRole } from "../auth";
+import { requirePermission } from "../auth";
 
 const kategoriValues = ["Workshop", "Brevet AB", "Brevet C", "BFA", "Lainnya"] as const;
 const fontFamilies = ["Helvetica", "Times-Roman", "Courier"] as const;
@@ -52,7 +52,7 @@ export async function listTemplates(filters: {
   kategori?: string;
   isActive?: boolean;
 } = {}): Promise<TemplateRow[]> {
-  await requireRole(["admin"]);
+  await requirePermission("sertifikat", "configure");
 
   const conditions = [];
   if (filters.kategori && kategoriValues.includes(filters.kategori as (typeof kategoriValues)[number])) {
@@ -70,7 +70,7 @@ export async function listTemplates(filters: {
 }
 
 export async function getTemplate(id: number): Promise<TemplateRow | null> {
-  await requireRole(["admin"]);
+  await requirePermission("sertifikat", "configure");
   const parsedId = idSchema.parse(id);
   const [row] = await db
     .select()
@@ -109,7 +109,7 @@ export async function createTemplate(input: {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data template tidak valid." };
   }
 
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
   const file = input.formData.get("image");
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "Gambar template wajib diunggah." };
@@ -176,7 +176,7 @@ export async function updateTemplate(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data template tidak valid." };
   }
 
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
   const [row] = await db
     .update(certificateTemplates)
     .set({
@@ -204,7 +204,7 @@ export async function updateTemplate(
 
 export async function deleteTemplate(id: number): Promise<{ ok: true; data: TemplateRow } | { ok: false; error: string }> {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [row] = await db
     .update(certificateTemplates)
@@ -228,7 +228,7 @@ export async function deleteTemplate(id: number): Promise<{ ok: true; data: Temp
 
 export async function setDefaultTemplate(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [selected] = await db
     .select({

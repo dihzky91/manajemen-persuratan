@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { asc, eq, sql, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
 import { kelasUjian, jadwalUjian, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
   kelasCreateSchema,
   kelasUpdateSchema,
@@ -64,7 +64,7 @@ export async function listKelas(filter: KelasFilter = {}): Promise<KelasRow[]> {
 
 export async function createKelas(data: KelasCreateInput) {
   const parsed = kelasCreateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const id = nanoid();
   const rows = await db
@@ -96,7 +96,7 @@ export async function createKelas(data: KelasCreateInput) {
 
 export async function updateKelas(data: KelasUpdateInput) {
   const parsed = kelasUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const rows = await db
     .update(kelasUjian)
@@ -127,7 +127,7 @@ export async function updateKelas(data: KelasUpdateInput) {
 }
 
 export async function deleteKelas(id: string) {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("jadwalUjian", "configure");
 
   const countResult = await db
     .select({ count: sql<number>`count(*)::int` })

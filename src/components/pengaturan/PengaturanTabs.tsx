@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Bell, ServerCog, UserCircle2 } from "lucide-react";
+import { Building2, Bell, ServerCog, UserCircle2, UsersRound } from "lucide-react";
 import {
   Tabs,
   TabsContent,
@@ -13,6 +13,7 @@ interface PengaturanTabsProps {
   profil: React.ReactNode;
   notifikasi: React.ReactNode;
   sistem: React.ReactNode;
+  manajemenUser?: React.ReactNode;
 }
 
 export function PengaturanTabs({
@@ -20,6 +21,7 @@ export function PengaturanTabs({
   profil,
   notifikasi,
   sistem,
+  manajemenUser,
 }: PengaturanTabsProps) {
   return (
     <Tabs defaultValue="profil" className="w-full">
@@ -40,6 +42,12 @@ export function PengaturanTabs({
           <ServerCog className="h-4 w-4" />
           <span>Sistem & Integrasi</span>
         </TabsTrigger>
+        {manajemenUser ? (
+          <TabsTrigger value="manajemenUser" className="justify-start gap-2 sm:justify-center">
+            <UsersRound className="h-4 w-4" />
+            <span>Manajemen User</span>
+          </TabsTrigger>
+        ) : null}
       </TabsList>
 
       <TabsContent value="profil" className="mt-6">
@@ -54,6 +62,11 @@ export function PengaturanTabs({
       <TabsContent value="sistem" className="mt-6">
         {sistem}
       </TabsContent>
+      {manajemenUser ? (
+        <TabsContent value="manajemenUser" className="mt-6">
+          {manajemenUser}
+        </TabsContent>
+      ) : null}
     </Tabs>
   );
 }

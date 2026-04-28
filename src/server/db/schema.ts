@@ -153,6 +153,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   qrContactUrl: text("qr_contact_url"),
   isActive: boolean("is_active").default(true),
+  activatedAt: timestamp("activated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -822,6 +823,102 @@ export const jadwalAdminJaga = pgTable("jadwal_admin_jaga", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export type AnnouncementAudience = {
+  all: boolean;
+  roles: Array<"admin" | "staff" | "pejabat" | "viewer">;
+  divisiIds: number[];
+};
+
+export type AnnouncementAttachment = {
+  fileName: string;
+  url: string;
+  contentType?: string;
+  size?: number;
+};
+
+export const announcements = pgTable("announcements", {
+  id: text("id").primaryKey(),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  audience: jsonb("audience").$type<AnnouncementAudience>().notNull(),
+  attachments: jsonb("attachments")
+    .$type<AnnouncementAttachment[]>()
+    .notNull()
+    .default([]),
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  requiresAck: boolean("requires_ack").default(false).notNull(),
+  status: text("status", { enum: ["draft", "published"] })
+    .default("published")
+    .notNull(),
+  createdBy: text("created_by")
+    .references(() => users.id)
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const announcementReads = pgTable(
+  "announcement_reads",
+  {
+    announcementId: text("announcement_id")
+      .notNull()
+      .references(() => announcements.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at").defaultNow().notNull(),
+    acknowledgedAt: timestamp("acknowledged_at"),
+  },
+  (t) => ({
+    pk: primaryKey({
+      columns: [t.announcementId, t.userId],
+      name: "announcement_reads_pk",
+    }),
+    announcementIdx: index("announcement_reads_announcement_idx").on(
+      t.announcementId,
+    ),
+    userIdx: index("announcement_reads_user_idx").on(t.userId),
+  }),
+);
+
+// ─── USER INVITATIONS ────────────────────────────────────────────────────────
+// Fase 2 — Invitation lifecycle: invite → aktivasi → login.
+// Token dikirim via email, berlaku 24 jam. Setelah user set password, usedAt diisi.
+
+export const userInvitationStatusEnum = pgEnum("user_invitation_status", [
+  "pending",
+  "accepted",
+  "expired",
+  "cancelled",
+]);
+
+export const userInvitations = pgTable(
+  "user_invitations",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    email: varchar("email", { length: 150 }).notNull(),
+    namaLengkap: varchar("nama_lengkap", { length: 200 }).notNull(),
+    role: roleEnum("role").default("staff").notNull(),
+    divisiId: integer("divisi_id").references(() => divisi.id),
+    jabatan: varchar("jabatan", { length: 150 }),
+    token: text("token").notNull().unique(),
+    status: userInvitationStatusEnum("status").default("pending").notNull(),
+    expiredAt: timestamp("expired_at").notNull(),
+    usedAt: timestamp("used_at"),
+    invitedBy: text("invited_by")
+      .references(() => users.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    emailIdx: index("user_invitations_email_idx").on(t.email),
+    tokenIdx: index("user_invitations_token_idx").on(t.token),
+    statusIdx: index("user_invitations_status_idx").on(t.status),
+  }),
+);
+
 // ─── TYPE EXPORTS ────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -872,6 +969,12 @@ export type AdminJaga = typeof adminJaga.$inferSelect;
 export type NewAdminJaga = typeof adminJaga.$inferInsert;
 export type JadwalAdminJaga = typeof jadwalAdminJaga.$inferSelect;
 export type NewJadwalAdminJaga = typeof jadwalAdminJaga.$inferInsert;
+export type Announcement = typeof announcements.$inferSelect;
+export type NewAnnouncement = typeof announcements.$inferInsert;
+export type AnnouncementRead = typeof announcementReads.$inferSelect;
+export type NewAnnouncementRead = typeof announcementReads.$inferInsert;
+export type UserInvitation = typeof userInvitations.$inferSelect;
+export type NewUserInvitation = typeof userInvitations.$inferInsert;
 
 // ─── PENOMORAN SERTIFIKAT (Certificate Hub) ──────────────────────────────────
 // Sub-modul terpisah dari modul sertifikat kegiatan/event.

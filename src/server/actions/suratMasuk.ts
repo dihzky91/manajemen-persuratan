@@ -11,7 +11,7 @@ import {
   suratMasukCreateSchema,
   suratMasukUpdateSchema,
 } from "@/lib/validators/suratMasuk.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 export type SuratMasukRow = {
   id: string;
@@ -95,7 +95,7 @@ export async function getSuratMasukById(id: string) {
 
 export async function createSuratMasuk(data: unknown) {
   const parsed = suratMasukCreateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("suratMasuk", "create");
   const [row] = await db
     .insert(suratMasuk)
     .values({
@@ -119,7 +119,7 @@ export async function createSuratMasuk(data: unknown) {
 
 export async function uploadSuratMasukFile(data: unknown) {
   const parsed = uploadFileSchema.parse(data);
-  await requireRole(["admin", "staff"]);
+  await requirePermission("suratMasuk", "create");
   const prepared = prepareUploadPayload(parsed);
 
   const storage = getStorageProvider();
@@ -138,7 +138,7 @@ export async function uploadSuratMasukFile(data: unknown) {
 
 export async function updateSuratMasuk(data: unknown) {
   const parsed = suratMasukUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("suratMasuk", "update");
 
   const [existing] = await db
     .select({ id: suratMasuk.id })
@@ -175,7 +175,7 @@ export async function updateStatusSuratMasuk(data: unknown) {
       status: z.enum(["diterima", "diproses", "diarsip", "dibatalkan"]),
     })
     .parse(data);
-  const session = await requireRole(["admin", "staff", "pejabat"]);
+  const session = await requirePermission("suratMasuk", "update");
 
   const [row] = await db
     .update(suratMasuk)
@@ -215,7 +215,7 @@ export async function markSuratMasukDiproses(ids: string[]) {
 
 export async function deleteSuratMasuk(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("suratMasuk", "delete");
 
   const [existing] = await db
     .select({ id: suratMasuk.id, perihal: suratMasuk.perihal })

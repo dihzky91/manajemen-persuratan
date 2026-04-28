@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { asc, eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
 import { penugasanPengawas, jadwalUjian, pengawas, kelasUjian, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
   assignPengawasSchema,
   type AssignPengawasInput,
@@ -26,7 +26,7 @@ export type PenugasanRow = {
   createdAt: Date;
 };
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function timesOverlap(
   aStart: string,
@@ -68,7 +68,7 @@ async function detectConflict(
   });
 }
 
-// ─── QUERIES ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ QUERIES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getPenugasanByUjian(ujianId: string): Promise<PenugasanRow[]> {
   await requireSession();
@@ -162,11 +162,11 @@ export async function getPenugasanByPengawas(
   return rows as JadwalPengawasRow[];
 }
 
-// ─── MUTATIONS ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ MUTATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function assignPengawas(data: AssignPengawasInput) {
   const parsed = assignPengawasSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   // Ambil data ujian untuk pengecekan konflik
   const ujianRows = await db
@@ -231,7 +231,7 @@ export async function assignPengawas(data: AssignPengawasInput) {
 }
 
 export async function unassignPengawas(penugasanId: string) {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const existing = await db
     .select({ ujianId: penugasanPengawas.ujianId, pengawasId: penugasanPengawas.pengawasId })

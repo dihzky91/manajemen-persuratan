@@ -18,6 +18,7 @@ import {
 
 interface SidebarProps {
   unreadDisposisiCount?: number;
+  unreadAnnouncementCount?: number;
   systemIdentity?: { namaSistem: string; logoUrl: string | null };
   userRole?: NavRole | null;
   mobileOpen?: boolean;
@@ -26,6 +27,7 @@ interface SidebarProps {
 
 export function Sidebar({
   unreadDisposisiCount = 0,
+  unreadAnnouncementCount = 0,
   systemIdentity,
   userRole,
   mobileOpen = false,
@@ -58,6 +60,7 @@ export function Sidebar({
           logoUrl={logoUrl}
           activeItemLabel={activeItem?.label}
           unreadDisposisiCount={unreadDisposisiCount}
+          unreadAnnouncementCount={unreadAnnouncementCount}
         />
       </aside>
 
@@ -86,6 +89,7 @@ export function Sidebar({
               logoUrl={logoUrl}
               activeItemLabel={activeItem?.label}
               unreadDisposisiCount={unreadDisposisiCount}
+              unreadAnnouncementCount={unreadAnnouncementCount}
               mobile
               onNavigate={() => onMobileOpenChange?.(false)}
             />
@@ -103,6 +107,7 @@ function SidebarContent({
   logoUrl,
   activeItemLabel,
   unreadDisposisiCount,
+  unreadAnnouncementCount,
   mobile = false,
   onNavigate,
 }: {
@@ -112,6 +117,7 @@ function SidebarContent({
   logoUrl: string;
   activeItemLabel?: string;
   unreadDisposisiCount: number;
+  unreadAnnouncementCount: number;
   mobile?: boolean;
   onNavigate?: () => void;
 }) {
@@ -186,6 +192,14 @@ function SidebarContent({
                             className="rounded-full"
                           >
                             {unreadDisposisiCount}
+                          </Badge>
+                        ) : null}
+                        {item.href === "/pengumuman" && unreadAnnouncementCount > 0 ? (
+                          <Badge
+                            variant={isActive ? "secondary" : "outline"}
+                            className="rounded-full"
+                          >
+                            {unreadAnnouncementCount}
                           </Badge>
                         ) : null}
                         {isActive ? (

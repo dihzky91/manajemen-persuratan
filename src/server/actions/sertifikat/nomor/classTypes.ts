@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { asc, eq, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -11,9 +11,9 @@ import {
   certificateItems,
   certificateSerialConfig,
 } from "@/server/db/schema";
-import { requireRole, requireSession } from "../../auth";
+import { requirePermission, requireSession } from "../../auth";
 
-// ─── Schemas ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const classTypeInputSchema = z.object({
   name: z.string().trim().min(1, "Nama jenis kelas wajib diisi.").max(200),
@@ -30,7 +30,7 @@ const serialValueSchema = z
   .int("Nomor serial harus bilangan bulat.")
   .min(0, "Nomor serial tidak boleh negatif.");
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type CertificateClassTypeRow = {
   id: string;
@@ -45,7 +45,7 @@ export type SerialConfigInfo = {
   maxUsedSerial: number;
 };
 
-// ─── Actions: Jenis Kelas ─────────────────────────────────────────────────────
+// â”€â”€â”€ Actions: Jenis Kelas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function listCertificateClassTypes(): Promise<CertificateClassTypeRow[]> {
   await requireSession();
@@ -62,7 +62,7 @@ export async function createCertificateClassType(data: unknown) {
     return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   }
   const parsed = result.data;
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   try {
     const [row] = await db
@@ -108,7 +108,7 @@ export async function updateCertificateClassType(id: string, data: unknown) {
     return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   }
   const parsed = result.data;
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   try {
     const [row] = await db
@@ -150,7 +150,7 @@ export async function updateCertificateClassType(id: string, data: unknown) {
 
 export async function deleteCertificateClassType(id: string) {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [existing] = await db
     .select({ id: certificateClassTypes.id, name: certificateClassTypes.name, code: certificateClassTypes.code })
@@ -188,10 +188,10 @@ export async function deleteCertificateClassType(id: string) {
   return { ok: true as const };
 }
 
-// ─── Actions: Serial Config ───────────────────────────────────────────────────
+// â”€â”€â”€ Actions: Serial Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getSerialConfig(): Promise<SerialConfigInfo> {
-  await requireRole(["admin"]);
+  await requirePermission("sertifikat", "configure");
 
   const [config] = await db
     .select()
@@ -213,9 +213,9 @@ export async function getSerialConfig(): Promise<SerialConfigInfo> {
 
 export async function updateSerialConfig(newValue: number) {
   const parsed = serialValueSchema.parse(newValue);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
-  // Ambil max serial yang sudah digunakan — tidak boleh dimundurkan
+  // Ambil max serial yang sudah digunakan â€” tidak boleh dimundurkan
   const [maxRow] = await db
     .select({ maxSerial: max(certificateItems.serialNumber) })
     .from(certificateItems);

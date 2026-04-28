@@ -111,3 +111,69 @@
     background-color: hsl(221.2 83.2% 53.3% / 0.16);
   }
 }
+
+.announcement-editor-content {
+  min-height: 220px;
+  padding: 0.9rem 0.95rem;
+  outline: none;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.announcement-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--muted-foreground) / 0.9);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.announcement-editor-content h1 {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  font-weight: 700;
+  margin: 0.5rem 0;
+}
+
+.announcement-editor-content h2 {
+  font-size: 1.1rem;
+  line-height: 1.45;
+  font-weight: 700;
+  margin: 0.45rem 0;
+}
+
+.announcement-editor-content ul,
+.announcement-editor-content ol {
+  padding-left: 1.2rem;
+  margin: 0.45rem 0;
+}
+
+.announcement-editor-content blockquote {
+  border-left: 3px solid hsl(var(--border));
+  margin: 0.5rem 0;
+  padding-left: 0.7rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.announcement-editor-content pre {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: 0.65rem;
+  overflow-x: auto;
+}
+
+.announcement-editor-html-mode {
+  border-color: hsl(220 14% 24%);
+  background-color: hsl(224 16% 15%);
+}
+
+.announcement-editor-html-textarea {
+  background: hsl(224 19% 13%);
+  color: hsl(210 40% 96%);
+  border-top: 1px solid hsl(220 14% 24%);
+}
+
+.announcement-editor-html-textarea::placeholder {
+  color: hsl(220 12% 66%);
+}

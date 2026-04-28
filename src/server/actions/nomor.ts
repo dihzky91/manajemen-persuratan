@@ -6,7 +6,7 @@ import { db } from "@/server/db";
 import { nomorSuratCounter, auditLog } from "@/server/db/schema";
 import { jenisSuratValues } from "@/lib/jenis-surat";
 import { allocateNomorSurat } from "@/lib/nomor-surat";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 const generateNomorSchema = z.object({
   jenisSurat: z.enum(jenisSuratValues),
@@ -60,7 +60,7 @@ export async function listNomorSuratCounters(): Promise<NomorSuratCounterRow[]> 
 // WAJIB: pakai DB transaction + SELECT FOR UPDATE untuk mencegah race condition
 export async function generateNomorSurat(input: unknown) {
   const data = generateNomorSchema.parse(input);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("nomor", "generate");
 
   const result = await allocateNomorSurat({
     tahun: data.tahun,
@@ -92,7 +92,7 @@ export async function generateNomorSurat(input: unknown) {
 
 export async function generateBulkNomorSurat(input: unknown) {
   const data = generateBulkNomorSchema.parse(input);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("nomor", "generate");
 
   const result = await allocateNomorSurat({
     tahun: data.tahun,
@@ -121,7 +121,7 @@ export async function generateBulkNomorSurat(input: unknown) {
 
 export async function updateNomorSuratCounterPrefix(input: unknown) {
   const data = updatePrefixSchema.parse(input);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("nomor", "update");
 
   const [row] = await db
     .update(nomorSuratCounter)

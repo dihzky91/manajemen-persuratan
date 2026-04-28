@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx drizzle-kit *)"
+      "Bash(npx drizzle-kit *)",
+      "Bash(grep -n '$hooks\\\\|Hooks' 'D:\\\\laragon\\\\www\\\\riserscrm\\\\app\\\\Config\\\\Services.php')",
+      "Bash(grep -r '$hooks\\\\s*=' 'D:\\\\laragon\\\\www\\\\riserscrm' '--include=*.php')",
+      "Bash(xargs grep *)",
+      "Bash(xargs cat *)"
     ]
   }
 }

@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -10,7 +10,7 @@ import {
   pejabatPenandatangan,
   signatories,
 } from "@/server/db/schema";
-import { requireRole, requireSession } from "../auth";
+import { requirePermission, requireSession } from "../auth";
 
 const signatoryInputSchema = z.object({
   nama: z.string().trim().min(1, "Nama penandatangan wajib diisi.").max(255),
@@ -52,7 +52,7 @@ export async function listSignatories(): Promise<SignatoryRow[]> {
 
 export async function createSignatory(data: unknown) {
   const parsed = signatoryInputSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const [row] = await db
     .insert(signatories)
@@ -81,7 +81,7 @@ export async function createSignatory(data: unknown) {
 export async function updateSignatory(id: number, data: unknown) {
   const parsedId = idSchema.parse(id);
   const parsed = signatoryInputSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const [row] = await db
     .update(signatories)
@@ -111,7 +111,7 @@ export async function updateSignatory(id: number, data: unknown) {
 
 export async function deleteSignatory(id: number) {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const [existing] = await db
     .select({ id: signatories.id, nama: signatories.nama, jabatan: signatories.jabatan })

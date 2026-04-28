@@ -12,7 +12,7 @@ import {
   type DivisiCreateInput,
   type DivisiUpdateInput,
 } from "@/lib/validators/divisi.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 export type DivisiRow = {
   id: number;
@@ -43,7 +43,7 @@ export async function listDivisi(): Promise<DivisiRow[]> {
 
 export async function createDivisi(data: DivisiCreateInput) {
   const parsed = divisiCreateSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("divisi", "create");
 
   try {
     const kode = normalizeKode(parsed.kode);
@@ -74,7 +74,7 @@ export async function createDivisi(data: DivisiCreateInput) {
 
 export async function updateDivisi(data: DivisiUpdateInput) {
   const parsed = divisiUpdateSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("divisi", "update");
 
   try {
     const kode = normalizeKode(parsed.kode);
@@ -109,7 +109,7 @@ export async function updateDivisi(data: DivisiUpdateInput) {
 
 export async function deleteDivisi(data: { id: number }) {
   const parsed = divisiDeleteSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("divisi", "delete");
 
   const countResult = await db
     .select({ count: sql<number>`count(*)::int` })

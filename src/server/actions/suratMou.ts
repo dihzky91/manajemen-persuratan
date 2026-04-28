@@ -20,7 +20,7 @@ import {
   suratMouCreateSchema,
   suratMouUpdateSchema,
 } from "@/lib/validators/suratMou.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 export type SuratMouRow = {
   id: string;
@@ -80,7 +80,7 @@ export async function listSuratMou(): Promise<SuratMouRow[]> {
 
 export async function createSuratMou(data: unknown) {
   const parsed = suratMouCreateSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratMou", "create");
 
   const [row] = await db
     .insert(suratMou)
@@ -105,7 +105,7 @@ export async function createSuratMou(data: unknown) {
 
 export async function updateSuratMou(data: unknown) {
   const parsed = suratMouUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratMou", "update");
 
   const [existing] = await db
     .select({ id: suratMou.id })
@@ -137,7 +137,7 @@ export async function updateSuratMou(data: unknown) {
 
 export async function deleteSuratMou(data: unknown) {
   const parsed = idSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("suratMou", "delete");
 
   const [existing] = await db
     .select({ id: suratMou.id, nomorMOU: suratMou.nomorMOU })
@@ -164,7 +164,7 @@ export async function deleteSuratMou(data: unknown) {
 
 export async function uploadSuratMouFile(data: unknown) {
   const parsed = uploadFileSchema.parse(data);
-  await requireRole(["admin", "pejabat"]);
+  await requirePermission("suratMou", "create");
   const prepared = prepareUploadPayload(parsed);
   const storage = getStorageProvider();
   const uploaded = await storage.upload({
@@ -179,7 +179,7 @@ export async function uploadSuratMouFile(data: unknown) {
 
 export async function generateQrSuratMou(data: { id: string }) {
   const parsed = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratMou", "generate");
 
   const [row] = await db
     .select({

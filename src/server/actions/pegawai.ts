@@ -36,7 +36,7 @@ import {
   integritasSchema,
   kelengkapanSchema,
 } from "@/lib/validators/pegawai.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 export type PegawaiListRow = {
   id: string;
@@ -125,7 +125,7 @@ const PENDING_INVITE_PASSWORD = "PENDING_INVITE";
 
 export async function createPegawai(data: unknown) {
   const parsed = pegawaiCreateSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pegawai", "create");
 
   // Pastikan email belum dipakai (selain unique constraint DB).
   const existing = await db
@@ -193,7 +193,7 @@ export async function createPegawai(data: unknown) {
 
 export async function updatePegawai(data: unknown) {
   const parsed = pegawaiUpdateSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pegawai", "update");
 
   try {
     const [row] = await db
@@ -239,7 +239,7 @@ export async function updatePegawai(data: unknown) {
 
 export async function deletePegawai(data: unknown) {
   const parsed = pegawaiDeleteSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pegawai", "delete");
 
   if (session.user.id === parsed.id) {
     return {

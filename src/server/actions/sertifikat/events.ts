@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import {
   and,
@@ -25,7 +25,7 @@ import {
   participants,
   signatories,
 } from "@/server/db/schema";
-import { requireRole, requireSession } from "../auth";
+import { requirePermission, requireSession } from "../auth";
 
 const kategoriValues = ["Workshop", "Brevet AB", "Brevet C", "BFA", "Lainnya"] as const;
 const statusEventValues = ["aktif", "dibatalkan", "ditunda", "arsip"] as const;
@@ -358,7 +358,7 @@ export async function getEvent(id: number): Promise<EventRow | null> {
 }
 
 export async function listEventTemplateOptions(): Promise<EventTemplateOption[]> {
-  await requireRole(["admin", "staff"]);
+  await requirePermission("sertifikat", "manage");
 
   return db
     .select({
@@ -376,7 +376,7 @@ export async function createEvent(data: unknown) {
   const result = eventInputSchema.safeParse(data);
   if (!result.success) return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   const parsed = result.data;
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
   const selectedSignatories = normalizeSignatories(parsed);
 
   try {
@@ -429,7 +429,7 @@ export async function updateEvent(id: number, data: unknown) {
   const result = eventInputSchema.safeParse(data);
   if (!result.success) return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   const parsed = result.data;
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
   const selectedSignatories = normalizeSignatories(parsed);
 
   try {
@@ -478,7 +478,7 @@ export async function updateEvent(id: number, data: unknown) {
 
 export async function deleteEvent(id: number) {
   const parsedId = eventIdSchema.parse(id);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const [existing] = await db
     .select({ id: events.id, namaKegiatan: events.namaKegiatan })
@@ -505,7 +505,7 @@ export async function deleteEvent(id: number) {
   return { ok: true as const };
 }
 
-// ─── Quick Stats per Event (D2) ──────────────────────────────────────────────
+// â”€â”€â”€ Quick Stats per Event (D2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type EventQuickStats = {
   total: number;
@@ -517,7 +517,7 @@ export type EventQuickStats = {
 };
 
 export async function getEventQuickStats(eventId: number): Promise<EventQuickStats> {
-  await requireRole(["admin", "staff"]);
+  await requirePermission("sertifikat", "manage");
   const parsedId = eventIdSchema.parse(eventId);
 
   const [stats] = await db
@@ -540,7 +540,7 @@ export async function getEventQuickStats(eventId: number): Promise<EventQuickSta
   return stats ?? { total: 0, aktif: 0, dicabut: 0, punyaEmail: 0, emailTerkirim: 0, sudahDownload: 0 };
 }
 
-// ─── Trash / Restore (C1) ─────────────────────────────────────────────────────
+// â”€â”€â”€ Trash / Restore (C1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type DeletedEventRow = {
   id: number;
@@ -553,7 +553,7 @@ export type DeletedEventRow = {
 };
 
 export async function listDeletedEvents(): Promise<DeletedEventRow[]> {
-  await requireRole(["admin"]);
+  await requirePermission("sertifikat", "configure");
   const rows = await db
     .select({
       id: events.id,
@@ -572,7 +572,7 @@ export async function listDeletedEvents(): Promise<DeletedEventRow[]> {
 
 export async function restoreEvent(id: number) {
   const parsedId = eventIdSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [existing] = await db
     .select({ id: events.id, namaKegiatan: events.namaKegiatan, deletedAt: events.deletedAt })
@@ -604,7 +604,7 @@ export async function restoreEvent(id: number) {
 export async function updateEventStatus(eventId: number, statusEvent: StatusEvent) {
   const parsedId = eventIdSchema.parse(eventId);
   const parsedStatus = z.enum(statusEventValues).parse(statusEvent);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [row] = await db
     .update(events)

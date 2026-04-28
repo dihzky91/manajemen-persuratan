@@ -16,7 +16,7 @@ import {
   pejabatDeleteSchema,
   pejabatUpdateSchema,
 } from "@/lib/validators/pejabat.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 export type PejabatRow = {
   id: number;
@@ -51,7 +51,7 @@ export async function listPejabat(): Promise<PejabatRow[]> {
 
 export async function createPejabat(data: unknown) {
   const parsed = pejabatCreateSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pejabat", "create");
 
   const [row] = await db
     .insert(pejabatPenandatangan)
@@ -79,7 +79,7 @@ export async function createPejabat(data: unknown) {
 
 export async function updatePejabat(data: unknown) {
   const parsed = pejabatUpdateSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pejabat", "update");
 
   const [row] = await db
     .update(pejabatPenandatangan)
@@ -112,7 +112,7 @@ export async function updatePejabat(data: unknown) {
 
 export async function deletePejabat(data: unknown) {
   const parsed = pejabatDeleteSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pejabat", "delete");
 
   const [existing] = await db
     .select({

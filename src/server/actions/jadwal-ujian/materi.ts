@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
 import { materiUjian, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
   materiCreateSchema,
   materiUpdateSchema,
@@ -39,7 +39,7 @@ export async function listMateri(): Promise<MateriRow[]> {
 
 export async function createMateri(data: MateriCreateInput) {
   const parsed = materiCreateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const id = nanoid();
   const rows = await db
@@ -63,7 +63,7 @@ export async function createMateri(data: MateriCreateInput) {
 
 export async function updateMateri(data: MateriUpdateInput) {
   const parsed = materiUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const rows = await db
     .update(materiUjian)
@@ -86,7 +86,7 @@ export async function updateMateri(data: MateriUpdateInput) {
 }
 
 export async function deleteMateri(id: string) {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("jadwalUjian", "configure");
 
   const rows = await db
     .select({ nama: materiUjian.nama })

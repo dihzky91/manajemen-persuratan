@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { systemSettings, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 import { sendEmail } from "@/lib/email/mailjet";
 import { getStorageProvider } from "@/lib/storage";
 import { env } from "@/lib/env";
@@ -18,7 +18,7 @@ const configSchema = z.object({
 });
 
 export async function updateSystemConfig(input: unknown) {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pengaturan", "update");
 
   const parsed = configSchema.safeParse(input);
   if (!parsed.success) {
@@ -66,7 +66,7 @@ export async function updateSystemConfig(input: unknown) {
 // ─── Test connections (admin only) ────────────────────────────────────────────
 
 export async function testEmailConnection() {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("pengaturan", "configure");
 
   // Pre-flight check — sendEmail silently returns on missing env, jadi kita
   // harus cek manual supaya test action tidak false-positive.
@@ -110,7 +110,7 @@ export async function testEmailConnection() {
 }
 
 export async function testStorageConnection() {
-  await requireRole(["admin"]);
+  await requirePermission("pengaturan", "configure");
   try {
     const storage = getStorageProvider();
     const payload = `storage-test-${Date.now()}`;

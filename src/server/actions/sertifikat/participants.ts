@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { auditLog, eventCertificateCounters, events, participantRevisions, participants, users } from "@/server/db/schema";
-import { requireRole, requireSession } from "../auth";
+import { requirePermission, requireSession } from "../auth";
 
 type RevisionChangeType =
   | "create"
@@ -290,7 +290,7 @@ export async function listAllByEvent(eventId: number): Promise<ParticipantRow[]>
 
 export async function createParticipant(data: unknown) {
   const parsed = participantInputSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   try {
     const [row] = await db.transaction(async (tx) => {
@@ -353,7 +353,7 @@ export async function createParticipant(data: unknown) {
 export async function updateParticipant(id: number, data: unknown) {
   const parsedId = idSchema.parse(id);
   const parsed = participantUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   try {
     const [before] = await db
@@ -410,7 +410,7 @@ export async function updateParticipant(id: number, data: unknown) {
 
 export async function deleteParticipant(id: number) {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const [existing] = await db
     .select()
@@ -450,7 +450,7 @@ export async function revokeParticipant(
   reason?: string,
 ): Promise<{ ok: true; data: ParticipantRow } | { ok: false; error: string }> {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [existing] = await db
     .select()
@@ -505,7 +505,7 @@ export async function reactivateParticipant(
   id: number,
 ): Promise<{ ok: true; data: ParticipantRow } | { ok: false; error: string }> {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [existing] = await db
     .select()
@@ -551,7 +551,7 @@ export async function reactivateParticipant(
   return { ok: true as const, data: row };
 }
 
-// ─── Global Search (D4) ──────────────────────────────────────────────────────
+// â”€â”€â”€ Global Search (D4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type GlobalParticipantRow = {
   id: number;
@@ -587,7 +587,7 @@ export type GlobalSearchResult = {
 export async function searchAllParticipants(
   filters: GlobalSearchFilters = {},
 ): Promise<GlobalSearchResult> {
-  await requireRole(["admin", "staff"]);
+  await requirePermission("sertifikat", "manage");
 
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = [10, 25, 50, 100].includes(filters.pageSize ?? 25) ? (filters.pageSize ?? 25) : 25;
@@ -653,7 +653,7 @@ export async function searchAllParticipants(
   };
 }
 
-// ─── Re-issue (C3) ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Re-issue (C3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const reissueInputSchema = z.object({
   nama: z.string().trim().min(1, "Nama wajib diisi.").max(255),
@@ -668,7 +668,7 @@ export async function reissueParticipant(
 ): Promise<{ ok: true; data: ParticipantRow } | { ok: false; error: string }> {
   const parsedOldId = idSchema.parse(oldParticipantId);
   const parsed = reissueInputSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [old] = await db
     .select()
@@ -762,7 +762,7 @@ export async function reissueParticipant(
   }
 }
 
-// ─── Revisions (C2) ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Revisions (C2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ParticipantRevisionRow = {
   id: number;
@@ -777,7 +777,7 @@ export type ParticipantRevisionRow = {
 };
 
 export async function listParticipantRevisions(participantId: number): Promise<ParticipantRevisionRow[]> {
-  await requireRole(["admin", "staff"]);
+  await requirePermission("sertifikat", "manage");
   const parsedId = idSchema.parse(participantId);
 
   const rows = await db
@@ -800,7 +800,7 @@ export async function listParticipantRevisions(participantId: number): Promise<P
   return rows;
 }
 
-// ─── Trash / Restore (C1) ─────────────────────────────────────────────────────
+// â”€â”€â”€ Trash / Restore (C1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type DeletedParticipantRow = ParticipantRow & {
   eventNamaKegiatan: string;
@@ -808,7 +808,7 @@ export type DeletedParticipantRow = ParticipantRow & {
 };
 
 export async function listDeletedParticipants(): Promise<DeletedParticipantRow[]> {
-  await requireRole(["admin"]);
+  await requirePermission("sertifikat", "configure");
   const rows = await db
     .select({
       id: participants.id,
@@ -839,7 +839,7 @@ export async function listDeletedParticipants(): Promise<DeletedParticipantRow[]
 
 export async function restoreParticipant(id: number) {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [existing] = await db
     .select()
@@ -897,7 +897,7 @@ export async function restoreParticipant(id: number) {
 
 export async function bulkDeleteParticipants(ids: number[]) {
   const parsedIds = z.array(z.coerce.number().int().positive()).min(1).parse(ids);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const existing = await db
     .select({ id: participants.id, noSertifikat: participants.noSertifikat, nama: participants.nama, eventId: participants.eventId })
@@ -933,7 +933,7 @@ export async function bulkDeleteParticipants(ids: number[]) {
 
 export async function bulkRevokeParticipants(ids: number[], reason?: string) {
   const parsedIds = z.array(z.coerce.number().int().positive()).min(1).parse(ids);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const existing = await db
     .select({ id: participants.id, noSertifikat: participants.noSertifikat, nama: participants.nama, eventId: participants.eventId })
@@ -984,7 +984,7 @@ export async function bulkImportParticipants(
   formData: FormData,
 ): Promise<{ ok: true; data: BulkImportResult } | { ok: false; error: string }> {
   const parsedEventId = idSchema.parse(eventId);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
   const file = formData.get("file");
 
   if (!(file instanceof File) || file.size === 0) {

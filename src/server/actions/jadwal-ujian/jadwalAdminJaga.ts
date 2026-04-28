@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { asc, desc, eq, sql, and, gte, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
 import { jadwalAdminJaga, kelasUjian, pengawas, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
   jadwalAdminJagaCreateSchema,
   jadwalAdminJagaUpdateSchema,
@@ -86,7 +86,7 @@ export async function getBebanJadwalAdminJaga(): Promise<BebanJadwalAdminJagaRow
 
 export async function createJadwalAdminJaga(data: JadwalAdminJagaCreateInput) {
   const parsed = jadwalAdminJagaCreateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const id = nanoid();
   await db.insert(jadwalAdminJaga).values({
@@ -120,7 +120,7 @@ export async function createJadwalAdminJaga(data: JadwalAdminJagaCreateInput) {
 
 export async function updateJadwalAdminJaga(data: JadwalAdminJagaUpdateInput) {
   const parsed = jadwalAdminJagaUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const existing = await db
     .select({ id: jadwalAdminJaga.id })
@@ -161,7 +161,7 @@ export async function updateJadwalAdminJaga(data: JadwalAdminJagaUpdateInput) {
 }
 
 export async function deleteJadwalAdminJaga(id: string) {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const rows = await db
     .select({ pengawasId: jadwalAdminJaga.pengawasId, tanggal: jadwalAdminJaga.tanggal })
@@ -186,7 +186,7 @@ export async function deleteJadwalAdminJaga(id: string) {
 export async function deleteJadwalAdminJagaByKelas(kelasId: string) {
   if (!kelasId) return { ok: false as const, error: "Kelas wajib dipilih." };
 
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
   const deleted = await db
     .delete(jadwalAdminJaga)
     .where(eq(jadwalAdminJaga.kelasId, kelasId))
@@ -222,7 +222,7 @@ export async function importJadwalAdminJaga(rows: ImportJadwalAdminJagaRow[]) {
   if (rows.length === 0) return { ok: false as const, error: "Tidak ada data untuk diimpor." };
   if (rows.length > 500) return { ok: false as const, error: "Maksimal 500 baris per import." };
 
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const parsedRows = rows.map((row) => jadwalAdminJagaCreateSchema.parse(row));
 

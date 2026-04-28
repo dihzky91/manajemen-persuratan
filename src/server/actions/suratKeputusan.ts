@@ -20,7 +20,7 @@ import {
   suratKeputusanCreateSchema,
   suratKeputusanUpdateSchema,
 } from "@/lib/validators/suratKeputusan.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 export type SuratKeputusanRow = {
   id: string;
@@ -76,7 +76,7 @@ export async function listSuratKeputusan(): Promise<SuratKeputusanRow[]> {
 
 export async function createSuratKeputusan(data: unknown) {
   const parsed = suratKeputusanCreateSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeputusan", "create");
 
   const [row] = await db
     .insert(suratKeputusan)
@@ -101,7 +101,7 @@ export async function createSuratKeputusan(data: unknown) {
 
 export async function updateSuratKeputusan(data: unknown) {
   const parsed = suratKeputusanUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeputusan", "update");
 
   const [existing] = await db
     .select({ id: suratKeputusan.id })
@@ -133,7 +133,7 @@ export async function updateSuratKeputusan(data: unknown) {
 
 export async function deleteSuratKeputusan(data: unknown) {
   const parsed = idSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("suratKeputusan", "delete");
 
   const [existing] = await db
     .select({ id: suratKeputusan.id, nomorSK: suratKeputusan.nomorSK })
@@ -160,7 +160,7 @@ export async function deleteSuratKeputusan(data: unknown) {
 
 export async function uploadSuratKeputusanFile(data: unknown) {
   const parsed = uploadFileSchema.parse(data);
-  await requireRole(["admin", "pejabat"]);
+  await requirePermission("suratKeputusan", "create");
   const prepared = prepareUploadPayload(parsed);
   const storage = getStorageProvider();
   const uploaded = await storage.upload({
@@ -175,7 +175,7 @@ export async function uploadSuratKeputusanFile(data: unknown) {
 
 export async function generateQrSuratKeputusan(data: { id: string }) {
   const parsed = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeputusan", "generate");
 
   const [row] = await db
     .select({

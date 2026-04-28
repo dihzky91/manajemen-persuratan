@@ -8,6 +8,7 @@ import type { NavRole } from "@/components/layout/navigation";
 interface DashboardShellProps {
   children: React.ReactNode;
   unreadDisposisiCount: number;
+  unreadAnnouncementCount: number;
   systemIdentity: { namaSistem: string; logoUrl: string | null };
   userRole: NavRole | null;
   userName?: string | null;
@@ -17,6 +18,7 @@ interface DashboardShellProps {
 export function DashboardShell({
   children,
   unreadDisposisiCount,
+  unreadAnnouncementCount,
   systemIdentity,
   userRole,
   userName,
@@ -28,6 +30,7 @@ export function DashboardShell({
     <div className="min-h-screen bg-background lg:flex">
       <Sidebar
         unreadDisposisiCount={unreadDisposisiCount}
+        unreadAnnouncementCount={unreadAnnouncementCount}
         systemIdentity={systemIdentity}
         userRole={userRole}
         mobileOpen={mobileSidebarOpen}

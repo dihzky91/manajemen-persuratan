@@ -8,7 +8,7 @@ import {
   disposisiCreateSchema,
   disposisiUpdateStatusSchema,
 } from "@/lib/validators/disposisi.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 import { sendEmail, buildDisposisiEmail } from "@/lib/email/mailjet";
 import { markSuratMasukDiproses } from "./suratMasuk";
 import { notifyDisposisiBaru, notifyDisposisiDeadline } from "./notifications";
@@ -169,7 +169,7 @@ export async function listDisposisiRecipients(): Promise<DisposisiRecipientOptio
 
 export async function createDisposisi(data: unknown) {
   const parsed = disposisiCreateSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("disposisi", "create");
 
   const [row] = await db
     .insert(disposisi)

@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { asc, desc, eq, sql, and, gte, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -66,7 +66,7 @@ async function buildKonflikMap(
   }
   return result;
 }
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
   ujianCreateSchema,
   ujianUpdateSchema,
@@ -268,7 +268,7 @@ export async function createUjian(data: UjianCreateInput & { pengawasIds?: strin
   const parsed = ujianCreateSchema.parse(data);
   const pengawasIds = data.pengawasIds ?? [];
   const adminJagaIds = [...new Set(data.adminJagaIds ?? [])];
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const id = nanoid();
   const rows = await db
@@ -336,7 +336,7 @@ export async function createUjian(data: UjianCreateInput & { pengawasIds?: strin
 
 export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: string[]; adminJagaIds?: string[] }) {
   const parsed = ujianUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const rows = await db
     .update(jadwalUjian)
@@ -409,7 +409,7 @@ export async function updateUjian(data: UjianUpdateInput & { pengawasIds?: strin
 }
 
 export async function deleteUjian(id: string) {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("jadwalUjian", "configure");
 
   const ujianRows = await db
     .select({ mataPelajaran: jadwalUjian.mataPelajaran })

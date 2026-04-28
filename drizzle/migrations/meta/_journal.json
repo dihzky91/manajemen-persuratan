@@ -127,6 +127,48 @@
       "when": 1745971200000,
       "tag": "0017_jadwal_admin_jaga_waktu",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777348800000,
+      "tag": "0018_announcements",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777351800000,
+      "tag": "0019_announcement_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777354800000,
+      "tag": "0020_announcement_pin_draft",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1777357800000,
+      "tag": "0021_announcement_acknowledgement",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1777360800000,
+      "tag": "0022_user_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1777363800000,
+      "tag": "0023_add_activated_at",
+      "breakpoints": true
     }
   ]
 }

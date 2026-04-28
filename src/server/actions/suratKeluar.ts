@@ -28,7 +28,7 @@ import {
   suratKeluarCreateSchema,
   suratKeluarUpdateSchema,
 } from "@/lib/validators/suratKeluar.schema";
-import { requireRole, requireSession } from "./auth";
+import { requirePermission, requireSession } from "./auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -185,7 +185,7 @@ export async function getSuratKeluarById(id: string) {
 
 export async function createSuratKeluar(data: unknown) {
   const parsed = suratKeluarCreateSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat", "staff"]);
+  const session = await requirePermission("suratKeluar", "create");
 
   const [row] = await db
     .insert(suratKeluar)
@@ -211,7 +211,7 @@ export async function createSuratKeluar(data: unknown) {
 
 export async function uploadSuratKeluarDraft(data: unknown) {
   const parsed = uploadFileSchema.parse(data);
-  await requireRole(["admin", "pejabat", "staff"]);
+  await requirePermission("suratKeluar", "create");
   const prepared = prepareUploadPayload(parsed);
 
   const storage = getStorageProvider();
@@ -230,7 +230,7 @@ export async function uploadSuratKeluarDraft(data: unknown) {
 
 export async function uploadSuratKeluarLampiran(data: unknown) {
   const parsed = uploadFileSchema.parse(data);
-  await requireRole(["admin", "pejabat", "staff"]);
+  await requirePermission("suratKeluar", "create");
   const prepared = prepareUploadPayload(parsed);
 
   const storage = getStorageProvider();
@@ -256,7 +256,7 @@ export async function uploadSuratKeluarFinal(data: unknown) {
       dataUrl: z.string().min(1, "Data file wajib ada."),
     })
     .parse(data);
-  await requireRole(["admin", "pejabat"]);
+  await requirePermission("suratKeluar", "generate");
   const prepared = prepareUploadPayload(parsed);
 
   const [existing] = await db
@@ -297,7 +297,7 @@ export async function uploadSuratKeluarFinal(data: unknown) {
 
 export async function stampQrToSuratKeluarPdf(data: unknown) {
   const parsed = stampQrPdfSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "generate");
   const prepared = prepareUploadPayload(parsed);
 
   if (prepared.contentType !== "application/pdf") {
@@ -403,7 +403,7 @@ export async function stampQrToSuratKeluarPdf(data: unknown) {
 
 export async function updateSuratKeluar(data: unknown) {
   const parsed = suratKeluarUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat", "staff"]);
+  const session = await requirePermission("suratKeluar", "update");
 
   const [existing] = await db
     .select({ status: suratKeluar.status })
@@ -441,7 +441,7 @@ export async function updateSuratKeluar(data: unknown) {
 
 export async function deleteSuratKeluar(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("suratKeluar", "delete");
 
   const [existing] = await db
     .select({ status: suratKeluar.status, perihal: suratKeluar.perihal })
@@ -474,7 +474,7 @@ export async function deleteSuratKeluar(data: { id: string }) {
 
 export async function ajukanPersetujuan(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat", "staff"]);
+  const session = await requirePermission("suratKeluar", "update");
 
   const [existing] = await db
     .select({ status: suratKeluar.status })
@@ -508,7 +508,7 @@ export async function ajukanPersetujuan(data: { id: string }) {
 
 export async function mulaiReviu(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "approve");
 
   const guard = await ensureSuratStatus(id, ["permohonan_persetujuan"]);
   if (!guard.ok) return guard;
@@ -542,7 +542,7 @@ export async function mulaiReviu(data: { id: string }) {
 
 export async function setujuiSurat(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "approve");
 
   const guard = await ensureSuratStatus(id, ["reviu"]);
   if (!guard.ok) return guard;
@@ -576,7 +576,7 @@ export async function tolakSurat(data: { id: string; catatanReviu: string }) {
       catatanReviu: z.string().min(1, "Catatan reviu wajib diisi"),
     })
     .parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "approve");
 
   const guard = await ensureSuratStatus(parsed.id, ["reviu"]);
   if (!guard.ok) return guard;
@@ -605,7 +605,7 @@ export async function tolakSurat(data: { id: string; catatanReviu: string }) {
 
 export async function selesaikanSurat(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "approve");
 
   const guard = await ensureSuratStatus(id, ["pengarsipan"]);
   if (!guard.ok) return guard;
@@ -659,7 +659,7 @@ export async function selesaikanSurat(data: { id: string }) {
 
 export async function generateQrSuratKeluar(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "generate");
 
   const [surat] = await db
     .select({
@@ -743,7 +743,7 @@ export async function getSuratKeluarVerificationById(
 
 export async function batalkanSurat(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("suratKeluar", "delete");
 
   const guard = await ensureSuratStatus(id, [
     "draft",
@@ -776,7 +776,7 @@ export async function batalkanSurat(data: { id: string }) {
 
 export async function assignNomorSuratKeluar(data: { id: string }) {
   const { id } = idSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "assign");
   const [surat] = await db
     .select({
       nomorSurat: suratKeluar.nomorSurat,
@@ -841,7 +841,7 @@ export async function assignNomorSuratKeluar(data: { id: string }) {
 
 export async function setManualNomorSuratKeluar(data: unknown) {
   const parsed = manualNomorSuratSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "assign");
   const nomorSurat = parsed.nomorSurat.trim();
 
   const guard = await ensureSuratStatus(parsed.id, ["pengarsipan"]);
@@ -898,7 +898,7 @@ export async function setManualNomorSuratKeluar(data: unknown) {
 
 export async function checkNomorSuratKeluarAvailability(data: unknown) {
   const parsed = manualNomorSuratSchema.parse(data);
-  await requireRole(["admin", "pejabat"]);
+  await requirePermission("suratKeluar", "assign");
   const nomorSurat = parsed.nomorSurat.trim();
 
   if (!nomorSurat) {
@@ -937,7 +937,7 @@ export async function checkNomorSuratKeluarAvailability(data: unknown) {
 
 export async function bulkAssignNomorSuratKeluar(data: { ids: string[] }) {
   const { ids } = bulkAssignNomorSchema.parse(data);
-  const session = await requireRole(["admin", "pejabat"]);
+  const session = await requirePermission("suratKeluar", "assign");
 
   const rows = await db
     .select({

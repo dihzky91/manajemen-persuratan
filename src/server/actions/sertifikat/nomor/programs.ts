@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { asc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -9,9 +9,9 @@ import {
   certificateBatches,
   certificatePrograms,
 } from "@/server/db/schema";
-import { requireRole, requireSession } from "../../auth";
+import { requirePermission, requireSession } from "../../auth";
 
-// ─── Schemas ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const programInputSchema = z.object({
   name: z.string().trim().min(1, "Nama program wajib diisi.").max(200),
@@ -20,7 +20,7 @@ const programInputSchema = z.object({
 
 const idSchema = z.string().min(1, "ID tidak valid.");
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type CertificateProgramRow = {
   id: string;
@@ -30,13 +30,13 @@ export type CertificateProgramRow = {
   updatedAt: Date;
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function normalizeOptional(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
 }
 
-// ─── Actions ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function listCertificatePrograms(): Promise<CertificateProgramRow[]> {
   await requireSession();
@@ -53,7 +53,7 @@ export async function createCertificateProgram(data: unknown) {
     return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   }
   const parsed = result.data;
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   try {
     const [row] = await db
@@ -97,7 +97,7 @@ export async function updateCertificateProgram(id: string, data: unknown) {
     return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   }
   const parsed = result.data;
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   try {
     const [row] = await db
@@ -136,7 +136,7 @@ export async function updateCertificateProgram(id: string, data: unknown) {
 
 export async function deleteCertificateProgram(id: string) {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [existing] = await db
     .select({ id: certificatePrograms.id, name: certificatePrograms.name })

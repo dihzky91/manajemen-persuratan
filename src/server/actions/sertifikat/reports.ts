@@ -1,10 +1,10 @@
-"use server";
+﻿"use server";
 
 import { and, eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "@/server/db";
 import { auditLog, events, participants } from "@/server/db/schema";
-import { requireRole } from "../auth";
+import { requirePermission } from "../auth";
 
 type ExportResult =
   | { ok: true; data: { fileName: string; xlsxBase64: string } }
@@ -24,7 +24,7 @@ function formatDate(value: Date | string | null) {
 }
 
 export async function exportEventReport(eventId: number): Promise<ExportResult> {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   try {
     // 1. Get event details

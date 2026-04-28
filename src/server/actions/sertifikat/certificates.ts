@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { createHash } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
@@ -19,7 +19,7 @@ import {
   signatories,
   type TemplateFieldMap,
 } from "@/server/db/schema";
-import { requireRole } from "../auth";
+import { requirePermission } from "../auth";
 import { checkSertifikatRateLimit, formatRetryAfter } from "@/lib/rate-limit/user-bucket";
 
 type TemplateKategori = typeof certificateTemplates.$inferSelect["kategori"];
@@ -218,7 +218,7 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
 export async function generateCertificatePdf(participantId: number): Promise<
   { ok: true; data: { fileName: string; pdfBase64: string } } | { ok: false; error: string }
 > {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const limit = checkSertifikatRateLimit(session.user.id, "certificate_download");
   if (!limit.ok) {
@@ -243,7 +243,7 @@ export async function generateCertificatePdf(participantId: number): Promise<
 export async function generateBulkCertificatesZip(eventId: number): Promise<
   { ok: true; data: { fileName: string; zipBase64: string } } | { ok: false; error: string }
 > {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const limit = checkSertifikatRateLimit(session.user.id, "certificate_bulk_download");
   if (!limit.ok) {
@@ -352,7 +352,7 @@ async function sendCertificateEmailInternal(
 }
 
 export async function sendCertificateEmail(participantId: number): Promise<{ ok: true } | { ok: false; error: string }> {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const limit = checkSertifikatRateLimit(session.user.id, "certificate_email");
   if (!limit.ok) {
@@ -365,7 +365,7 @@ export async function sendCertificateEmail(participantId: number): Promise<{ ok:
 export async function sendBulkCertificateEmails(eventId: number): Promise<
   { ok: true; data: { sent: number; skipped: number; failed: number } } | { ok: false; error: string }
 > {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   const limit = checkSertifikatRateLimit(session.user.id, "certificate_bulk_email");
   if (!limit.ok) {

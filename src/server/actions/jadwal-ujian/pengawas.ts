@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { asc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
 import { pengawas, penugasanPengawas, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
   pengawasCreateSchema,
   pengawasUpdateSchema,
@@ -42,7 +42,7 @@ export async function listPengawas(): Promise<PengawasRow[]> {
 
 export async function createPengawas(data: PengawasCreateInput) {
   const parsed = pengawasCreateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const id = nanoid();
   const rows = await db
@@ -70,7 +70,7 @@ export async function createPengawas(data: PengawasCreateInput) {
 
 export async function updatePengawas(data: PengawasUpdateInput) {
   const parsed = pengawasUpdateSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const rows = await db
     .update(pengawas)
@@ -97,7 +97,7 @@ export async function updatePengawas(data: PengawasUpdateInput) {
 }
 
 export async function deletePengawas(id: string) {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("jadwalUjian", "configure");
 
   const countResult = await db
     .select({ count: sql<number>`count(*)::int` })

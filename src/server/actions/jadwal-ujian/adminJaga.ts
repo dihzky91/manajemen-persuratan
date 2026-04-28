@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { asc, desc, eq, sql, and, gte, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
 import { adminJaga, jadwalUjian, kelasUjian, pengawas, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 import {
   adminJagaAssignSchema,
   type AdminJagaAssignInput,
@@ -114,7 +114,7 @@ export async function assignAdminJaga(
   data: AdminJagaAssignInput & { tanggalUjian: string; jamMulai: string; jamSelesai: string },
 ) {
   const parsed = adminJagaAssignSchema.parse(data);
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const existing = await db
     .select({
@@ -162,7 +162,7 @@ export async function assignAdminJaga(
 }
 
 export async function unassignAdminJaga(id: string) {
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("jadwalUjian", "manage");
 
   const rows = await db
     .select({ pengawasId: adminJaga.pengawasId, ujianId: adminJaga.ujianId })

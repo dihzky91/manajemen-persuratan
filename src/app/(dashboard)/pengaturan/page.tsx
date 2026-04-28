@@ -5,10 +5,13 @@ import { IdentitasSistemCard } from "@/components/pengaturan/IdentitasSistemCard
 import { ProfilAkunCard } from "@/components/pengaturan/ProfilAkunCard";
 import { NotifikasiPreferencesCard } from "@/components/pengaturan/NotifikasiPreferencesCard";
 import { SistemStatusSection } from "@/components/pengaturan/SistemStatusSection";
+import { ManajemenUserCard } from "@/components/pengaturan/ManajemenUserCard";
 import { PengaturanTabs } from "@/components/pengaturan/PengaturanTabs";
 import { getSystemSettings, getSessionRole } from "@/server/actions/systemSettings";
 import { getMyProfile } from "@/server/actions/profile";
 import { getMyNotificationPreferences } from "@/server/actions/notificationPreferences";
+import { listInvitations, listUsersForManagement } from "@/server/actions/invitations";
+import { listDivisi } from "@/server/actions/divisi";
 
 export const metadata: Metadata = {
   title: "Pengaturan | Manajemen Surat IAI Jakarta",
@@ -26,6 +29,21 @@ export default async function PengaturanPage() {
     redirect("/login");
   }
 
+  const isAdmin = role === "admin";
+
+  // Fetch data manajemen user hanya untuk admin
+  let invitations: Awaited<ReturnType<typeof listInvitations>> = [];
+  let userRows: Awaited<ReturnType<typeof listUsersForManagement>> = [];
+  let divisiOptions: Array<{ id: number; nama: string }> = [];
+
+  if (isAdmin) {
+    [invitations, userRows, divisiOptions] = await Promise.all([
+      listInvitations(),
+      listUsersForManagement(),
+      listDivisi().then((rows) => rows.map((r) => ({ id: r.id, nama: r.nama }))),
+    ]);
+  }
+
   return (
     <PageWrapper
       title="Pengaturan"
@@ -37,14 +55,23 @@ export default async function PengaturanPage() {
         identitas={
           <IdentitasSistemCard
             initial={systemSettingsData}
-            isAdmin={role === "admin"}
+            isAdmin={isAdmin}
           />
         }
         sistem={
           <SistemStatusSection
             systemSettings={systemSettingsData}
-            isAdmin={role === "admin"}
+            isAdmin={isAdmin}
           />
+        }
+        manajemenUser={
+          isAdmin ? (
+            <ManajemenUserCard
+              invitations={invitations}
+              users={userRows}
+              divisiOptions={divisiOptions}
+            />
+          ) : undefined
         }
       />
     </PageWrapper>

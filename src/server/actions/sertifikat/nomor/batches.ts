@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { and, asc, count, desc, eq, max, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -13,9 +13,9 @@ import {
   certificateSerialConfig,
   users,
 } from "@/server/db/schema";
-import { requireRole, requireSession } from "../../auth";
+import { requirePermission, requireSession } from "../../auth";
 
-// ─── Schemas ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const batchFilterSchema = z.object({
   programId:   z.string().optional(),
@@ -41,7 +41,7 @@ const updateQuantitySchema = z.object({
   angkatan:      z.number().int(),
 });
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type BatchRow = {
   id: string;
@@ -96,7 +96,7 @@ export type CsvExportRow = {
   Status: string;
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function getLastSerial(): Promise<number> {
   const [config] = await db
@@ -118,7 +118,7 @@ async function setLastSerial(value: number): Promise<void> {
     });
 }
 
-// ─── Actions: List & Get ──────────────────────────────────────────────────────
+// â”€â”€â”€ Actions: List & Get â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function listBatches(filters?: z.infer<typeof batchFilterSchema>): Promise<BatchRow[]> {
   await requireSession();
@@ -205,7 +205,7 @@ export async function getBatch(id: string): Promise<BatchDetailRow | null> {
   return { ...(batch as BatchRow), items: items as BatchItemRow[] };
 }
 
-// ─── Actions: Generate ────────────────────────────────────────────────────────
+// â”€â”€â”€ Actions: Generate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function generateBatch(data: unknown) {
   const result = generateSchema.safeParse(data);
@@ -213,7 +213,7 @@ export async function generateBatch(data: unknown) {
     return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   }
   const { programId, classTypeId, classTypeCode, angkatan, quantity } = result.data;
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   try {
     // 1. Baca serial terakhir
@@ -305,7 +305,7 @@ export async function generateBatch(data: unknown) {
   }
 }
 
-// ─── Actions: Update Jumlah Batch ────────────────────────────────────────────
+// â”€â”€â”€ Actions: Update Jumlah Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function updateBatchQuantity(rawData: unknown) {
   const result = updateQuantitySchema.safeParse(rawData);
@@ -313,7 +313,7 @@ export async function updateBatchQuantity(rawData: unknown) {
     return { ok: false as const, error: result.error.issues[0]?.message ?? "Data tidak valid." };
   }
   const { batchId, newQuantity, classTypeCode, angkatan } = result.data;
-  const session = await requireRole(["admin", "staff"]);
+  const session = await requirePermission("sertifikat", "manage");
 
   // Ambil semua items batch ini
   const batchItems = await db
@@ -326,7 +326,7 @@ export async function updateBatchQuantity(rawData: unknown) {
   if (newQuantity === currentQty) return { ok: true as const };
 
   if (newQuantity < currentQty) {
-    // === PENGURANGAN — hanya boleh untuk batch terakhir (serial tertinggi) ===
+    // === PENGURANGAN â€” hanya boleh untuk batch terakhir (serial tertinggi) ===
     const batchMaxSerial = Math.max(...batchItems.map((item) => item.serialNumber));
 
     const [globalMaxRow] = await db
@@ -388,7 +388,7 @@ export async function updateBatchQuantity(rawData: unknown) {
     });
 
   } else {
-    // === PENAMBAHAN — generate nomor baru melanjutkan serial global ===
+    // === PENAMBAHAN â€” generate nomor baru melanjutkan serial global ===
     const addCount = newQuantity - currentQty;
     const lastSerial = await getLastSerial();
     const startSerial = lastSerial + 1;
@@ -440,11 +440,11 @@ export async function updateBatchQuantity(rawData: unknown) {
   return { ok: true as const };
 }
 
-// ─── Actions: Cancel Batch ────────────────────────────────────────────────────
+// â”€â”€â”€ Actions: Cancel Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function cancelBatch(id: string) {
   const parsedId = idSchema.parse(id);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("sertifikat", "configure");
 
   const [existing] = await db
     .select({ id: certificateBatches.id, status: certificateBatches.status, firstCertificateNumber: certificateBatches.firstCertificateNumber })
@@ -479,12 +479,12 @@ export async function cancelBatch(id: string) {
   return { ok: true as const };
 }
 
-// ─── Actions: Export CSV ──────────────────────────────────────────────────────
+// â”€â”€â”€ Actions: Export CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function exportBatchToCsv(id: string): Promise<
   { ok: true; data: CsvExportRow[]; filename: string } | { ok: false; error: string }
 > {
-  await requireRole(["admin", "staff"]);
+  await requirePermission("sertifikat", "manage");
   const parsedId = idSchema.parse(id);
 
   const [batch] = await db
@@ -529,7 +529,7 @@ export async function exportBatchToCsv(id: string): Promise<
   return { ok: true, data, filename };
 }
 
-// ─── Actions: Rekap Tahunan ───────────────────────────────────────────────────
+// â”€â”€â”€ Actions: Rekap Tahunan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getAvailableYears(): Promise<number[]> {
   await requireSession();
@@ -600,7 +600,7 @@ export async function getYearlyProgramStats(year: number): Promise<YearlyProgram
   return rows;
 }
 
-// ─── Action: Dashboard Stats ──────────────────────────────────────────────────
+// â”€â”€â”€ Action: Dashboard Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type CertDashboardStats = {
   totalBatches: number;

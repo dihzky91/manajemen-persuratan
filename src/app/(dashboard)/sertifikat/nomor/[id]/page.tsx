@@ -6,7 +6,7 @@ import { PageWrapper } from "@/components/layout/PageWrapper";
 import { BatchDetailView } from "@/components/sertifikat/BatchDetailView";
 import { Button } from "@/components/ui/button";
 import { getBatch } from "@/server/actions/sertifikat/nomor/batches";
-import { requireRole } from "@/server/actions/auth";
+import { requirePermission } from "@/server/actions/auth";
 
 export const metadata: Metadata = {
   title: "Detail Batch Sertifikat | Manajemen Surat IAI Jakarta",
@@ -21,7 +21,7 @@ export default async function Page({ params }: PageProps) {
 
   const [batch, session] = await Promise.all([
     getBatch(id),
-    requireRole(["admin", "staff"]),
+    requirePermission("sertifikat", "manage"),
   ]);
 
   if (!batch) notFound();

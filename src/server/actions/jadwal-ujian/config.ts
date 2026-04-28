@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { asc, eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { jadwalUjianConfig, auditLog } from "@/server/db/schema";
-import { requireRole, requireSession } from "@/server/actions/auth";
+import { requirePermission, requireSession } from "@/server/actions/auth";
 
 export type ConfigJenis = "program" | "tipe" | "mode";
 
@@ -79,7 +79,7 @@ export async function getAllKonfig(): Promise<Record<ConfigJenis, string[]>> {
 }
 
 export async function listKonfig(): Promise<ConfigRow[]> {
-  await requireRole(["admin"]);
+  await requirePermission("jadwalUjian", "configure");
   const rows = await db
     .select()
     .from(jadwalUjianConfig)
@@ -94,7 +94,7 @@ const createSchema = z.object({
 
 export async function createKonfig(data: { jenis: ConfigJenis; nilai: string }) {
   const parsed = createSchema.parse(data);
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("jadwalUjian", "configure");
 
   // Hitung urutan berikutnya
   const existing = await db
@@ -133,7 +133,7 @@ export async function createKonfig(data: { jenis: ConfigJenis; nilai: string }) 
 }
 
 export async function deleteKonfig(id: string) {
-  const session = await requireRole(["admin"]);
+  const session = await requirePermission("jadwalUjian", "configure");
 
   const row = await db
     .select()

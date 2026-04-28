@@ -3,7 +3,7 @@
 import { desc, eq, and, gte, lte, like, inArray, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { auditLog, users } from "@/server/db/schema";
-import { requireRole } from "./auth";
+import { requirePermission } from "./auth";
 
 export type AuditLogRow = {
   id: number;
@@ -43,7 +43,7 @@ const SERTIFIKAT_ENTITY_TYPES = [
 ];
 
 export async function listAuditLog(filter: AuditLogFilter = {}): Promise<AuditLogResult> {
-  await requireRole(["admin"]);
+  await requirePermission("auditLog", "view");
   return listAuditLogInternal(filter);
 }
 
@@ -118,7 +118,7 @@ async function listAuditLogInternal(filter: AuditLogFilter = {}): Promise<AuditL
 
 // Daftar entitas unik untuk filter dropdown
 export async function listAuditEntitasTypes(): Promise<string[]> {
-  await requireRole(["admin"]);
+  await requirePermission("auditLog", "view");
   const rows = await db
     .selectDistinct({ entitasType: auditLog.entitasType })
     .from(auditLog)
@@ -129,6 +129,6 @@ export async function listAuditEntitasTypes(): Promise<string[]> {
 
 export async function listSertifikatAuditLog(filter: Omit<AuditLogFilter, "entitasType"> = {}): Promise<AuditLogResult> {
   // Sertifikat audit log accessible to staff (filtered to sertifikat entities only)
-  await requireRole(["admin", "staff"]);
+  await requirePermission("auditLog", "manage");
   return listAuditLogInternal({ ...filter, entitasType: "__sertifikat__" });
 }
