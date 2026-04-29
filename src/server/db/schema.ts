@@ -1488,6 +1488,28 @@ export const honorariumItems = pgTable(
   ],
 );
 
+// Potongan/pajak per instruktur dalam batch honorarium
+export const honorariumDeductions = pgTable(
+  "honorarium_deductions",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => honorariumBatches.id, { onDelete: "cascade" }),
+    instructorId: text("instructor_id")
+      .notNull()
+      .references(() => instructors.id),
+    deductionType: varchar("deduction_type", { length: 40 }).notNull(), // pph21, pph23, other
+    description: varchar("description", { length: 200 }).notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("hd_batch_idx").on(t.batchId),
+    index("hd_instructor_idx").on(t.instructorId),
+  ],
+);
+
 // Audit log perubahan honorarium
 export const honorariumAuditLogs = pgTable(
   "honorarium_audit_logs",
@@ -1543,6 +1565,8 @@ export type HonorariumBatch = typeof honorariumBatches.$inferSelect;
 export type NewHonorariumBatch = typeof honorariumBatches.$inferInsert;
 export type HonorariumItem = typeof honorariumItems.$inferSelect;
 export type NewHonorariumItem = typeof honorariumItems.$inferInsert;
+export type HonorariumDeduction = typeof honorariumDeductions.$inferSelect;
+export type NewHonorariumDeduction = typeof honorariumDeductions.$inferInsert;
 export type HonorariumAuditLog = typeof honorariumAuditLogs.$inferSelect;
 export type NewHonorariumAuditLog = typeof honorariumAuditLogs.$inferInsert;
 

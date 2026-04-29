@@ -1,0 +1,659 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Download, Plus, Trash2, RotateCcw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  lockHonorariumBatch,
+  markHonorariumBatchInProcess,
+  markHonorariumBatchPaid,
+  submitHonorariumBatchToFinance,
+  reopenHonorariumBatch,
+  addHonorariumDeduction,
+  removeHonorariumDeduction,
+  exportHonorariumBatchExcel,
+  type getHonorariumBatchDetail,
+  type DeductionRow,
+} from "@/server/actions/jadwal-otomatis/honorarium";
+
+type DetailData = NonNullable<Awaited<ReturnType<typeof getHonorariumBatchDetail>>>;
+
+interface HonorariumBatchDetailProps {
+  initialData: DetailData;
+  initialDeductions: DeductionRow[];
+  canManage: boolean;
+  isAdmin: boolean;
+}
+
+function formatCurrency(value: number) {
+  return `Rp ${Math.round(value).toLocaleString("id-ID")}`;
+}
+
+function statusLabel(status: string) {
+  if (status === "draft") return "Draft";
+  if (status === "dikirim_ke_keuangan") return "Dikirim ke Keuangan";
+  if (status === "diproses_keuangan") return "Diproses Keuangan";
+  if (status === "dibayar") return "Dibayar";
+  if (status === "locked") return "Locked";
+  return status;
+}
+
+function statusVariant(status: string): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "locked" || status === "dibayar") return "default";
+  if (status === "draft") return "secondary";
+  return "outline";
+}
+
+function sourceLabel(source: string) {
+  if (source === "actual") return "Substitusi";
+  if (source === "planned") return "Planned";
+  return source;
+}
+
+function actionLabel(action: string) {
+  if (action === "generated_draft") return "Generate Draft";
+  if (action === "submitted_to_finance") return "Kirim ke Keuangan";
+  if (action === "finance_processing_started") return "Mulai Proses Keuangan";
+  if (action === "finance_paid") return "Tandai Dibayar";
+  if (action === "batch_locked") return "Lock Batch";
+  if (action === "batch_reopened") return "Reopen Batch";
+  if (action === "deduction_added") return "Tambah Potongan";
+  if (action === "deduction_removed") return "Hapus Potongan";
+  if (action === "batch_exported_excel") return "Export Excel";
+  return action;
+}
+
+function payloadSummary(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "-";
+  const entries = Object.entries(payload as Record<string, unknown>)
+    .filter(([, value]) => value !== null && value !== "")
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${String(value)}`);
+  return entries.length > 0 ? entries.join(" | ") : "-";
+}
+
+function formatDateTime(value: Date | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("id-ID");
+}
+
+export function HonorariumBatchDetail({
+  initialData,
+  initialDeductions,
+  canManage,
+  isAdmin,
+}: HonorariumBatchDetailProps) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentReference, setPaymentReference] = useState("");
+
+  const [deductions, setDeductions] = useState<DeductionRow[]>(initialDeductions);
+  const [newDeductionInstructor, setNewDeductionInstructor] = useState("");
+  const [newDeductionType, setNewDeductionType] = useState("pph21");
+  const [newDeductionDesc, setNewDeductionDesc] = useState("");
+  const [newDeductionAmount, setNewDeductionAmount] = useState("");
+
+  const [reopenReason, setReopenReason] = useState("");
+
+  const { batch, items, recaps, auditLogs } = initialData;
+
+  const uniqueInstructors = Array.from(
+    new Map(recaps.map((r) => [r.instructorId, r.instructorName])),
+    ([id, name]) => ({ id, name }),
+  );
+
+  function handleSubmitToFinance() {
+    if (!confirm("Kirim batch ini ke keuangan?")) return;
+    startTransition(async () => {
+      try {
+        await submitHonorariumBatchToFinance(batch.id);
+        toast.success("Batch dikirim ke keuangan.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal kirim ke keuangan.");
+      }
+    });
+  }
+
+  function handleMarkInProcess() {
+    startTransition(async () => {
+      try {
+        await markHonorariumBatchInProcess(batch.id);
+        toast.success("Status batch menjadi diproses keuangan.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal update status batch.");
+      }
+    });
+  }
+
+  function handleMarkPaid() {
+    startTransition(async () => {
+      try {
+        await markHonorariumBatchPaid({
+          batchId: batch.id,
+          paidDate: paidDate || undefined,
+          paymentReference,
+        });
+        toast.success("Batch ditandai sudah dibayar.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal menandai batch dibayar.");
+      }
+    });
+  }
+
+  function handleLockBatch() {
+    if (!confirm("Lock batch ini? Setelah lock, batch dianggap final.")) return;
+    startTransition(async () => {
+      try {
+        await lockHonorariumBatch(batch.id);
+        toast.success("Batch berhasil di-lock.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal lock batch.");
+      }
+    });
+  }
+
+  function handleReopen() {
+    if (!reopenReason.trim()) {
+      toast.error("Alasan reopen wajib diisi.");
+      return;
+    }
+    if (!confirm("Reopen batch ini? Batch akan kembali ke status draft.")) return;
+    startTransition(async () => {
+      try {
+        await reopenHonorariumBatch({ batchId: batch.id, reason: reopenReason.trim() });
+        toast.success("Batch berhasil di-reopen.");
+        setReopenReason("");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal reopen batch.");
+      }
+    });
+  }
+
+  function handleAddDeduction() {
+    if (!newDeductionInstructor || !newDeductionDesc || !newDeductionAmount) {
+      toast.error("Lengkapi semua field potongan.");
+      return;
+    }
+    const amount = Number.parseFloat(newDeductionAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Jumlah potongan harus angka positif.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const result = await addHonorariumDeduction({
+          batchId: batch.id,
+          instructorId: newDeductionInstructor,
+          deductionType: newDeductionType as "pph21" | "pph23" | "other",
+          description: newDeductionDesc.trim(),
+          amount,
+        });
+        if (result.ok) {
+          toast.success("Potongan berhasil ditambahkan.");
+          setNewDeductionInstructor("");
+          setNewDeductionType("pph21");
+          setNewDeductionDesc("");
+          setNewDeductionAmount("");
+          router.refresh();
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal tambah potongan.");
+      }
+    });
+  }
+
+  function handleRemoveDeduction(deductionId: string) {
+    if (!confirm("Hapus potongan ini?")) return;
+    startTransition(async () => {
+      try {
+        await removeHonorariumDeduction({ deductionId });
+        toast.success("Potongan berhasil dihapus.");
+        setDeductions((prev) => prev.filter((d) => d.id !== deductionId));
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal hapus potongan.");
+      }
+    });
+  }
+
+  function handleExportExcel() {
+    startTransition(async () => {
+      try {
+        const result = await exportHonorariumBatchExcel(batch.id);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        const binaryStr = atob(result.data.xlsxBase64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = result.data.fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Excel berhasil diekspor.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal export Excel.");
+      }
+    });
+  }
+
+  const deductionSummary = recaps.map((r) => {
+    const instrDeductions = deductions.filter((d) => d.instructorId === r.instructorId);
+    const totalDeduction = instrDeductions.reduce((s, d) => s + d.amount, 0);
+    return { ...r, deductions: instrDeductions, totalDeduction };
+  });
+
+  return (
+    <div className="space-y-6">
+      <Card className="rounded-[28px]">
+        <CardHeader className="border-b border-border">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>{batch.documentNumber}</CardTitle>
+              <CardDescription>
+                Periode {batch.periodStart} s.d. {batch.periodEnd}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={statusVariant(batch.status)}>{statusLabel(batch.status)}</Badge>
+              <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={pending}>
+                <Download className="h-4 w-4 mr-1" />
+                Excel
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-4">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Jumlah Sesi</p>
+              <p className="text-lg font-semibold tabular-nums">{batch.itemCount}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Batch</p>
+              <p className="text-lg font-semibold tabular-nums">{formatCurrency(batch.totalAmount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Dibuat Oleh</p>
+              <p className="font-medium">{batch.generatedByName ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Dibayar Oleh</p>
+              <p className="font-medium">{batch.paidByName ?? "-"}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Dibuat</p>
+              <p className="text-sm">{formatDateTime(batch.createdAt)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Dikirim ke Keuangan</p>
+              <p className="text-sm">{formatDateTime(batch.submittedAt)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Dibayar</p>
+              <p className="text-sm">{formatDateTime(batch.paidAt)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Locked</p>
+              <p className="text-sm">{formatDateTime(batch.lockedAt)}</p>
+            </div>
+          </div>
+
+          {batch.internalNotes ? (
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground mb-1">Catatan Internal</p>
+              <p className="text-sm whitespace-pre-wrap">{batch.internalNotes}</p>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {canManage ? (
+        <Card className="rounded-[28px]">
+          <CardHeader className="border-b border-border">
+            <CardTitle>Aksi Status</CardTitle>
+            <CardDescription>Transisi status batch honorarium sesuai workflow keuangan.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {batch.status === "draft" ? (
+              <Button onClick={handleSubmitToFinance} disabled={pending}>
+                Kirim ke Keuangan
+              </Button>
+            ) : null}
+
+            {batch.status === "dikirim_ke_keuangan" ? (
+              <Button onClick={handleMarkInProcess} disabled={pending}>
+                Tandai Diproses Keuangan
+              </Button>
+            ) : null}
+
+            {batch.status === "diproses_keuangan" ? (
+              <div className="grid gap-3 md:grid-cols-[180px_1fr_auto] md:items-end">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Tanggal Bayar</p>
+                  <Input type="date" value={paidDate} onChange={(e) => setPaidDate(e.target.value)} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Referensi Transfer</p>
+                  <Input
+                    placeholder="Contoh: TRX-INV-2026-0429"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                  />
+                </div>
+                <Button onClick={handleMarkPaid} disabled={pending}>
+                  Tandai Dibayar
+                </Button>
+              </div>
+            ) : null}
+
+            {batch.status === "dibayar" ? (
+              <Button onClick={handleLockBatch} disabled={pending}>
+                Lock Batch
+              </Button>
+            ) : null}
+
+            {batch.status === "locked" ? (
+              <p className="text-sm text-muted-foreground">Batch sudah final (locked).</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Reopen Section - Hanya admin */}
+      {isAdmin && batch.status !== "draft" ? (
+        <Card className="rounded-[28px] border-destructive/30">
+          <CardHeader className="border-b border-border">
+            <CardTitle className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Reopen Batch
+            </CardTitle>
+            <CardDescription>Kembalikan batch ke status draft. Hanya untuk admin. Alasan wajib diisi.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Alasan Reopen</p>
+                <Input
+                  placeholder="Wajib: jelaskan alasan reopen batch ini..."
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                />
+              </div>
+              <Button variant="destructive" onClick={handleReopen} disabled={pending || !reopenReason.trim()}>
+                Reopen Batch
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card className="rounded-[28px]">
+        <CardHeader className="border-b border-border">
+          <CardTitle>Rekap Instruktur</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Instruktur</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Sesi</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Gross</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Deductions</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deductionSummary.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                      Belum ada rekap.
+                    </td>
+                  </tr>
+                ) : (
+                  deductionSummary.map((recap) => (
+                    <tr key={recap.instructorId} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-6 py-3">{recap.instructorName}</td>
+                      <td className="px-6 py-3 text-right tabular-nums">{recap.totalSessions}</td>
+                      <td className="px-6 py-3 text-right tabular-nums">{formatCurrency(recap.grossAmount)}</td>
+                      <td className="px-6 py-3 text-right tabular-nums text-destructive">
+                        {recap.totalDeduction > 0 ? `(${formatCurrency(recap.totalDeduction)})` : "-"}
+                      </td>
+                      <td className="px-6 py-3 text-right tabular-nums font-medium">{formatCurrency(recap.netAmount)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Deductions Card */}
+      <Card className="rounded-[28px]">
+        <CardHeader className="border-b border-border">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Potongan (Deductions)</CardTitle>
+              <CardDescription>PPh 21, PPh 23, atau potongan lainnya per instruktur.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6 p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Instruktur</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Tipe</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Keterangan</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Jumlah</th>
+                  {canManage && batch.status === "draft" ? (
+                    <th className="px-6 py-3 text-center font-medium text-muted-foreground">Aksi</th>
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody>
+                {deductions.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManage && batch.status === "draft" ? 5 : 4} className="px-6 py-8 text-center text-muted-foreground">
+                      Belum ada potongan.
+                    </td>
+                  </tr>
+                ) : (
+                  deductions.map((d) => (
+                    <tr key={d.id} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-6 py-3">{d.instructorName}</td>
+                      <td className="px-6 py-3">
+                        <Badge variant="outline">
+                          {d.deductionType === "pph21" ? "PPh 21" : d.deductionType === "pph23" ? "PPh 23" : "Lainnya"}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-3">{d.description}</td>
+                      <td className="px-6 py-3 text-right tabular-nums text-destructive">{formatCurrency(d.amount)}</td>
+                      {canManage && batch.status === "draft" ? (
+                        <td className="px-6 py-3 text-center">
+                          <Button variant="ghost" size="sm" onClick={() => handleRemoveDeduction(d.id)} disabled={pending}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+        {canManage && batch.status === "draft" ? (
+          <CardFooter className="border-t border-border px-6 py-4">
+            <div className="grid gap-3 w-full md:grid-cols-[200px_130px_1fr_130px_auto] md:items-end">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Instruktur</p>
+                <Select value={newDeductionInstructor} onValueChange={setNewDeductionInstructor}>
+                  <SelectTrigger><SelectValue placeholder="Pilih instruktur" /></SelectTrigger>
+                  <SelectContent>
+                    {uniqueInstructors.map((inst) => (
+                      <SelectItem key={inst.id} value={inst.id}>{inst.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Tipe</p>
+                <Select value={newDeductionType} onValueChange={setNewDeductionType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pph21">PPh 21</SelectItem>
+                    <SelectItem value="pph23">PPh 23</SelectItem>
+                    <SelectItem value="other">Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Keterangan</p>
+                <Input
+                  placeholder="Misal: PPh 21 atas honor"
+                  value={newDeductionDesc}
+                  onChange={(e) => setNewDeductionDesc(e.target.value)}
+                />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Jumlah (Rp)</p>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={newDeductionAmount}
+                  onChange={(e) => setNewDeductionAmount(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleAddDeduction} disabled={pending} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Tambah
+              </Button>
+            </div>
+          </CardFooter>
+        ) : null}
+      </Card>
+
+      <Card className="rounded-[28px]">
+        <CardHeader className="border-b border-border">
+          <CardTitle>Detail Item Sesi</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Tanggal</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Program</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Instruktur</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Sumber</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Materi</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rate</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
+                      Tidak ada item batch.
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((item) => (
+                    <tr key={item.id} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-6 py-3">{item.scheduledDate}</td>
+                      <td className="px-6 py-3">{item.programName}</td>
+                      <td className="px-6 py-3">{item.paidInstructorName}</td>
+                      <td className="px-6 py-3">
+                        <Badge variant={item.source === "actual" ? "outline" : "secondary"}>
+                          {sourceLabel(item.source)}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-3">{item.materiBlock}</td>
+                      <td className="px-6 py-3 text-right tabular-nums">{formatCurrency(item.rateSnapshot)}</td>
+                      <td className="px-6 py-3 text-right tabular-nums">{formatCurrency(item.amount)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[28px]">
+        <CardHeader className="border-b border-border">
+          <CardTitle>Audit Trail</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Waktu</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Aktor</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Aksi</th>
+                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Payload</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                      Belum ada audit log.
+                    </td>
+                  </tr>
+                ) : (
+                  auditLogs.map((log) => (
+                    <tr key={log.id} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-6 py-3">{new Date(log.createdAt).toLocaleString("id-ID")}</td>
+                      <td className="px-6 py-3">{log.actorName}</td>
+                      <td className="px-6 py-3">
+                        <Badge variant="outline">{actionLabel(log.action)}</Badge>
+                      </td>
+                      <td className="px-6 py-3 text-xs text-muted-foreground">
+                        {payloadSummary(log.payload)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -3,7 +3,7 @@
 ## Status
 Draft implementasi internal (tanpa keterlibatan instruktur di sistem)
 
-Checkpoint terakhir: 29 April 2026 (Asia/Jakarta) - selesai sampai Phase A (fondasi), belum masuk workflow penuh keuangan.
+Checkpoint terakhir: 29 April 2026 (Asia/Jakarta) - workflow status keuangan inti sudah jalan (`draft -> dikirim_ke_keuangan -> diproses_keuangan -> dibayar -> locked`) + halaman detail batch.
 
 ---
 
@@ -286,28 +286,29 @@ Tujuan:
 - [x] Terapkan filter sesi layak bayar (`completed` + `accepted`) saat generate draft.
 - [x] Terapkan fallback rate dari master tarif (`program + level + mode + tanggal berlaku`).
 - [x] Tampilkan daftar batch internal di halaman honorarium.
-- [ ] Tambah halaman detail batch (header + item + audit trail).
+- [x] Tambah halaman detail batch (header + item + audit trail).
 
 #### B. Workflow Internal ke Keuangan
-- [ ] Aksi kirim ke keuangan (`draft -> dikirim_ke_keuangan`).
-- [ ] Guard status: batch terkunci edit ketika sudah dikirim ke keuangan.
-- [ ] Catat audit log untuk semua transisi status.
+- [x] Aksi kirim ke keuangan (`draft -> dikirim_ke_keuangan`).
+- [x] Guard status: batch terkunci edit ketika sudah dikirim ke keuangan.
+- [x] Catat audit log untuk semua transisi status.
 
 #### C. Serah ke Keuangan dan Pembayaran
-- [ ] Aksi proses bayar (`-> diproses_keuangan`).
-- [ ] Aksi selesai bayar (`-> dibayar`) + tanggal bayar + referensi transfer.
-- [ ] Tampilan queue keuangan (filter status + periode).
-- [ ] Rekap total gross/net per batch untuk keuangan.
+- [x] Aksi proses bayar (`-> diproses_keuangan`).
+- [x] Aksi selesai bayar (`-> dibayar`) + tanggal bayar + referensi transfer.
+- [x] Tampilan queue keuangan (filter status + periode).
+- [x] Rekap total gross/net per batch untuk keuangan.
 
 #### D. Finalisasi dan Governance
-- [ ] Aksi lock batch (`-> locked`) setelah pembayaran final.
-- [ ] Mekanisme reopen terbatas role + alasan wajib.
+- [x] Aksi lock batch (`-> locked`) setelah pembayaran final.
+- [x] Mekanisme reopen terbatas role (admin) + alasan wajib.
 - [ ] Validasi kelengkapan data sebelum lock.
-- [ ] Nomor dokumen honorarium konsisten dan unik per batch.
-- [ ] Laporan audit perubahan per batch.
+- [x] Nomor dokumen honorarium konsisten dan unik per batch.
+- [x] Laporan audit perubahan per batch.
+- [x] Deductions dan perhitungan `net_amount` riil (PPh 21, PPh 23, other).
 
 #### E. Output dan Integrasi
-- [ ] Export Excel sesuai template keuangan (fallback).
+- [x] Export Excel sesuai template keuangan (fallback) — 3 sheet (Ringkasan, Potongan, Detail Sesi).
 - [ ] Export PDF opsional (jika diperlukan pimpinan/audit).
 - [ ] Notifikasi internal saat status berubah (operasional/keuangan).
 - [ ] Rekonsiliasi total batch vs total pembayaran.
@@ -323,19 +324,26 @@ Tujuan:
 - [x] Blok generate jika ada `rate_missing`.
 - [x] UI daftar batch internal + tombol generate draft.
 - [x] Detail report tampilkan komponen `honor`, `transport`, dan `sumber rate`.
+- [x] Halaman detail batch honorarium (header, item, audit trail, aksi status per state).
+- [x] Workflow status batch keuangan (`draft -> dikirim_ke_keuangan -> diproses_keuangan -> dibayar -> locked`).
+- [x] Audit trail untuk transisi status batch.
+
+#### Selesai dikerjakan
+- [x] Deductions dan perhitungan `net_amount` riil (`honorarium_deductions` + UI CRUD).
+- [x] Mekanisme reopen batch terbatas role (admin only) + alasan wajib (mandatory reason).
+- [x] Export Excel template keuangan (fallback) — 3 sheet (Ringkasan, Potongan, Detail Sesi).
 
 #### Belum dikerjakan (next)
-- [ ] Aksi `draft -> dikirim_ke_keuangan`.
-- [ ] Aksi `dikirim_ke_keuangan -> diproses_keuangan`.
-- [ ] Aksi `diproses_keuangan -> dibayar`.
-- [ ] Aksi `dibayar -> locked`.
-- [ ] Halaman detail batch (header, item, audit trail, action button per status).
+- [ ] Validasi kelengkapan data sebelum lock.
+- [ ] Export PDF opsional.
+- [ ] Notifikasi internal saat status berubah.
+- [ ] Rekonsiliasi total batch vs pembayaran.
 
 #### Langkah pertama saat resume di device lain
 1. Pull/update branch terbaru.
 2. Jalankan migrasi DB terbaru (minimal sampai `0036_honorarium_rate_rules.sql`).
 3. Jalankan app dan cek modul `/jadwal-otomatis/honorarium`.
-4. Lanjut implementasi item pada bagian “Belum dikerjakan (next)” di atas.
+4. Lanjut implementasi item pada bagian "Belum dikerjakan (next)" di atas.
 
 ---
 
@@ -382,9 +390,16 @@ Tujuan:
 ## 17. Handover Status Terakhir (29 April 2026, Asia/Jakarta)
 
 ### Ringkasan progres saat sesi ini berhenti
-- Implementasi honorarium sudah sampai tahap fondasi + draft internal dan report detail dasar.
-- Workflow status keuangan (`dikirim_ke_keuangan -> diproses_keuangan -> dibayar -> locked`) belum diimplementasikan penuh.
-- Dokumen ini sudah jadi sumber acuan lintas agent untuk melanjutkan fase berikutnya.
+- Implementasi honorarium sudah sampai workflow internal-keuangan inti sampai lock batch.
+- Halaman detail batch sudah tersedia di `/jadwal-otomatis/honorarium/[batchId]` dengan header, item, rekap instruktur, audit trail, dan action button sesuai status.
+- Action status yang sudah aktif: `submit to finance`, `mark in process`, `mark paid` (tanggal bayar + referensi transfer), `lock`, dan `reopen` (admin only + alasan wajib).
+- **Deductions**: Tabel `honorarium_deductions` + CRUD di halaman detail batch (hanya saat status draft). Net amount sekarang real = gross - deductions.
+- **Export Excel**: Tombol Excel di header detail batch, 3 sheet (Ringkasan, Potongan, Detail Sesi).
+- **Reopen**: Khusus admin, input alasan wajib, mengembalikan batch ke draft dari status apa pun.
+- Audit log status transisi sudah dicatat di `honorarium_audit_logs` (termasuk `deduction_added`, `deduction_removed`, `batch_reopened`, `batch_exported_excel`).
+- Queue batch keuangan di halaman utama sudah bisa difilter berdasarkan status dan periode.
+- Rekap gross/net per batch sudah menampilkan nilai riil dengan deductions.
+- Dokumen ini tetap jadi acuan lintas agent untuk fase lanjutan.
 
 ### Status git saat ini
 - Working tree berisi banyak perubahan lokal (modifikasi + file baru), termasuk migrasi sampai `0036_honorarium_rate_rules.sql` dan modul honorarium.
@@ -393,6 +408,7 @@ Tujuan:
 - Aksi lanjutan yang tertunda: `git add -A`, `git commit`, lalu `git push origin main` setelah izin akses tersedia.
 
 ### Titik lanjut paling aman untuk agent berikutnya
-1. Verifikasi app tetap jalan setelah migrasi terbaru.
-2. Kerjakan transisi status batch keuangan (submit/proses/bayar/lock) + audit trail.
-3. Setelah validasi selesai, baru commit dan push seluruh perubahan.
+1. Jalankan migrasi DB: `0037_honorarium_deductions.sql` (buat tabel honorarium_deductions).
+2. Verifikasi app tetap jalan setelah migrasi.
+3. Lanjutkan item "Belum dikerjakan (next)" di atas: validasi kelengkapan sebelum lock, export PDF, notifikasi, rekonsiliasi.
+4. Setelah validasi selesai, commit dan push seluruh perubahan.

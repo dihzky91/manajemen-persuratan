@@ -1,0 +1,56 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
+import { PageWrapper } from "@/components/layout/PageWrapper";
+import { HonorariumBatchDetail } from "@/components/jadwal-otomatis/HonorariumBatchDetail";
+import { Button } from "@/components/ui/button";
+import { getSession } from "@/server/actions/auth";
+import { getHonorariumBatchDetail, listHonorariumDeductions } from "@/server/actions/jadwal-otomatis/honorarium";
+
+export const metadata: Metadata = {
+  title: "Detail Batch Honorarium | Manajemen Surat IAI Jakarta",
+};
+
+type PageProps = {
+  params: Promise<{ batchId: string }>;
+};
+
+export default async function Page({ params }: PageProps) {
+  const { batchId } = await params;
+
+  const [detail, session, deductions] = await Promise.all([
+    getHonorariumBatchDetail(batchId),
+    getSession(),
+    listHonorariumDeductions(batchId),
+  ]);
+
+  if (!detail) notFound();
+
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const canManage = role === "admin" || role === "staff";
+  const isAdmin = role === "admin";
+
+  return (
+    <PageWrapper
+      title={`Batch ${detail.batch.documentNumber}`}
+      description={`Periode ${detail.batch.periodStart} s.d. ${detail.batch.periodEnd}`}
+    >
+      <div className="mb-5">
+        <Button asChild variant="outline" size="sm">
+          <Link href="/jadwal-otomatis/honorarium">
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Kembali ke Daftar Batch
+          </Link>
+        </Button>
+      </div>
+
+      <HonorariumBatchDetail
+        initialData={detail}
+        initialDeductions={deductions}
+        canManage={canManage}
+        isAdmin={isAdmin}
+      />
+    </PageWrapper>
+  );
+}

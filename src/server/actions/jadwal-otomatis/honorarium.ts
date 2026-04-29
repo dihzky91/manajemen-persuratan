@@ -4,12 +4,13 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requirePermission } from "@/server/actions/auth";
+import { requirePermission, requireRole, requireSession } from "@/server/actions/auth";
 import { db } from "@/server/db";
 import {
   classSessions,
   honorariumAuditLogs,
   honorariumBatches,
+  honorariumDeductions,
   honorariumItems,
   honorariumRateRules,
   instructorExpertise,
@@ -18,6 +19,7 @@ import {
   kelasPelatihan,
   programs,
   sessionAssignments,
+  users,
 } from "@/server/db/schema";
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -55,6 +57,50 @@ const generateBatchSchema = z.object({
   endDate: dateSchema,
   internalNotes: z.string().trim().max(500).optional().or(z.literal("")),
 });
+
+const listBatchFilterSchema = z.object({
+  startDate: dateSchema.optional().or(z.literal("")),
+  endDate: dateSchema.optional().or(z.literal("")),
+  status: z
+    .enum(["draft", "dikirim_ke_keuangan", "diproses_keuangan", "dibayar", "locked"])
+    .optional()
+    .or(z.literal("")),
+  financeOnly: z.boolean().optional(),
+});
+
+const batchIdSchema = z.object({
+  batchId: z.string().min(1),
+});
+
+const markBatchPaidSchema = z.object({
+  batchId: z.string().min(1),
+  paidDate: dateSchema.optional(),
+  paymentReference: z.string().trim().max(200).optional().or(z.literal("")),
+});
+
+const addDeductionSchema = z.object({
+  batchId: z.string().min(1),
+  instructorId: z.string().min(1),
+  deductionType: z.enum(["pph21", "pph23", "other"]),
+  description: z.string().trim().min(1).max(200),
+  amount: z.number().finite().min(0),
+});
+
+const removeDeductionSchema = z.object({
+  deductionId: z.string().min(1),
+});
+
+const reopenBatchSchema = z.object({
+  batchId: z.string().min(1),
+  reason: z.string().trim().min(1, "Alasan reopen wajib diisi.").max(500),
+});
+
+type HonorariumBatchStatus =
+  | "draft"
+  | "dikirim_ke_keuangan"
+  | "diproses_keuangan"
+  | "dibayar"
+  | "locked";
 
 type ExpertiseLevel = "basic" | "middle" | "senior";
 
@@ -632,6 +678,98 @@ function getEligibleRows(rows: HonorariumReportRow[]) {
   );
 }
 
+function mergeNotes(current: string | null, next: string | undefined) {
+  const trimmed = next?.trim();
+  if (!trimmed) return current;
+  if (!current?.trim()) return trimmed;
+  return `${current.trim()}\n${trimmed}`;
+}
+
+function parsePaidDate(value: string | undefined) {
+  if (!value) return new Date();
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return new Date();
+  return parsed;
+}
+
+async function transitionBatchStatus(params: {
+  batchId: string;
+  from: HonorariumBatchStatus;
+  to: HonorariumBatchStatus;
+  actorId: string;
+  action: string;
+  note?: string;
+  payload?: Record<string, unknown>;
+  paidAt?: Date | null;
+  paidBy?: string | null;
+  submittedAt?: Date | null;
+  lockedAt?: Date | null;
+}) {
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({
+        id: honorariumBatches.id,
+        documentNumber: honorariumBatches.documentNumber,
+        status: honorariumBatches.status,
+        internalNotes: honorariumBatches.internalNotes,
+      })
+      .from(honorariumBatches)
+      .where(eq(honorariumBatches.id, params.batchId))
+      .limit(1);
+
+    if (!existing) {
+      throw new Error("Batch honorarium tidak ditemukan.");
+    }
+
+    if (existing.status !== params.from) {
+      throw new Error(
+        `Status batch harus ${params.from}, status saat ini ${existing.status}.`,
+      );
+    }
+
+    const updatePayload: Partial<typeof honorariumBatches.$inferInsert> = {
+      status: params.to,
+      internalNotes: mergeNotes(existing.internalNotes, params.note),
+      updatedAt: new Date(),
+    };
+
+    if (params.submittedAt !== undefined) updatePayload.submittedAt = params.submittedAt;
+    if (params.paidAt !== undefined) updatePayload.paidAt = params.paidAt;
+    if (params.paidBy !== undefined) updatePayload.paidBy = params.paidBy;
+    if (params.lockedAt !== undefined) updatePayload.lockedAt = params.lockedAt;
+
+    const [updated] = await tx
+      .update(honorariumBatches)
+      .set(updatePayload)
+      .where(
+        and(
+          eq(honorariumBatches.id, params.batchId),
+          eq(honorariumBatches.status, params.from),
+        ),
+      )
+      .returning({ id: honorariumBatches.id });
+
+    if (!updated) {
+      throw new Error("Batch gagal diperbarui karena status berubah.");
+    }
+
+    await tx.insert(honorariumAuditLogs).values({
+      id: nanoid(),
+      batchId: params.batchId,
+      actorId: params.actorId,
+      action: params.action,
+      payload: {
+        from: params.from,
+        to: params.to,
+        ...(params.payload ?? {}),
+      },
+    });
+  });
+
+  revalidatePath("/jadwal-otomatis/honorarium");
+  revalidatePath(`/jadwal-otomatis/honorarium/${params.batchId}`);
+}
+
 export type HonorariumBatchRow = {
   id: string;
   documentNumber: string;
@@ -646,10 +784,38 @@ export type HonorariumBatchRow = {
   createdAt: Date;
   itemCount: number;
   totalAmount: number;
+  grossAmount: number;
+  netAmount: number;
 };
 
-export async function listHonorariumBatches(): Promise<HonorariumBatchRow[]> {
+export async function listHonorariumBatches(
+  filters?: z.infer<typeof listBatchFilterSchema>,
+): Promise<HonorariumBatchRow[]> {
   await requirePermission("jadwalUjian", "view");
+  const parsed = listBatchFilterSchema.parse(filters ?? {});
+
+  if (
+    parsed.startDate &&
+    parsed.endDate &&
+    parsed.startDate !== "" &&
+    parsed.endDate !== "" &&
+    parsed.startDate > parsed.endDate
+  ) {
+    throw new Error("Tanggal mulai filter batch harus <= tanggal akhir.");
+  }
+
+  const whereClause = and(
+    parsed.startDate ? gte(honorariumBatches.periodStart, parsed.startDate) : undefined,
+    parsed.endDate ? lte(honorariumBatches.periodEnd, parsed.endDate) : undefined,
+    parsed.status ? eq(honorariumBatches.status, parsed.status) : undefined,
+    parsed.financeOnly
+      ? inArray(honorariumBatches.status, [
+          "dikirim_ke_keuangan",
+          "diproses_keuangan",
+          "dibayar",
+        ])
+      : undefined,
+  );
 
   const batchRows = await db
     .select({
@@ -666,21 +832,31 @@ export async function listHonorariumBatches(): Promise<HonorariumBatchRow[]> {
       createdAt: honorariumBatches.createdAt,
     })
     .from(honorariumBatches)
+    .where(whereClause)
     .orderBy(desc(honorariumBatches.createdAt))
     .limit(50);
 
   if (batchRows.length === 0) return [];
 
   const batchIds = batchRows.map((row) => row.id);
-  const aggregateRows = await db
-    .select({
-      batchId: honorariumItems.batchId,
-      itemCount: sql<number>`COUNT(*)::int`,
-      totalAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
-    })
-    .from(honorariumItems)
-    .where(inArray(honorariumItems.batchId, batchIds))
-    .groupBy(honorariumItems.batchId);
+  const [aggregateRows, allDeductions] = await Promise.all([
+    db
+      .select({
+        batchId: honorariumItems.batchId,
+        itemCount: sql<number>`COUNT(*)::int`,
+        totalAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
+      })
+      .from(honorariumItems)
+      .where(inArray(honorariumItems.batchId, batchIds))
+      .groupBy(honorariumItems.batchId),
+    db
+      .select({
+        batchId: honorariumDeductions.batchId,
+        amount: honorariumDeductions.amount,
+      })
+      .from(honorariumDeductions)
+      .where(inArray(honorariumDeductions.batchId, batchIds)),
+  ]);
 
   const aggregateByBatch = new Map(
     aggregateRows.map((row) => [
@@ -692,14 +868,204 @@ export async function listHonorariumBatches(): Promise<HonorariumBatchRow[]> {
     ]),
   );
 
+  const deductionByBatch = new Map<string, number>();
+  for (const d of allDeductions) {
+    const current = deductionByBatch.get(d.batchId) ?? 0;
+    deductionByBatch.set(d.batchId, current + toNumber(d.amount));
+  }
+
   return batchRows.map((row) => {
     const aggregate = aggregateByBatch.get(row.id);
+    const gross = aggregate?.totalAmount ?? 0;
+    const deduction = deductionByBatch.get(row.id) ?? 0;
     return {
       ...row,
       itemCount: aggregate?.itemCount ?? 0,
-      totalAmount: aggregate?.totalAmount ?? 0,
+      totalAmount: gross,
+      grossAmount: gross,
+      netAmount: Math.max(0, gross - deduction),
     };
   });
+}
+
+export type HonorariumBatchDetail = {
+  batch: {
+    id: string;
+    documentNumber: string;
+    periodStart: string;
+    periodEnd: string;
+    status: string;
+    generatedByName: string | null;
+    paidByName: string | null;
+    paidBy: string | null;
+    submittedAt: Date | null;
+    paidAt: Date | null;
+    lockedAt: Date | null;
+    internalNotes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    itemCount: number;
+    totalAmount: number;
+  };
+  items: Array<{
+    id: string;
+    scheduledDate: string;
+    programName: string;
+    paidInstructorName: string;
+    source: string;
+    materiBlock: string;
+    expertiseLevelSnapshot: string;
+    rateSnapshot: number;
+    amount: number;
+  }>;
+  recaps: Array<{
+    instructorId: string;
+    instructorName: string;
+    totalSessions: number;
+    grossAmount: number;
+    netAmount: number;
+  }>;
+  auditLogs: Array<{
+    id: string;
+    actorName: string;
+    action: string;
+    payload: unknown;
+    createdAt: Date;
+  }>;
+};
+
+export async function getHonorariumBatchDetail(
+  batchId: string,
+): Promise<HonorariumBatchDetail | null> {
+  await requirePermission("jadwalUjian", "view");
+  const parsed = batchIdSchema.parse({ batchId });
+
+  const [batchRow] = await db
+    .select({
+      id: honorariumBatches.id,
+      documentNumber: honorariumBatches.documentNumber,
+      periodStart: honorariumBatches.periodStart,
+      periodEnd: honorariumBatches.periodEnd,
+      status: honorariumBatches.status,
+      generatedByName: users.namaLengkap,
+      paidBy: honorariumBatches.paidBy,
+      submittedAt: honorariumBatches.submittedAt,
+      paidAt: honorariumBatches.paidAt,
+      lockedAt: honorariumBatches.lockedAt,
+      internalNotes: honorariumBatches.internalNotes,
+      createdAt: honorariumBatches.createdAt,
+      updatedAt: honorariumBatches.updatedAt,
+    })
+    .from(honorariumBatches)
+    .leftJoin(users, eq(honorariumBatches.generatedBy, users.id))
+    .where(eq(honorariumBatches.id, parsed.batchId))
+    .limit(1);
+
+  if (!batchRow) return null;
+
+  const [itemRows, recapRows, auditRows, paidByRow, deductionRows] = await Promise.all([
+    db
+      .select({
+        id: honorariumItems.id,
+        scheduledDate: honorariumItems.scheduledDate,
+        programName: programs.name,
+        paidInstructorName: honorariumItems.paidInstructorName,
+        source: honorariumItems.source,
+        materiBlock: honorariumItems.materiBlock,
+        expertiseLevelSnapshot: honorariumItems.expertiseLevelSnapshot,
+        rateSnapshot: honorariumItems.rateSnapshot,
+        amount: honorariumItems.amount,
+      })
+      .from(honorariumItems)
+      .innerJoin(programs, eq(honorariumItems.programId, programs.id))
+      .where(eq(honorariumItems.batchId, parsed.batchId))
+      .orderBy(asc(honorariumItems.scheduledDate), asc(honorariumItems.paidInstructorName)),
+    db
+      .select({
+        instructorId: honorariumItems.paidInstructorId,
+        instructorName: honorariumItems.paidInstructorName,
+        totalSessions: sql<number>`COUNT(*)::int`,
+        grossAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
+      })
+      .from(honorariumItems)
+      .where(eq(honorariumItems.batchId, parsed.batchId))
+      .groupBy(honorariumItems.paidInstructorId, honorariumItems.paidInstructorName)
+      .orderBy(asc(honorariumItems.paidInstructorName)),
+    db
+      .select({
+        id: honorariumAuditLogs.id,
+        actorName: users.namaLengkap,
+        action: honorariumAuditLogs.action,
+        payload: honorariumAuditLogs.payload,
+        createdAt: honorariumAuditLogs.createdAt,
+      })
+      .from(honorariumAuditLogs)
+      .leftJoin(users, eq(honorariumAuditLogs.actorId, users.id))
+      .where(eq(honorariumAuditLogs.batchId, parsed.batchId))
+      .orderBy(desc(honorariumAuditLogs.createdAt)),
+    batchRow.paidBy
+      ? db
+          .select({ name: users.namaLengkap })
+          .from(users)
+          .where(eq(users.id, batchRow.paidBy))
+          .limit(1)
+          .then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
+    db
+      .select({
+        instructorId: honorariumDeductions.instructorId,
+        amount: honorariumDeductions.amount,
+      })
+      .from(honorariumDeductions)
+      .where(eq(honorariumDeductions.batchId, parsed.batchId)),
+  ]);
+
+  const totalAmount = itemRows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+
+  const deductionsByInstructor = new Map<string, number>();
+  for (const d of deductionRows) {
+    const current = deductionsByInstructor.get(d.instructorId) ?? 0;
+    deductionsByInstructor.set(d.instructorId, current + toNumber(d.amount));
+  }
+
+  return {
+    batch: {
+      id: batchRow.id,
+      documentNumber: batchRow.documentNumber,
+      periodStart: batchRow.periodStart,
+      periodEnd: batchRow.periodEnd,
+      status: batchRow.status,
+      generatedByName: batchRow.generatedByName ?? null,
+      paidByName: paidByRow?.name ?? null,
+      paidBy: batchRow.paidBy,
+      submittedAt: batchRow.submittedAt,
+      paidAt: batchRow.paidAt,
+      lockedAt: batchRow.lockedAt,
+      internalNotes: batchRow.internalNotes,
+      createdAt: batchRow.createdAt,
+      updatedAt: batchRow.updatedAt,
+      itemCount: itemRows.length,
+      totalAmount,
+    },
+    items: itemRows.map((row) => ({
+      ...row,
+      rateSnapshot: toNumber(row.rateSnapshot),
+      amount: toNumber(row.amount),
+    })),
+    recaps: recapRows.map((row) => {
+      const gross = toNumber(row.grossAmount);
+      const deduction = deductionsByInstructor.get(row.instructorId) ?? 0;
+      return {
+        ...row,
+        grossAmount: gross,
+        netAmount: Math.max(0, gross - deduction),
+      };
+    }),
+    auditLogs: auditRows.map((row) => ({
+      ...row,
+      actorName: row.actorName ?? "System",
+    })),
+  };
 }
 
 export async function generateHonorariumBatch(data: z.infer<typeof generateBatchSchema>) {
@@ -790,4 +1156,342 @@ export async function generateHonorariumBatch(data: z.infer<typeof generateBatch
     itemCount: eligibleRows.length,
     totalAmount: eligibleRows.reduce((sum, row) => sum + row.totalAmount, 0),
   };
+}
+
+export async function submitHonorariumBatchToFinance(batchId: string) {
+  const session = await requirePermission("jadwalUjian", "manage");
+  const parsed = batchIdSchema.parse({ batchId });
+
+  await transitionBatchStatus({
+    batchId: parsed.batchId,
+    from: "draft",
+    to: "dikirim_ke_keuangan",
+    actorId: session.user.id,
+    action: "submitted_to_finance",
+    submittedAt: new Date(),
+  });
+
+  return { ok: true as const };
+}
+
+export async function markHonorariumBatchInProcess(batchId: string) {
+  const session = await requirePermission("jadwalUjian", "manage");
+  const parsed = batchIdSchema.parse({ batchId });
+
+  await transitionBatchStatus({
+    batchId: parsed.batchId,
+    from: "dikirim_ke_keuangan",
+    to: "diproses_keuangan",
+    actorId: session.user.id,
+    action: "finance_processing_started",
+  });
+
+  return { ok: true as const };
+}
+
+export async function markHonorariumBatchPaid(data: z.infer<typeof markBatchPaidSchema>) {
+  const session = await requirePermission("jadwalUjian", "manage");
+  const parsed = markBatchPaidSchema.parse(data);
+
+  await transitionBatchStatus({
+    batchId: parsed.batchId,
+    from: "diproses_keuangan",
+    to: "dibayar",
+    actorId: session.user.id,
+    action: "finance_paid",
+    paidAt: parsePaidDate(parsed.paidDate),
+    paidBy: session.user.id,
+    payload: {
+      paymentReference: parsed.paymentReference || null,
+      paidDate: parsed.paidDate || null,
+    },
+  });
+
+  return { ok: true as const };
+}
+
+export async function lockHonorariumBatch(batchId: string) {
+  const session = await requirePermission("jadwalUjian", "manage");
+  const parsed = batchIdSchema.parse({ batchId });
+
+  await transitionBatchStatus({
+    batchId: parsed.batchId,
+    from: "dibayar",
+    to: "locked",
+    actorId: session.user.id,
+    action: "batch_locked",
+    lockedAt: new Date(),
+  });
+
+  return { ok: true as const };
+}
+
+// ─── DEDUCTIONS ───────────────────────────────────────────────────────────────
+
+export async function addHonorariumDeduction(data: z.infer<typeof addDeductionSchema>) {
+  const session = await requirePermission("jadwalUjian", "manage");
+  const parsed = addDeductionSchema.parse(data);
+
+  const [batch] = await db
+    .select({ status: honorariumBatches.status })
+    .from(honorariumBatches)
+    .where(eq(honorariumBatches.id, parsed.batchId))
+    .limit(1);
+
+  if (!batch) throw new Error("Batch tidak ditemukan.");
+  if (batch.status !== "draft") throw new Error("Potongan hanya bisa ditambahkan saat batch status draft.");
+
+  const id = nanoid();
+  await db.insert(honorariumDeductions).values({
+    id,
+    batchId: parsed.batchId,
+    instructorId: parsed.instructorId,
+    deductionType: parsed.deductionType,
+    description: parsed.description,
+    amount: parsed.amount.toFixed(2),
+  });
+
+  await db.insert(honorariumAuditLogs).values({
+    id: nanoid(),
+    batchId: parsed.batchId,
+    actorId: session.user.id,
+    action: "deduction_added",
+    payload: { deductionId: id, instructorId: parsed.instructorId, type: parsed.deductionType, amount: parsed.amount },
+  });
+
+  revalidatePath(`/jadwal-otomatis/honorarium/${parsed.batchId}`);
+  return { ok: true as const, deductionId: id };
+}
+
+export async function removeHonorariumDeduction(data: z.infer<typeof removeDeductionSchema>) {
+  const session = await requirePermission("jadwalUjian", "manage");
+  const parsed = removeDeductionSchema.parse(data);
+
+  const [deduction] = await db
+    .select({
+      id: honorariumDeductions.id,
+      batchId: honorariumDeductions.batchId,
+    })
+    .from(honorariumDeductions)
+    .where(eq(honorariumDeductions.id, parsed.deductionId))
+    .limit(1);
+
+  if (!deduction) throw new Error("Potongan tidak ditemukan.");
+
+  const [batch] = await db
+    .select({ status: honorariumBatches.status })
+    .from(honorariumBatches)
+    .where(eq(honorariumBatches.id, deduction.batchId))
+    .limit(1);
+
+  if (!batch || batch.status !== "draft") throw new Error("Potongan hanya bisa dihapus saat batch status draft.");
+
+  await db.delete(honorariumDeductions).where(eq(honorariumDeductions.id, parsed.deductionId));
+
+  await db.insert(honorariumAuditLogs).values({
+    id: nanoid(),
+    batchId: deduction.batchId,
+    actorId: session.user.id,
+    action: "deduction_removed",
+    payload: { deductionId: parsed.deductionId },
+  });
+
+  revalidatePath(`/jadwal-otomatis/honorarium/${deduction.batchId}`);
+  return { ok: true as const };
+}
+
+export type DeductionRow = {
+  id: string;
+  instructorId: string;
+  instructorName: string;
+  deductionType: string;
+  description: string;
+  amount: number;
+  createdAt: Date;
+};
+
+export async function listHonorariumDeductions(batchId: string): Promise<DeductionRow[]> {
+  await requirePermission("jadwalUjian", "view");
+
+  const rows = await db
+    .select({
+      id: honorariumDeductions.id,
+      instructorId: honorariumDeductions.instructorId,
+      instructorName: instructors.name,
+      deductionType: honorariumDeductions.deductionType,
+      description: honorariumDeductions.description,
+      amount: honorariumDeductions.amount,
+      createdAt: honorariumDeductions.createdAt,
+    })
+    .from(honorariumDeductions)
+    .innerJoin(instructors, eq(honorariumDeductions.instructorId, instructors.id))
+    .where(eq(honorariumDeductions.batchId, batchId))
+    .orderBy(asc(honorariumDeductions.createdAt));
+
+  return rows.map((row) => ({
+    ...row,
+    amount: toNumber(row.amount),
+  }));
+}
+
+// ─── REOPEN BATCH ─────────────────────────────────────────────────────────────
+
+const REOPEN_ALLOWED_FROM: HonorariumBatchStatus[] = [
+  "dikirim_ke_keuangan",
+  "diproses_keuangan",
+  "dibayar",
+  "locked",
+];
+
+export async function reopenHonorariumBatch(data: z.infer<typeof reopenBatchSchema>) {
+  // Reopen hanya untuk admin (role guard ketat)
+  const session = await requireRole(["admin"]);
+  const parsed = reopenBatchSchema.parse(data);
+
+  const [existing] = await db
+    .select({ id: honorariumBatches.id, status: honorariumBatches.status, internalNotes: honorariumBatches.internalNotes })
+    .from(honorariumBatches)
+    .where(eq(honorariumBatches.id, parsed.batchId))
+    .limit(1);
+
+  if (!existing) throw new Error("Batch tidak ditemukan.");
+  if (!REOPEN_ALLOWED_FROM.includes(existing.status as HonorariumBatchStatus)) {
+    throw new Error(`Batch dengan status ${existing.status} tidak bisa di-reopen.`);
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(honorariumBatches)
+      .set({
+        status: "draft",
+        internalNotes: mergeNotes(existing.internalNotes, `[REOPEN] ${parsed.reason}`),
+        submittedAt: null,
+        paidAt: null,
+        lockedAt: null,
+        paidBy: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(honorariumBatches.id, parsed.batchId));
+
+    await tx.insert(honorariumAuditLogs).values({
+      id: nanoid(),
+      batchId: parsed.batchId,
+      actorId: session.user.id,
+      action: "batch_reopened",
+      payload: {
+        from: existing.status,
+        to: "draft",
+        reason: parsed.reason,
+      },
+    });
+  });
+
+  revalidatePath("/jadwal-otomatis/honorarium");
+  revalidatePath(`/jadwal-otomatis/honorarium/${parsed.batchId}`);
+  return { ok: true as const };
+}
+
+// ─── EXPORT EXCEL FALLBACK ────────────────────────────────────────────────────
+
+type ExportExcelResult =
+  | { ok: true; data: { fileName: string; xlsxBase64: string } }
+  | { ok: false; error: string };
+
+export async function exportHonorariumBatchExcel(batchId: string): Promise<ExportExcelResult> {
+  await requirePermission("jadwalUjian", "view");
+
+  const detail = await getHonorariumBatchDetail(batchId);
+  if (!detail) return { ok: false, error: "Batch tidak ditemukan." };
+
+  const deductions = await listHonorariumDeductions(batchId);
+
+  try {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Ringkasan Batch
+    const summaryRows: (string | number | null)[][] = [
+      ["LAPORAN HONORARIUM INTERNAL"],
+      [""],
+      ["Nomor Dokumen", detail.batch.documentNumber],
+      ["Periode", `${detail.batch.periodStart} s.d. ${detail.batch.periodEnd}`],
+      ["Status", detail.batch.status],
+      ["Dibuat Oleh", detail.batch.generatedByName ?? "-"],
+      ["Dibayar Oleh", detail.batch.paidByName ?? "-"],
+      ["Total Sesi", detail.batch.itemCount],
+      ["Total Gross", detail.batch.totalAmount],
+      ["Total Net", detail.recaps.reduce((s, r) => s + r.netAmount, 0)],
+      [""],
+      ["RINCIAN PER INSTRUKTUR"],
+      ["Instruktur", "Total Sesi", "Gross", "Deductions", "Net"],
+      ...detail.recaps.map((r) => [
+        r.instructorName,
+        r.totalSessions,
+        r.grossAmount,
+        deductions
+          .filter((d) => d.instructorId === r.instructorId)
+          .reduce((s, d) => s + d.amount, 0),
+        r.netAmount,
+      ]),
+      [""],
+      ["Diekspor pada", new Date().toLocaleString("id-ID")],
+    ];
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+    summarySheet["!cols"] = [{ wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, summarySheet, "Ringkasan");
+
+    // Sheet 2: Detail Potongan
+    const deductionRows = deductions.map((d, i) => ({
+      "No.": i + 1,
+      Instruktur: d.instructorName,
+      "Tipe Potongan": d.deductionType === "pph21" ? "PPh 21" : d.deductionType === "pph23" ? "PPh 23" : "Lainnya",
+      Keterangan: d.description,
+      Jumlah: d.amount,
+    }));
+    const deductionSheet = XLSX.utils.json_to_sheet(
+      deductionRows.length > 0
+        ? deductionRows
+        : [{ "No.": "", Instruktur: "", "Tipe Potongan": "", Keterangan: "", Jumlah: "" }],
+    );
+    deductionSheet["!cols"] = [
+      { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 30 }, { wch: 15 },
+    ];
+    XLSX.utils.book_append_sheet(wb, deductionSheet, "Potongan");
+
+    // Sheet 3: Detail per Sesi
+    const itemRows = detail.items.map((item, i) => ({
+      "No.": i + 1,
+      Tanggal: item.scheduledDate,
+      Program: item.programName,
+      Instruktur: item.paidInstructorName,
+      Sumber: item.source === "actual" ? "Substitusi" : "Planned",
+      Materi: item.materiBlock,
+      Level: item.expertiseLevelSnapshot,
+      Rate: item.rateSnapshot,
+      Amount: item.amount,
+    }));
+    const itemSheet = XLSX.utils.json_to_sheet(itemRows);
+    itemSheet["!cols"] = [
+      { wch: 5 }, { wch: 14 }, { wch: 18 }, { wch: 25 }, { wch: 12 },
+      { wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 14 },
+    ];
+    XLSX.utils.book_append_sheet(wb, itemSheet, "Detail Sesi");
+
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const xlsxBase64 = Buffer.from(buffer).toString("base64");
+
+    const fileName = `honorarium-${detail.batch.documentNumber.toLowerCase()}-${detail.batch.periodStart}-${detail.batch.periodEnd}.xlsx`;
+
+    await db.insert(honorariumAuditLogs).values({
+      id: nanoid(),
+      batchId: detail.batch.id,
+      actorId: (await requireSession()).user.id,
+      action: "batch_exported_excel",
+      payload: { fileName },
+    });
+
+    return { ok: true, data: { fileName, xlsxBase64 } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Gagal export Excel." };
+  }
 }

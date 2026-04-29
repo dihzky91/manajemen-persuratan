@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Download, Filter, FilePlus2 } from "lucide-react";
+import { Download, Eye, Filter, FilePlus2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ type Option = {
 
 type HonorariumReportData = Awaited<ReturnType<typeof getHonorariumReport>>;
 type HonorariumBatchData = Awaited<ReturnType<typeof listHonorariumBatches>>;
+type BatchStatusFilter = "" | "draft" | "dikirim_ke_keuangan" | "diproses_keuangan" | "dibayar" | "locked" | "all";
 
 interface HonorariumReportProps {
   instructors: Option[];
@@ -91,6 +93,10 @@ export function HonorariumReport({
   const [endDate, setEndDate] = useState(initialReport.appliedFilters.endDate);
   const [instructorId, setInstructorId] = useState(initialReport.appliedFilters.instructorId);
   const [programId, setProgramId] = useState(initialReport.appliedFilters.programId);
+  const [batchStartDate, setBatchStartDate] = useState(initialReport.appliedFilters.startDate);
+  const [batchEndDate, setBatchEndDate] = useState(initialReport.appliedFilters.endDate);
+  const [batchStatus, setBatchStatus] = useState<BatchStatusFilter>("all");
+  const [batchScope, setBatchScope] = useState<"all" | "finance">("all");
 
   const rows = report.rows;
 
@@ -142,13 +148,35 @@ export function HonorariumReport({
           return;
         }
 
-        const latestBatches = await listHonorariumBatches();
+        const latestBatches = await listHonorariumBatches({
+          startDate: batchStartDate,
+          endDate: batchEndDate,
+          status: batchStatus === "all" ? "" : batchStatus,
+          financeOnly: batchScope === "finance",
+        });
         setBatches(latestBatches);
         toast.success(
           `Draft ${result.documentNumber} dibuat (${result.itemCount} sesi).`,
         );
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Gagal generate draft honorarium.");
+      }
+    });
+  }
+
+  function handleApplyBatchFilter() {
+    startTransition(async () => {
+      try {
+        const result = await listHonorariumBatches({
+          startDate: batchStartDate,
+          endDate: batchEndDate,
+          status: batchStatus === "all" ? "" : batchStatus,
+          financeOnly: batchScope === "finance",
+        });
+        setBatches(result);
+        toast.success("Queue batch diperbarui.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Filter batch tidak valid.");
       }
     });
   }
@@ -291,7 +319,7 @@ export function HonorariumReport({
             <div>
               <CardTitle>Batch Honorarium Internal</CardTitle>
               <CardDescription>
-                Generate draft internal dari periode terpilih untuk dikirim ke supervisor/keuangan.
+                Generate draft internal dari periode terpilih untuk diproses sampai pembayaran.
               </CardDescription>
             </div>
             <Button onClick={handleGenerateDraftBatch} disabled={pending}>
@@ -301,6 +329,56 @@ export function HonorariumReport({
           </div>
         </CardHeader>
         <CardContent className="pt-6 p-0">
+          <div className="px-6 pb-4">
+            <div className="grid gap-3 md:grid-cols-5">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Periode Mulai</p>
+                <Input
+                  type="date"
+                  value={batchStartDate}
+                  onChange={(e) => setBatchStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Periode Akhir</p>
+                <Input
+                  type="date"
+                  value={batchEndDate}
+                  onChange={(e) => setBatchEndDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Status Batch</p>
+                <Select value={batchStatus} onValueChange={(value) => setBatchStatus(value as BatchStatusFilter)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua status</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="dikirim_ke_keuangan">Dikirim ke Keuangan</SelectItem>
+                    <SelectItem value="diproses_keuangan">Diproses Keuangan</SelectItem>
+                    <SelectItem value="dibayar">Dibayar</SelectItem>
+                    <SelectItem value="locked">Locked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Mode Queue</p>
+                <Select value={batchScope} onValueChange={(value) => setBatchScope(value as "all" | "finance")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua batch</SelectItem>
+                    <SelectItem value="finance">Antrian keuangan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleApplyBatchFilter} disabled={pending} className="w-full">
+                  <Filter className="h-4 w-4 mr-1" />
+                  Terapkan Queue
+                </Button>
+              </div>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -309,14 +387,16 @@ export function HonorariumReport({
                   <th className="text-left px-6 py-3 font-medium text-muted-foreground">Periode</th>
                   <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
                   <th className="text-right px-6 py-3 font-medium text-muted-foreground">Jumlah Sesi</th>
-                  <th className="text-right px-6 py-3 font-medium text-muted-foreground">Total</th>
+                  <th className="text-right px-6 py-3 font-medium text-muted-foreground">Gross</th>
+                  <th className="text-right px-6 py-3 font-medium text-muted-foreground">Net</th>
                   <th className="text-left px-6 py-3 font-medium text-muted-foreground">Dibuat</th>
+                  <th className="text-left px-6 py-3 font-medium text-muted-foreground">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {batches.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-6 py-8 text-center text-muted-foreground">
                       Belum ada batch honorarium internal.
                     </td>
                   </tr>
@@ -333,10 +413,17 @@ export function HonorariumReport({
                         </Badge>
                       </td>
                       <td className="px-6 py-3 text-right tabular-nums">{batch.itemCount}</td>
-                      <td className="px-6 py-3 text-right tabular-nums">
-                        {formatCurrency(batch.totalAmount)}
-                      </td>
+                      <td className="px-6 py-3 text-right tabular-nums">{formatCurrency(batch.grossAmount)}</td>
+                      <td className="px-6 py-3 text-right tabular-nums">{formatCurrency(batch.netAmount)}</td>
                       <td className="px-6 py-3">{new Date(batch.createdAt).toLocaleString("id-ID")}</td>
+                      <td className="px-6 py-3">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link href={`/jadwal-otomatis/honorarium/${batch.id}`}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            Detail
+                          </Link>
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}
