@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, and, asc, inArray, sql } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -11,12 +11,9 @@ import {
   instructorUnavailability,
   sessionAssignments,
   classSessions,
-  kelasPelatihan,
-  programs,
   curriculumTemplate,
 } from "@/server/db/schema";
 import { requirePermission } from "@/server/actions/auth";
-import type { Instructor } from "@/server/db/schema";
 
 // ─── EXPERTISE ─────────────────────────────────────────────────────────────
 
@@ -24,6 +21,7 @@ const expertiseCreateSchema = z.object({
   instructorId: z.string().min(1),
   programId: z.string().min(1),
   materiBlock: z.string().trim().min(1).max(100),
+  level: z.enum(["basic", "middle", "senior"]).default("middle"),
 });
 
 export async function listExpertise(instructorId: string) {
@@ -43,7 +41,13 @@ export async function addExpertise(data: z.infer<typeof expertiseCreateSchema>) 
   try {
     await db
       .insert(instructorExpertise)
-      .values({ id: nanoid(), ...parsed })
+      .values({
+        id: nanoid(),
+        instructorId: parsed.instructorId,
+        programId: parsed.programId,
+        materiBlock: parsed.materiBlock,
+        level: parsed.level,
+      })
       .onConflictDoNothing();
   } catch {
     // skip duplicate
@@ -170,4 +174,17 @@ export async function getMateriBlocksByProgram(programId: string) {
     .orderBy(asc(curriculumTemplate.materiBlock));
 
   return rows.map((r) => r.materiBlock);
+}
+
+export async function listProgramMateriBlocks() {
+  await requirePermission("jadwalUjian", "view");
+
+  return db
+    .select({
+      programId: curriculumTemplate.programId,
+      materiBlock: curriculumTemplate.materiBlock,
+    })
+    .from(curriculumTemplate)
+    .groupBy(curriculumTemplate.programId, curriculumTemplate.materiBlock)
+    .orderBy(asc(curriculumTemplate.programId), asc(curriculumTemplate.materiBlock));
 }

@@ -4,8 +4,12 @@ import { PageWrapper } from "@/components/layout/PageWrapper";
 import { InstrukturDetail } from "@/components/jadwal-otomatis/InstrukturDetail";
 import { listInstructors } from "@/server/actions/jadwal-otomatis/instructors";
 import { listExpertise, listUnavailability } from "@/server/actions/jadwal-otomatis/expertise";
-import { getTeachingHistory } from "@/server/actions/jadwal-otomatis/assignments";
+import {
+  getTeachingHistory,
+  getInstructorAllocationSummary,
+} from "@/server/actions/jadwal-otomatis/assignments";
 import { listPrograms } from "@/server/actions/jadwal-otomatis/programs";
+import { listInstructorRates } from "@/server/actions/jadwal-otomatis/honorarium";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -18,12 +22,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { id } = await params;
-  const [all, expertise, unavailability, history, programs] = await Promise.all([
+  const [all, expertise, rates, unavailability, history, programs, allocationSummary] = await Promise.all([
     listInstructors(),
     listExpertise(id),
+    listInstructorRates(id),
     listUnavailability(id),
     getTeachingHistory(id),
     listPrograms(),
+    getInstructorAllocationSummary(id),
   ]);
 
   const instructor = all.find((i) => i.id === id);
@@ -34,9 +40,11 @@ export default async function Page({ params }: Props) {
       <InstrukturDetail
         instructor={instructor}
         expertise={expertise}
+        rates={rates}
         unavailability={unavailability}
         history={history}
         programs={programs}
+        allocationSummary={allocationSummary}
       />
     </PageWrapper>
   );

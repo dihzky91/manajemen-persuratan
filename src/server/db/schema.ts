@@ -5,6 +5,7 @@ import {
   boolean,
   date,
   integer,
+  numeric,
   serial,
   pgEnum,
   varchar,
@@ -1104,8 +1105,16 @@ export const certificateItems = pgTable(
 
 // ─── JADWAL OTOMATIS BREVET ──────────────────────────────────────────────────
 
+// Enum untuk status sesi kelas (Phase 3)
+export const classSessionStatusEnum = pgEnum("class_session_status", [
+  "scheduled",
+  "cancelled",
+  "makeup",
+  "completed",
+]);
+
 export const programs = pgTable("programs", {
-  id: text("id").primaryKey(),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   code: varchar("code", { length: 20 }).notNull().unique(),
   name: varchar("name", { length: 100 }).notNull(),
   totalSessions: integer("total_sessions").notNull(),
@@ -1117,7 +1126,7 @@ export const programs = pgTable("programs", {
 
 // Tipe kelas yang tersedia: weekend_pagi, weekend_siang, weekday_selasa_kamis, weekday_senin_rabu_jumat
 export const classTypes = pgTable("class_types", {
-  id: text("id").primaryKey(),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   code: varchar("code", { length: 30 }).notNull().unique(),
   name: varchar("name", { length: 100 }).notNull(),
   activeDays: varchar("active_days", { length: 100 }).notNull(), // "Sat,Sun" | "Tue,Thu" | "Mon,Wed,Fri"
@@ -1132,7 +1141,7 @@ export const classTypes = pgTable("class_types", {
 export const curriculumTemplate = pgTable(
   "curriculum_template",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     programId: text("program_id")
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
@@ -1150,7 +1159,7 @@ export const curriculumTemplate = pgTable(
 export const curriculumExamPoints = pgTable(
   "curriculum_exam_points",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     programId: text("program_id")
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
@@ -1169,7 +1178,7 @@ export const curriculumExamPoints = pgTable(
 export const nationalHolidays = pgTable(
   "national_holidays",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     date: date("date").notNull(),
     name: varchar("name", { length: 200 }).notNull(),
     year: integer("year").notNull(),
@@ -1182,7 +1191,7 @@ export const nationalHolidays = pgTable(
 
 // Kelas pelatihan (bukan kelas ujian dari jadwal_ujian module)
 export const kelasPelatihan = pgTable("kelas_pelatihan", {
-  id: text("id").primaryKey(),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   namaKelas: varchar("nama_kelas", { length: 200 }).notNull(),
   programId: text("program_id")
     .notNull()
@@ -1203,7 +1212,7 @@ export const kelasPelatihan = pgTable("kelas_pelatihan", {
 export const classExcludedDates = pgTable(
   "class_excluded_dates",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     kelasId: text("kelas_id")
       .notNull()
       .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
@@ -1219,7 +1228,7 @@ export const classExcludedDates = pgTable(
 export const classSessions = pgTable(
   "class_sessions",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     kelasId: text("kelas_id")
       .notNull()
       .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
@@ -1230,18 +1239,56 @@ export const classSessions = pgTable(
     timeSlotStart: varchar("time_slot_start", { length: 5 }).notNull(),
     timeSlotEnd: varchar("time_slot_end", { length: 5 }).notNull(),
     materiName: varchar("materi_name", { length: 200 }),
-    status: varchar("status", { length: 20 }).default("scheduled").notNull(),
+    status: classSessionStatusEnum("status").default("scheduled").notNull(),
+    // Phase 3: Force Majeure fields
+    cancelledAt: timestamp("cancelled_at"),
+    cancelledBy: text("cancelled_by").references(() => users.id),
+    cancellationReason: varchar("cancellation_reason", { length: 300 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
     index("cs_kelas_date").on(t.kelasId, t.scheduledDate),
+    index("cs_status_idx").on(t.status),
+  ],
+);
+
+// Sesi makeup (pengganti) - Phase 3
+export const makeupSessions = pgTable(
+  "makeup_sessions",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    originalSessionId: text("original_session_id")
+      .notNull()
+      .references(() => classSessions.id, { onDelete: "cascade" }),
+    kelasId: text("kelas_id")
+      .notNull()
+      .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
+    // Data dari sesi asli (untuk referensi)
+    sessionNumber: integer("session_number"),
+    isExamDay: boolean("is_exam_day").default(false).notNull(),
+    examSubjects: text("exam_subjects").array(),
+    materiName: varchar("materi_name", { length: 200 }),
+    // Tanggal dan waktu makeup
+    scheduledDate: date("scheduled_date").notNull(),
+    timeSlotStart: varchar("time_slot_start", { length: 5 }).notNull(),
+    timeSlotEnd: varchar("time_slot_end", { length: 5 }).notNull(),
+    status: classSessionStatusEnum("status").default("scheduled").notNull(),
+    // Tracking
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("ms_kelas_date").on(t.kelasId, t.scheduledDate),
+    index("ms_original_session").on(t.originalSessionId),
+    index("ms_status_idx").on(t.status),
   ],
 );
 
 // ─── INSTRUKTUR (Phase 2) ─────────────────────────────────────────────────────
 
 export const instructors = pgTable("instructors", {
-  id: text("id").primaryKey(),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: varchar("name", { length: 200 }).notNull(),
   email: varchar("email", { length: 150 }),
   phone: varchar("phone", { length: 30 }),
@@ -1254,7 +1301,7 @@ export const instructors = pgTable("instructors", {
 export const instructorExpertise = pgTable(
   "instructor_expertise",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     instructorId: text("instructor_id")
       .notNull()
       .references(() => instructors.id, { onDelete: "cascade" }),
@@ -1262,6 +1309,7 @@ export const instructorExpertise = pgTable(
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
     materiBlock: varchar("materi_block", { length: 100 }).notNull(),
+    level: varchar("level", { length: 20 }).default("middle").notNull(),
   },
   (t) => [
     uniqueIndex("uniq_instructor_expertise").on(t.instructorId, t.programId, t.materiBlock),
@@ -1273,7 +1321,7 @@ export const instructorExpertise = pgTable(
 export const instructorUnavailability = pgTable(
   "instructor_unavailability",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     instructorId: text("instructor_id")
       .notNull()
       .references(() => instructors.id, { onDelete: "cascade" }),
@@ -1290,7 +1338,7 @@ export const instructorUnavailability = pgTable(
 export const sessionAssignments = pgTable(
   "session_assignments",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     sessionId: text("session_id")
       .notNull()
       .references(() => classSessions.id, { onDelete: "cascade" }),
@@ -1300,6 +1348,11 @@ export const sessionAssignments = pgTable(
     actualInstructorId: text("actual_instructor_id")
       .references(() => instructors.id),
     substitutionReason: varchar("substitution_reason", { length: 300 }),
+    availabilityStatus: varchar("availability_status", { length: 30 })
+      .default("pending_wa_confirmation")
+      .notNull(),
+    availabilityCheckedAt: timestamp("availability_checked_at"),
+    availabilityNote: varchar("availability_note", { length: 300 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -1307,6 +1360,150 @@ export const sessionAssignments = pgTable(
     uniqueIndex("uniq_session_instructor").on(t.sessionId, t.plannedInstructorId),
     index("sa_instructor_idx").on(t.plannedInstructorId),
     index("sa_actual_instructor_idx").on(t.actualInstructorId),
+  ],
+);
+
+// Rate honorarium instruktur per program & materi block (Phase 4)
+export const instructorRates = pgTable(
+  "instructor_rates",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    instructorId: text("instructor_id")
+      .notNull()
+      .references(() => instructors.id, { onDelete: "cascade" }),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    materiBlock: varchar("materi_block", { length: 100 }).notNull(),
+    rateAmount: numeric("rate_amount", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_instructor_rate").on(t.instructorId, t.programId, t.materiBlock),
+    index("ir_instructor_idx").on(t.instructorId),
+    index("ir_program_idx").on(t.programId),
+  ],
+);
+
+// Master tarif honorarium standar (program + level + mode + periode berlaku)
+export const honorariumRateRules = pgTable(
+  "honorarium_rate_rules",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    level: varchar("level", { length: 20 }).notNull(), // basic | middle | senior
+    mode: varchar("mode", { length: 10 }).notNull(), // online | offline
+    honorPerSession: numeric("honor_per_session", { precision: 12, scale: 2 }).notNull(),
+    transportAmount: numeric("transport_amount", { precision: 12, scale: 2 }).notNull(),
+    effectiveFrom: date("effective_from").notNull(),
+    effectiveTo: date("effective_to"),
+    locationScope: varchar("location_scope", { length: 200 }).default("").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    notes: varchar("notes", { length: 300 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_honorarium_rate_rule").on(
+      t.programId,
+      t.level,
+      t.mode,
+      t.effectiveFrom,
+      t.locationScope,
+    ),
+    index("hrr_program_idx").on(t.programId),
+    index("hrr_effective_idx").on(t.effectiveFrom, t.effectiveTo),
+    index("hrr_active_idx").on(t.isActive),
+  ],
+);
+
+// Batch honorarium internal (workflow operasional -> supervisor -> keuangan)
+export const honorariumBatches = pgTable(
+  "honorarium_batches",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    documentNumber: varchar("document_number", { length: 80 }).notNull().unique(),
+    periodStart: date("period_start").notNull(),
+    periodEnd: date("period_end").notNull(),
+    status: varchar("status", { length: 40 }).default("draft").notNull(),
+    generatedBy: text("generated_by").references(() => users.id),
+    approvedBy: text("approved_by").references(() => users.id),
+    paidBy: text("paid_by").references(() => users.id),
+    submittedAt: timestamp("submitted_at"),
+    approvedAt: timestamp("approved_at"),
+    paidAt: timestamp("paid_at"),
+    lockedAt: timestamp("locked_at"),
+    internalNotes: text("internal_notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("hb_period_idx").on(t.periodStart, t.periodEnd),
+    index("hb_status_idx").on(t.status),
+  ],
+);
+
+// Detail honorarium per sesi (snapshot immutable per batch)
+export const honorariumItems = pgTable(
+  "honorarium_items",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => honorariumBatches.id, { onDelete: "cascade" }),
+    assignmentId: text("assignment_id")
+      .notNull()
+      .references(() => sessionAssignments.id),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => classSessions.id),
+    kelasId: text("kelas_id")
+      .notNull()
+      .references(() => kelasPelatihan.id),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id),
+    scheduledDate: date("scheduled_date").notNull(),
+    paidInstructorId: text("paid_instructor_id")
+      .notNull()
+      .references(() => instructors.id),
+    paidInstructorName: varchar("paid_instructor_name", { length: 200 }).notNull(),
+    source: varchar("source", { length: 20 }).notNull(), // planned | actual
+    materiBlock: varchar("materi_block", { length: 100 }).notNull(),
+    expertiseLevelSnapshot: varchar("expertise_level_snapshot", { length: 20 })
+      .default("middle")
+      .notNull(),
+    rateSnapshot: numeric("rate_snapshot", { precision: 12, scale: 2 }).notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_honorarium_batch_assignment").on(t.batchId, t.assignmentId),
+    index("hi_batch_idx").on(t.batchId),
+    index("hi_instructor_idx").on(t.paidInstructorId),
+    index("hi_date_idx").on(t.scheduledDate),
+  ],
+);
+
+// Audit log perubahan honorarium
+export const honorariumAuditLogs = pgTable(
+  "honorarium_audit_logs",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => honorariumBatches.id, { onDelete: "cascade" }),
+    actorId: text("actor_id").references(() => users.id),
+    action: varchar("action", { length: 60 }).notNull(),
+    payload: jsonb("payload"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("hal_batch_idx").on(t.batchId),
+    index("hal_action_idx").on(t.action),
   ],
 );
 
@@ -1328,6 +1525,8 @@ export type ClassExcludedDate = typeof classExcludedDates.$inferSelect;
 export type NewClassExcludedDate = typeof classExcludedDates.$inferInsert;
 export type ClassSession = typeof classSessions.$inferSelect;
 export type NewClassSession = typeof classSessions.$inferInsert;
+export type MakeupSession = typeof makeupSessions.$inferSelect;
+export type NewMakeupSession = typeof makeupSessions.$inferInsert;
 export type Instructor = typeof instructors.$inferSelect;
 export type NewInstructor = typeof instructors.$inferInsert;
 export type InstructorExpertise = typeof instructorExpertise.$inferSelect;
@@ -1336,6 +1535,16 @@ export type InstructorUnavailability = typeof instructorUnavailability.$inferSel
 export type NewInstructorUnavailability = typeof instructorUnavailability.$inferInsert;
 export type SessionAssignment = typeof sessionAssignments.$inferSelect;
 export type NewSessionAssignment = typeof sessionAssignments.$inferInsert;
+export type InstructorRate = typeof instructorRates.$inferSelect;
+export type NewInstructorRate = typeof instructorRates.$inferInsert;
+export type HonorariumRateRule = typeof honorariumRateRules.$inferSelect;
+export type NewHonorariumRateRule = typeof honorariumRateRules.$inferInsert;
+export type HonorariumBatch = typeof honorariumBatches.$inferSelect;
+export type NewHonorariumBatch = typeof honorariumBatches.$inferInsert;
+export type HonorariumItem = typeof honorariumItems.$inferSelect;
+export type NewHonorariumItem = typeof honorariumItems.$inferInsert;
+export type HonorariumAuditLog = typeof honorariumAuditLogs.$inferSelect;
+export type NewHonorariumAuditLog = typeof honorariumAuditLogs.$inferInsert;
 
 // ─── TYPE EXPORTS (Penomoran Sertifikat) ─────────────────────────────────────
 

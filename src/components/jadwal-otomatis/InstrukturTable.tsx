@@ -24,30 +24,70 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { deleteInstructor, type InstructorRow } from "@/server/actions/jadwal-otomatis/instructors";
+import { deleteInstructor } from "@/server/actions/jadwal-otomatis/instructors";
+
+type InstrukturTableRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean;
+  expertiseCount: number;
+  weeklySessions: number;
+  monthlySessions: number;
+  activeClassCount: number;
+};
 
 interface InstrukturTableProps {
-  initialData: any[];
+  initialData: InstrukturTableRow[];
   canManage: boolean;
 }
 
 export function InstrukturTable({ initialData, canManage }: InstrukturTableProps) {
   const router = useRouter();
-  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InstrukturTableRow | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
 
-  const columns = useMemo<ColumnDef<any>[]>(() => {
-    const base: ColumnDef<any>[] = [
-      { accessorKey: "name", header: "Nama", cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
+  const columns = useMemo<ColumnDef<InstrukturTableRow>[]>(() => {
+    const base: ColumnDef<InstrukturTableRow>[] = [
+      {
+        accessorKey: "name",
+        header: "Nama",
+        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      },
       {
         accessorKey: "email",
         header: "Email",
-        cell: ({ row }) => row.original.email ?? <span className="text-muted-foreground text-xs">—</span>,
+        cell: ({ row }) => row.original.email ?? <span className="text-muted-foreground text-xs">-</span>,
       },
       {
         accessorKey: "phone",
         header: "Telepon",
-        cell: ({ row }) => row.original.phone ?? <span className="text-muted-foreground text-xs">—</span>,
+        cell: ({ row }) => row.original.phone ?? <span className="text-muted-foreground text-xs">-</span>,
+      },
+      {
+        accessorKey: "expertiseCount",
+        header: "Keahlian",
+        cell: ({ row }) => <span className="tabular-nums">{row.original.expertiseCount}</span>,
+      },
+      {
+        id: "workload",
+        header: "Beban Kerja",
+        cell: ({ row }) => (
+          <div className="text-xs">
+            <p>
+              7h: <span className="tabular-nums">{row.original.weeklySessions}</span> sesi
+            </p>
+            <p>
+              30h: <span className="tabular-nums">{row.original.monthlySessions}</span> sesi
+            </p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "activeClassCount",
+        header: "Kelas Aktif",
+        cell: ({ row }) => <span className="tabular-nums">{row.original.activeClassCount}</span>,
       },
       {
         accessorKey: "isActive",
@@ -76,7 +116,7 @@ export function InstrukturTable({ initialData, canManage }: InstrukturTableProps
                 <Eye className="mr-2 h-4 w-4" />
                 Detail
               </DropdownMenuItem>
-              {canManage && (
+              {canManage ? (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(row.original)}>
@@ -84,7 +124,7 @@ export function InstrukturTable({ initialData, canManage }: InstrukturTableProps
                     Hapus
                   </DropdownMenuItem>
                 </>
-              )}
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -97,8 +137,11 @@ export function InstrukturTable({ initialData, canManage }: InstrukturTableProps
   function handleDeleteConfirm() {
     if (!deleteTarget) return;
     startDeleteTransition(async () => {
-      const res = await deleteInstructor(deleteTarget.id);
-      if (!res.ok) { toast.error("Gagal menghapus."); return; }
+      const result = await deleteInstructor(deleteTarget.id);
+      if (!result.ok) {
+        toast.error("Gagal menghapus.");
+        return;
+      }
       toast.success(`Instruktur "${deleteTarget.name}" dihapus.`);
       setDeleteTarget(null);
       router.refresh();
@@ -112,19 +155,31 @@ export function InstrukturTable({ initialData, canManage }: InstrukturTableProps
           <CardTitle>Daftar Instruktur</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <DataTable columns={columns} data={initialData} searchColumnId="name" searchPlaceholder="Cari instruktur..." emptyMessage="Belum ada instruktur." />
+          <DataTable
+            columns={columns}
+            data={initialData}
+            searchColumnId="name"
+            searchPlaceholder="Cari instruktur..."
+            emptyMessage="Belum ada instruktur."
+          />
         </CardContent>
       </Card>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o && !isDeleting) setDeleteTarget(null); }}>
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Hapus Instruktur?</DialogTitle>
-            <DialogDescription>Instruktur <span className="font-medium">{deleteTarget?.name}</span> akan dihapus permanen.</DialogDescription>
+            <DialogDescription>
+              Instruktur <span className="font-medium">{deleteTarget?.name}</span> akan dihapus permanen.
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>Batal</Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>{isDeleting ? "Menghapus..." : "Hapus"}</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+              {isDeleting ? "Menghapus..." : "Hapus"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

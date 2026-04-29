@@ -1,7 +1,7 @@
 # Rencana Sistem Penjadwalan Otomatis — Multi-Program (Brevet AB, Brevet C, BFA)
 
 ## Status
-Perencanaan — belum implementasi
+Implementasi bertahap — Phase 4 selesai
 
 ---
 
@@ -435,9 +435,9 @@ Master Instruktur → klik instruktur
 - [ ] End date re-derive otomatis
 
 ### Phase 4 — Honorarium & Reporting
-- [ ] Rate instruktur per materi_block
-- [ ] Laporan honorarium per periode / per instruktur
-- [ ] Export jadwal ke PDF (replace proses Excel manual)
+- [x] Rate instruktur per materi_block
+- [x] Laporan honorarium per periode / per instruktur
+- [x] Export jadwal ke PDF (replace proses Excel manual)
 
 ---
 
@@ -447,3 +447,36 @@ Master Instruktur → klik instruktur
 - RBAC existing → guard fitur ini dengan capability `manage_schedule`
 - PDF export → replace proses Excel → PDF manual saat ini
 - Room/ruang tracking (jika ada) → conflict detection makeup lebih akurat
+
+---
+
+## 12. Update Implementasi (29 April 2026)
+
+### 12A. Form Instruktur
+- Form tambah instruktur sekarang wajib punya minimal 1 keahlian.
+- Setiap keahlian menyimpan: `program`, `materi_block`, dan `level` (`basic`, `middle`, `senior`).
+
+### 12B. Konteks Alokasi Instruktur
+- Master instruktur menampilkan ringkasan:
+  - jumlah keahlian,
+  - beban 7 hari,
+  - beban 30 hari,
+  - jumlah kelas aktif.
+- Detail instruktur menampilkan kelas aktif, sesi terdekat, dan jumlah sesi menunggu konfirmasi WA.
+
+### 12C. Rekomendasi Saat Assign
+- Saat admin pilih blok materi, sistem menampilkan rekomendasi instruktur berbasis skor:
+  - 50% kecocokan keahlian + level,
+  - 25% beban 7 hari,
+  - 15% histori materi sejenis,
+  - 10% rotasi beban 30 hari.
+- Output rekomendasi menampilkan skor, beban, kelas aktif, dan histori sejenis.
+
+### 12D. Konfirmasi Ketersediaan via WA
+- `session_assignments` menyimpan status ketersediaan:
+  - `pending_wa_confirmation`,
+  - `accepted`,
+  - `rejected`,
+  - `no_response`.
+- Status default setelah assign/substitusi adalah `pending_wa_confirmation`.
+- Admin melakukan kontak real-time via WA, lalu update status konfirmasi di tabel jadwal.

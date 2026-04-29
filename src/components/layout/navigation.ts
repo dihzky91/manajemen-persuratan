@@ -1,5 +1,6 @@
 import {
   Award,
+  Banknote,
   BadgeCheck,
   BarChart2,
   BarChart3,
@@ -283,6 +284,14 @@ export const navigationSections: NavigationSection[] = [
         active: true,
         allowedRoles: ["admin", "staff"],
         requiredCapability: "jadwal_ujian:manage",
+      },
+      {
+        href: "/jadwal-otomatis/honorarium",
+        label: "Honorarium",
+        icon: Banknote,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:view",
       },
     ],
   },

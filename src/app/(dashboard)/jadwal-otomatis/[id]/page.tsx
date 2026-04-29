@@ -26,16 +26,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { id } = await params;
-  const [kelas, sessions, assignments, instructors, materiBlocks, session] = await Promise.all([
-    getKelasOtomatisDetail(id),
+  const kelas = await getKelasOtomatisDetail(id);
+
+  if (!kelas) notFound();
+
+  const [sessions, assignments, instructors, materiBlocks, session] = await Promise.all([
     getSessionsByKelas(id),
     getAssignmentsByKelas(id),
     listInstructors(),
-    getMateriBlocksByProgram((await getKelasOtomatisDetail(id))?.programId ?? ""),
+    getMateriBlocksByProgram(kelas.programId),
     getSession(),
   ]);
-
-  if (!kelas) notFound();
 
   const role = (session?.user as { role?: string } | undefined)?.role;
   const canManage = role === "admin" || role === "staff";
