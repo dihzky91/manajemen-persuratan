@@ -22,6 +22,7 @@ export type KelasRow = {
   lokasi: string | null;
   catatan: string | null;
   jumlahUjian: number;
+  kelasPelatihanId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -50,6 +51,7 @@ export async function listKelas(filter: KelasFilter = {}): Promise<KelasRow[]> {
       lokasi: kelasUjian.lokasi,
       catatan: kelasUjian.catatan,
       jumlahUjian: sql<number>`count(${jadwalUjian.id})::int`.as("jumlah_ujian"),
+      kelasPelatihanId: kelasUjian.kelasPelatihanId,
       createdAt: kelasUjian.createdAt,
       updatedAt: kelasUjian.updatedAt,
     })

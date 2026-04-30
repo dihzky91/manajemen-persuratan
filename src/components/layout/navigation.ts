@@ -199,8 +199,16 @@ export const navigationSections: NavigationSection[] = [
     ],
   },
   {
-    title: "Jadwal Ujian",
+    title: "Program Pelatihan",
     items: [
+      {
+        href: "/jadwal-otomatis",
+        label: "Jadwal Kelas",
+        icon: Calendar,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:view",
+      },
       {
         href: "/jadwal-ujian",
         label: "Jadwal Ujian",
@@ -209,6 +217,27 @@ export const navigationSections: NavigationSection[] = [
         allowedRoles: ["admin", "staff"],
         requiredCapability: "jadwal_ujian:view",
       },
+      {
+        href: "/jadwal-otomatis/honorarium",
+        label: "Honorarium",
+        icon: Banknote,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:view",
+      },
+      {
+        href: "/jadwal-otomatis/instruktur",
+        label: "Instruktur",
+        icon: Users,
+        active: true,
+        allowedRoles: ["admin", "staff"],
+        requiredCapability: "jadwal_ujian:manage",
+      },
+    ],
+  },
+  {
+    title: "Manajemen Ujian",
+    items: [
       {
         href: "/jadwal-ujian/admin-jaga",
         label: "Admin Jaga",
@@ -263,35 +292,6 @@ export const navigationSections: NavigationSection[] = [
         active: true,
         allowedRoles: ["admin"],
         requiredCapability: "jadwal_ujian:configure",
-      },
-    ],
-  },
-  {
-    title: "Jadwal Otomatis",
-    items: [
-      {
-        href: "/jadwal-otomatis",
-        label: "Jadwal Brevet",
-        icon: Calendar,
-        active: true,
-        allowedRoles: ["admin", "staff"],
-        requiredCapability: "jadwal_ujian:view",
-      },
-      {
-        href: "/jadwal-otomatis/instruktur",
-        label: "Instruktur",
-        icon: Users,
-        active: true,
-        allowedRoles: ["admin", "staff"],
-        requiredCapability: "jadwal_ujian:manage",
-      },
-      {
-        href: "/jadwal-otomatis/honorarium",
-        label: "Honorarium",
-        icon: Banknote,
-        active: true,
-        allowedRoles: ["admin", "staff"],
-        requiredCapability: "jadwal_ujian:view",
       },
     ],
   },

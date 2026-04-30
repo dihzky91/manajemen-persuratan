@@ -781,6 +781,8 @@ export const kelasUjian = pgTable("kelas_ujian", {
   mode: varchar("mode", { length: 50 }).notNull(),
   lokasi: varchar("lokasi", { length: 300 }),
   catatan: text("catatan"),
+  kelasPelatihanId: text("kelas_pelatihan_id")
+    .references(() => kelasPelatihan.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

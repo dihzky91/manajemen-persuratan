@@ -73,6 +73,18 @@ export function KelasManager({ initialData, canManage, programOptions, tipeOptio
         cell: ({ row }) => <span className="font-medium">{row.original.namaKelas}</span>,
       },
       {
+        id: "sumber",
+        header: "Sumber",
+        cell: ({ row }) =>
+          row.original.kelasPelatihanId ? (
+            <Badge variant="outline" className="border-blue-300 text-blue-700 text-xs gap-1">
+              Jadwal Otomatis
+            </Badge>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          ),
+      },
+      {
         accessorKey: "program",
         header: "Program",
         cell: ({ row }) => <Badge variant="secondary">{row.original.program}</Badge>,
