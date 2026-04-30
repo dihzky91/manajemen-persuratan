@@ -1375,12 +1375,13 @@ export const instructorRates = pgTable(
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
     materiBlock: varchar("materi_block", { length: 100 }).notNull(),
+    mode: varchar("mode", { length: 10 }).notNull().default("offline"), // offline | online
     rateAmount: numeric("rate_amount", { precision: 12, scale: 2 }).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("uniq_instructor_rate").on(t.instructorId, t.programId, t.materiBlock),
+    uniqueIndex("uniq_instructor_rate").on(t.instructorId, t.programId, t.materiBlock, t.mode),
     index("ir_instructor_idx").on(t.instructorId),
     index("ir_program_idx").on(t.programId),
   ],

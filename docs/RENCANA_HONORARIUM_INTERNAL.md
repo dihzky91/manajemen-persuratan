@@ -302,16 +302,16 @@ Tujuan:
 #### D. Finalisasi dan Governance
 - [x] Aksi lock batch (`-> locked`) setelah pembayaran final.
 - [x] Mekanisme reopen terbatas role (admin) + alasan wajib.
-- [ ] Validasi kelengkapan data sebelum lock.
+- [x] Validasi kelengkapan data sebelum lock.
 - [x] Nomor dokumen honorarium konsisten dan unik per batch.
 - [x] Laporan audit perubahan per batch.
 - [x] Deductions dan perhitungan `net_amount` riil (PPh 21, PPh 23, other).
 
 #### E. Output dan Integrasi
 - [x] Export Excel sesuai template keuangan (fallback) — 3 sheet (Ringkasan, Potongan, Detail Sesi).
-- [ ] Export PDF opsional (jika diperlukan pimpinan/audit).
-- [ ] Notifikasi internal saat status berubah (operasional/keuangan).
-- [ ] Rekonsiliasi total batch vs total pembayaran.
+- [x] Export PDF opsional (jika diperlukan pimpinan/audit).
+- [x] Notifikasi internal saat status berubah (operasional/keuangan).
+- [x] Rekonsiliasi total batch vs total pembayaran.
 
 ### 12.2 Checkpoint Lintas Device
 
@@ -334,16 +334,13 @@ Tujuan:
 - [x] Export Excel template keuangan (fallback) — 3 sheet (Ringkasan, Potongan, Detail Sesi).
 
 #### Belum dikerjakan (next)
-- [ ] Validasi kelengkapan data sebelum lock.
-- [ ] Export PDF opsional.
-- [ ] Notifikasi internal saat status berubah.
-- [ ] Rekonsiliasi total batch vs pembayaran.
+- [x] Semua item inti sudah selesai.
 
 #### Langkah pertama saat resume di device lain
 1. Pull/update branch terbaru.
 2. Jalankan migrasi DB terbaru (minimal sampai `0036_honorarium_rate_rules.sql`).
 3. Jalankan app dan cek modul `/jadwal-otomatis/honorarium`.
-4. Lanjut implementasi item pada bagian "Belum dikerjakan (next)" di atas.
+4. Lanjut hardening/opsional sesuai kebutuhan operasional.
 
 ---
 
@@ -410,5 +407,7 @@ Tujuan:
 ### Titik lanjut paling aman untuk agent berikutnya
 1. Jalankan migrasi DB: `0037_honorarium_deductions.sql` (buat tabel honorarium_deductions).
 2. Verifikasi app tetap jalan setelah migrasi.
-3. Lanjutkan item "Belum dikerjakan (next)" di atas: validasi kelengkapan sebelum lock, export PDF, notifikasi, rekonsiliasi.
-4. Setelah validasi selesai, commit dan push seluruh perubahan.
+3. Lanjutkan hardening/opsional (monitoring & penyempurnaan UX rekonsiliasi) bila diperlukan.
+4. Commit dan push seluruh perubahan.
+
+

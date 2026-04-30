@@ -18,3 +18,15 @@ export const kelasOtomatisFilterSchema = z.object({
 });
 
 export type KelasOtomatisFilter = z.infer<typeof kelasOtomatisFilterSchema>;
+
+export const kelasOtomatisUpdateStartDateSchema = z.object({
+  id: z.string().min(1, "ID kelas wajib diisi"),
+  startDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal tidak valid (YYYY-MM-DD)"),
+  exclusionStrategy: z.enum(["keep", "shift", "clear"]).default("keep"),
+});
+
+export type KelasOtomatisUpdateStartDateInput = z.infer<
+  typeof kelasOtomatisUpdateStartDateSchema
+>;

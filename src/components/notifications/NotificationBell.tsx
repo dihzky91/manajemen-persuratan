@@ -76,6 +76,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         disposisi: "/disposisi",
         surat_keluar: "/surat-keluar",
         surat_masuk: "/surat-masuk",
+        honorarium_batch: "/jadwal-otomatis/honorarium",
       };
       const baseRoute = routes[notif.entitasType];
       if (baseRoute) {

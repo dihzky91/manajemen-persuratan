@@ -228,6 +228,17 @@ const availabilityUpdateSchema = z.object({
   availabilityNote: z.string().trim().max(300).optional().or(z.literal("")),
 });
 
+const bulkAvailabilityUpdateSchema = z.object({
+  assignmentIds: z.array(z.string().min(1)).min(1, "Pilih minimal satu assignment").max(200),
+  availabilityStatus: availabilityStatusSchema,
+  availabilityNote: z.string().trim().max(300).optional().or(z.literal("")),
+});
+
+const bulkSessionStatusUpdateSchema = z.object({
+  assignmentIds: z.array(z.string().min(1)).min(1, "Pilih minimal satu assignment").max(200),
+  sessionStatus: z.enum(["scheduled", "completed"]),
+});
+
 export async function updateAssignmentAvailabilityStatus(
   data: z.infer<typeof availabilityUpdateSchema>,
 ) {
@@ -247,6 +258,54 @@ export async function updateAssignmentAvailabilityStatus(
 
   revalidatePath("/jadwal-otomatis");
   return { ok: true as const };
+}
+
+export async function bulkUpdateAssignmentAvailabilityStatus(
+  data: z.infer<typeof bulkAvailabilityUpdateSchema>,
+) {
+  const parsed = bulkAvailabilityUpdateSchema.parse(data);
+  await requirePermission("jadwalUjian", "manage");
+
+  const result = await db
+    .update(sessionAssignments)
+    .set({
+      availabilityStatus: parsed.availabilityStatus,
+      availabilityNote: parsed.availabilityNote || null,
+      availabilityCheckedAt:
+        parsed.availabilityStatus === "pending_wa_confirmation" ? null : new Date(),
+      updatedAt: new Date(),
+    })
+    .where(inArray(sessionAssignments.id, parsed.assignmentIds));
+
+  revalidatePath("/jadwal-otomatis");
+  return { ok: true as const, updatedCount: result.rowCount ?? 0 };
+}
+
+export async function bulkUpdateSessionStatus(
+  data: z.infer<typeof bulkSessionStatusUpdateSchema>,
+) {
+  const parsed = bulkSessionStatusUpdateSchema.parse(data);
+  await requirePermission("jadwalUjian", "manage");
+
+  const assignmentRows = await db
+    .select({ sessionId: sessionAssignments.sessionId })
+    .from(sessionAssignments)
+    .where(inArray(sessionAssignments.id, parsed.assignmentIds));
+
+  const sessionIds = Array.from(new Set(assignmentRows.map((row) => row.sessionId)));
+  if (sessionIds.length === 0) {
+    return { ok: true as const, updatedCount: 0 };
+  }
+
+  const result = await db
+    .update(classSessions)
+    .set({
+      status: parsed.sessionStatus,
+    })
+    .where(inArray(classSessions.id, sessionIds));
+
+  revalidatePath("/jadwal-otomatis");
+  return { ok: true as const, updatedCount: result.rowCount ?? 0 };
 }
 
 // GET ASSIGNMENTS FOR KELAS

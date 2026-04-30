@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import {
   assignInstructorToBlock,
+  bulkUpdateAssignmentAvailabilityStatus,
+  bulkUpdateSessionStatus,
   getInstructorRecommendationsForBlock,
   updateAssignmentAvailabilityStatus,
   unassignInstructorFromSession,
@@ -133,6 +135,7 @@ function getDayName(dateStr: string) {
 }
 
 type AvailabilityStatus = "pending_wa_confirmation" | "accepted" | "rejected" | "no_response";
+type BulkSessionStatus = "scheduled" | "completed";
 
 function toAvailabilityStatus(value: string): AvailabilityStatus {
   if (value === "accepted" || value === "rejected" || value === "no_response") return value;
@@ -163,6 +166,10 @@ export function JadwalDetail({
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [selectedAssignments, setSelectedAssignments] = useState<Set<string>>(new Set());
   const [unassignPending, startUnassign] = useTransition();
+  const [bulkAvailabilityStatus, setBulkAvailabilityStatus] = useState<"" | AvailabilityStatus>("");
+  const [bulkStatusPending, startBulkStatus] = useTransition();
+  const [bulkSessionStatus, setBulkSessionStatus] = useState<"" | BulkSessionStatus>("");
+  const [bulkSessionPending, startBulkSession] = useTransition();
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)),
@@ -322,6 +329,60 @@ export function JadwalDetail({
       }
       toast.success(`${result.deletedCount} penugasan dihapus.`);
       setSelectedAssignments(new Set());
+      router.refresh();
+    });
+  }
+
+  function handleBulkAvailabilityUpdate() {
+    if (selectedAssignments.size === 0) {
+      toast.error("Pilih sesi yang ingin diubah status WA-nya.");
+      return;
+    }
+    if (!bulkAvailabilityStatus) {
+      toast.error("Pilih status WA tujuan terlebih dahulu.");
+      return;
+    }
+
+    startBulkStatus(async () => {
+      const result = await bulkUpdateAssignmentAvailabilityStatus({
+        assignmentIds: Array.from(selectedAssignments),
+        availabilityStatus: bulkAvailabilityStatus,
+      });
+
+      if (!result.ok) {
+        toast.error("Gagal memperbarui status WA secara bulk.");
+        return;
+      }
+
+      toast.success(`${result.updatedCount} status WA berhasil diperbarui.`);
+      setBulkAvailabilityStatus("");
+      router.refresh();
+    });
+  }
+
+  function handleBulkSessionStatusUpdate() {
+    if (selectedAssignments.size === 0) {
+      toast.error("Pilih sesi yang ingin diubah status sesinya.");
+      return;
+    }
+    if (!bulkSessionStatus) {
+      toast.error("Pilih status sesi tujuan terlebih dahulu.");
+      return;
+    }
+
+    startBulkSession(async () => {
+      const result = await bulkUpdateSessionStatus({
+        assignmentIds: Array.from(selectedAssignments),
+        sessionStatus: bulkSessionStatus,
+      });
+
+      if (!result.ok) {
+        toast.error("Gagal memperbarui status sesi secara bulk.");
+        return;
+      }
+
+      toast.success(`${result.updatedCount} status sesi berhasil diperbarui.`);
+      setBulkSessionStatus("");
       router.refresh();
     });
   }
@@ -653,15 +714,60 @@ export function JadwalDetail({
                         : "Pilih sesi"}
                     </span>
                     {selectedAssignments.size > 0 ? (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleBulkUnassign}
-                        disabled={unassignPending}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Hapus Terpilih
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={bulkAvailabilityStatus || undefined}
+                          onValueChange={(value) => setBulkAvailabilityStatus(value as AvailabilityStatus)}
+                          disabled={bulkStatusPending}
+                        >
+                          <SelectTrigger className="h-8 w-[180px]">
+                            <SelectValue placeholder="Ubah Status WA..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending_wa_confirmation">Menunggu WA</SelectItem>
+                            <SelectItem value="accepted">Diterima</SelectItem>
+                            <SelectItem value="rejected">Ditolak</SelectItem>
+                            <SelectItem value="no_response">No Response</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          onClick={handleBulkAvailabilityUpdate}
+                          disabled={bulkStatusPending}
+                        >
+                          {bulkStatusPending ? "Menyimpan..." : "Simpan Status"}
+                        </Button>
+                        <Select
+                          value={bulkSessionStatus || undefined}
+                          onValueChange={(value) => setBulkSessionStatus(value as BulkSessionStatus)}
+                          disabled={bulkSessionPending}
+                        >
+                          <SelectTrigger className="h-8 w-[170px]">
+                            <SelectValue placeholder="Ubah Status Sesi..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="scheduled">scheduled</SelectItem>
+                            <SelectItem value="completed">completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleBulkSessionStatusUpdate}
+                          disabled={bulkSessionPending}
+                        >
+                          {bulkSessionPending ? "Menyimpan..." : "Simpan Sesi"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleBulkUnassign}
+                          disabled={unassignPending}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Hapus Terpilih
+                        </Button>
+                      </div>
                     ) : null}
                   </>
                 ) : null}

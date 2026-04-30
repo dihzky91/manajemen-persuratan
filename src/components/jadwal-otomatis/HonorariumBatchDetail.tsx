@@ -24,6 +24,7 @@ import {
   addHonorariumDeduction,
   removeHonorariumDeduction,
   exportHonorariumBatchExcel,
+  logHonorariumBatchPdfExport,
   type getHonorariumBatchDetail,
   type DeductionRow,
 } from "@/server/actions/jadwal-otomatis/honorarium";
@@ -72,6 +73,7 @@ function actionLabel(action: string) {
   if (action === "deduction_added") return "Tambah Potongan";
   if (action === "deduction_removed") return "Hapus Potongan";
   if (action === "batch_exported_excel") return "Export Excel";
+  if (action === "batch_exported_pdf") return "Export PDF";
   return action;
 }
 
@@ -89,6 +91,10 @@ function formatDateTime(value: Date | null) {
   return new Date(value).toLocaleString("id-ID");
 }
 
+function sanitizeFileName(value: string) {
+  return value.replace(/[\\/:*?"<>|]/g, "-");
+}
+
 export function HonorariumBatchDetail({
   initialData,
   initialDeductions,
@@ -99,6 +105,7 @@ export function HonorariumBatchDetail({
   const [pending, startTransition] = useTransition();
   const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   const [deductions, setDeductions] = useState<DeductionRow[]>(initialDeductions);
   const [newDeductionInstructor, setNewDeductionInstructor] = useState("");
@@ -141,12 +148,23 @@ export function HonorariumBatchDetail({
   }
 
   function handleMarkPaid() {
+    if (!paymentReference.trim()) {
+      toast.error("Referensi transfer wajib diisi.");
+      return;
+    }
+    const parsedAmount = Number.parseFloat(paymentAmount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Nominal pembayaran wajib diisi dan harus lebih dari 0.");
+      return;
+    }
+
     startTransition(async () => {
       try {
         await markHonorariumBatchPaid({
           batchId: batch.id,
           paidDate: paidDate || undefined,
-          paymentReference,
+          paymentReference: paymentReference.trim(),
+          paymentAmount: parsedAmount,
         });
         toast.success("Batch ditandai sudah dibayar.");
         router.refresh();
@@ -261,11 +279,128 @@ export function HonorariumBatchDetail({
     });
   }
 
+  function handleExportPdf() {
+    startTransition(async () => {
+      try {
+        const { default: jsPDF } = await import("jspdf");
+        const { default: autoTable } = await import("jspdf-autotable");
+
+        const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        const exportedAt = new Date();
+        const totalNet = deductionSummary.reduce((sum, row) => sum + row.netAmount, 0);
+
+        doc.setFontSize(14);
+        doc.text("LAPORAN HONORARIUM INTERNAL", 14, 14);
+        doc.setFontSize(9);
+        doc.text(`Nomor Dokumen: ${batch.documentNumber}`, 14, 20);
+        doc.text(`Periode: ${batch.periodStart} s.d. ${batch.periodEnd}`, 14, 25);
+        doc.text(`Status: ${statusLabel(batch.status)}`, 14, 30);
+        doc.text(`Total Sesi: ${batch.itemCount}`, 110, 20);
+        doc.text(`Total Gross: ${formatCurrency(batch.totalAmount)}`, 110, 25);
+        doc.text(`Total Net: ${formatCurrency(totalNet)}`, 110, 30);
+        doc.text(`Diekspor: ${exportedAt.toLocaleString("id-ID")}`, 220, 30);
+
+        autoTable(doc, {
+          startY: 36,
+          head: [["Instruktur", "Total Sesi", "Gross", "Deductions", "Net"]],
+          body: deductionSummary.map((recap) => [
+            recap.instructorName,
+            String(recap.totalSessions),
+            formatCurrency(recap.grossAmount),
+            recap.totalDeduction > 0 ? formatCurrency(recap.totalDeduction) : "-",
+            formatCurrency(recap.netAmount),
+          ]),
+          theme: "grid",
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+          columnStyles: {
+            1: { halign: "right", cellWidth: 24 },
+            2: { halign: "right", cellWidth: 30 },
+            3: { halign: "right", cellWidth: 30 },
+            4: { halign: "right", cellWidth: 30 },
+          },
+        });
+
+        autoTable(doc, {
+          startY: ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 36) + 8,
+          head: [["Instruktur", "Tipe", "Keterangan", "Jumlah"]],
+          body:
+            deductions.length > 0
+              ? deductions.map((d) => [
+                  d.instructorName,
+                  d.deductionType === "pph21" ? "PPh 21" : d.deductionType === "pph23" ? "PPh 23" : "Lainnya",
+                  d.description,
+                  formatCurrency(d.amount),
+                ])
+              : [["-", "-", "Tidak ada potongan", "-"]],
+          theme: "grid",
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+          columnStyles: {
+            3: { halign: "right", cellWidth: 32 },
+          },
+        });
+
+        autoTable(doc, {
+          startY: ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 36) + 8,
+          head: [[
+            "Tanggal",
+            "Program",
+            "Instruktur",
+            "Sumber",
+            "Materi",
+            "Level",
+            "Rate",
+            "Amount",
+          ]],
+          body: items.map((item) => [
+            item.scheduledDate,
+            item.programName,
+            item.paidInstructorName,
+            sourceLabel(item.source),
+            item.materiBlock,
+            item.expertiseLevelSnapshot,
+            formatCurrency(item.rateSnapshot),
+            formatCurrency(item.amount),
+          ]),
+          theme: "grid",
+          styles: { fontSize: 7.5, cellPadding: 1.8 },
+          headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+          columnStyles: {
+            0: { cellWidth: 22 },
+            1: { cellWidth: 28 },
+            2: { cellWidth: 35 },
+            3: { cellWidth: 16 },
+            4: { cellWidth: 52 },
+            5: { cellWidth: 16 },
+            6: { cellWidth: 22, halign: "right" },
+            7: { cellWidth: 22, halign: "right" },
+          },
+        });
+
+        const fileName = sanitizeFileName(
+          `honorarium-${batch.documentNumber.toLowerCase()}-${batch.periodStart}-${batch.periodEnd}.pdf`,
+        );
+        doc.save(fileName);
+        await logHonorariumBatchPdfExport({ batchId: batch.id, fileName });
+        toast.success("PDF berhasil diekspor.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal export PDF.");
+      }
+    });
+  }
+
   const deductionSummary = recaps.map((r) => {
     const instrDeductions = deductions.filter((d) => d.instructorId === r.instructorId);
     const totalDeduction = instrDeductions.reduce((s, d) => s + d.amount, 0);
     return { ...r, deductions: instrDeductions, totalDeduction };
   });
+  const reconciliation = initialData.reconciliation;
+  const reconciliationDiff = reconciliation.difference ?? 0;
+  const reconciliationStatus =
+    reconciliation.isMatched === null ? "Belum ada data pembayaran" : reconciliation.isMatched ? "Cocok" : "Selisih";
+  const reconciliationVariant =
+    reconciliation.isMatched === null ? "secondary" : reconciliation.isMatched ? "default" : "destructive";
 
   return (
     <div className="space-y-6">
@@ -280,6 +415,10 @@ export function HonorariumBatchDetail({
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={statusVariant(batch.status)}>{statusLabel(batch.status)}</Badge>
+              <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={pending}>
+                <Download className="h-4 w-4 mr-1" />
+                PDF
+              </Button>
               <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={pending}>
                 <Download className="h-4 w-4 mr-1" />
                 Excel
@@ -332,6 +471,43 @@ export function HonorariumBatchDetail({
               <p className="text-sm whitespace-pre-wrap">{batch.internalNotes}</p>
             </div>
           ) : null}
+
+          <div className="rounded-lg border border-border bg-muted/30 px-3 py-3 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Rekonsiliasi Pembayaran</p>
+              <Badge variant={reconciliationVariant}>{reconciliationStatus}</Badge>
+            </div>
+            <div className="grid gap-3 md:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Net Batch</p>
+                <p className="text-sm font-medium tabular-nums">{formatCurrency(reconciliation.netAmount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Nominal Dibayar</p>
+                <p className="text-sm font-medium tabular-nums">
+                  {reconciliation.paymentAmount === null ? "-" : formatCurrency(reconciliation.paymentAmount)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Selisih</p>
+                <p
+                  className={`text-sm font-medium tabular-nums ${
+                    reconciliation.difference === null
+                      ? ""
+                      : Math.abs(reconciliationDiff) <= 0.01
+                        ? "text-emerald-600"
+                        : "text-destructive"
+                  }`}
+                >
+                  {reconciliation.difference === null ? "-" : formatCurrency(reconciliationDiff)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Referensi Transfer</p>
+                <p className="text-sm">{reconciliation.paymentReference ?? "-"}</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -355,7 +531,7 @@ export function HonorariumBatchDetail({
             ) : null}
 
             {batch.status === "diproses_keuangan" ? (
-              <div className="grid gap-3 md:grid-cols-[180px_1fr_auto] md:items-end">
+              <div className="grid gap-3 md:grid-cols-[170px_1fr_170px_auto] md:items-end">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Tanggal Bayar</p>
                   <Input type="date" value={paidDate} onChange={(e) => setPaidDate(e.target.value)} />
@@ -366,6 +542,17 @@ export function HonorariumBatchDetail({
                     placeholder="Contoh: TRX-INV-2026-0429"
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Nominal Dibayar</p>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="1000"
+                    placeholder="Contoh: 25000000"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
                   />
                 </div>
                 <Button onClick={handleMarkPaid} disabled={pending}>

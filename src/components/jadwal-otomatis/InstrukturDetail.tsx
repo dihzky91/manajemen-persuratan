@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Trash2, CalendarX, Banknote } from "lucide-react";
@@ -33,6 +33,11 @@ const expertiseLevelLabels: Record<string, string> = {
   senior: "Senior",
   intermediate: "Middle",
   expert: "Senior",
+};
+
+const modeLabels: Record<"online" | "offline", string> = {
+  online: "Online",
+  offline: "Offline",
 };
 
 interface Props {
@@ -80,10 +85,54 @@ export function InstrukturDetail({
 
   const [rateProgram, setRateProgram] = useState("");
   const [rateBlock, setRateBlock] = useState("");
+  const [rateMode, setRateMode] = useState<"online" | "offline">("offline");
   const [rateAmount, setRateAmount] = useState("");
+  const [showRateOverrideForm, setShowRateOverrideForm] = useState(false);
 
   const [unavDate, setUnavDate] = useState("");
   const [unavReason, setUnavReason] = useState("");
+  const hasOverrides = rates.length > 0;
+
+  const rateProgramOptions = useMemo(() => {
+    const ids = new Set(expertise.map((item: any) => item.programId));
+    return programs.filter((program: any) => ids.has(program.id));
+  }, [expertise, programs]);
+
+  const expertiseByProgram = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const item of expertise) {
+      const current = map.get(item.programId) ?? [];
+      if (!current.includes(item.materiBlock)) current.push(item.materiBlock);
+      map.set(item.programId, current);
+    }
+    for (const [programId, blocks] of map) {
+      map.set(
+        programId,
+        blocks.sort((a, b) => a.localeCompare(b)),
+      );
+    }
+    return map;
+  }, [expertise]);
+
+  const availableRateBlocks = useMemo(
+    () => (rateProgram ? (expertiseByProgram.get(rateProgram) ?? []) : []),
+    [rateProgram, expertiseByProgram],
+  );
+
+  function handleStartRateOverride() {
+    if (rateProgramOptions.length === 0) {
+      toast.error("Tambahkan keahlian instruktur dulu sebelum membuat override rate.");
+      return;
+    }
+    const firstProgram = rateProgramOptions[0]?.id ?? "";
+    const nextProgram = rateProgram || firstProgram;
+    const nextBlocks = expertiseByProgram.get(nextProgram) ?? [];
+    setRateProgram(nextProgram);
+    setRateBlock(nextBlocks[0] ?? "");
+    setRateMode("offline");
+    setRateAmount("");
+    setShowRateOverrideForm(true);
+  }
 
   function handleAddExpertise() {
     if (!expProgram || !expBlock) {
@@ -152,11 +201,15 @@ export function InstrukturDetail({
         instructorId: instructor.id,
         programId: rateProgram,
         materiBlock: rateBlock,
+        mode: rateMode,
         rateAmount: parsedAmount,
       });
       if (result.ok) {
         toast.success("Rate honorarium disimpan");
+        setShowRateOverrideForm(false);
+        setRateProgram("");
         setRateBlock("");
+        setRateMode("offline");
         setRateAmount("");
         router.refresh();
       }
@@ -364,52 +417,109 @@ export function InstrukturDetail({
 
       <Card className="rounded-[28px]">
         <CardHeader className="border-b border-border">
-          <CardTitle>Rate Honorarium</CardTitle>
-          <CardDescription>Set tarif per sesi berdasarkan program dan materi block.</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <CardTitle>Rate Honorarium</CardTitle>
+              <CardDescription>
+                Default otomatis dari matriks standar berdasarkan program, level keahlian, dan metode kelas.
+              </CardDescription>
+            </div>
+            <Badge variant={hasOverrides ? "secondary" : "outline"}>
+              {hasOverrides ? "Override Manual Aktif" : "Rate Otomatis Aktif"}
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
-          <div className="grid gap-2 md:grid-cols-4 md:items-end">
-            <div>
-              <Select value={rateProgram} onValueChange={setRateProgram}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih program" />
-                </SelectTrigger>
-                <SelectContent>
-                  {programs.map((program: any) => (
-                    <SelectItem key={program.id} value={program.id}>
-                      {program.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Input
-                placeholder="Materi block"
-                value={rateBlock}
-                onChange={(event) => setRateBlock(event.target.value)}
-              />
-            </div>
-            <div>
-              <Input
-                type="number"
-                min="0"
-                step="1000"
-                placeholder="Rate per sesi"
-                value={rateAmount}
-                onChange={(event) => setRateAmount(event.target.value)}
-              />
-            </div>
-            <div>
-              <Button onClick={handleSaveRate} disabled={pending} className="w-full">
-                <Banknote className="h-4 w-4 mr-1" />
-                Simpan Rate
-              </Button>
-            </div>
+          <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            {hasOverrides
+              ? `Override tersimpan: ${rates.length} item. Selain item override, sesi lain tetap mengikuti matriks standar.`
+              : "Jika tidak ada override, honorarium dihitung otomatis mengikuti matriks standar."}
           </div>
 
+          {!showRateOverrideForm ? (
+            <div>
+              <Button variant="outline" onClick={handleStartRateOverride} disabled={pending}>
+                <Plus className="h-4 w-4 mr-1" />
+                Tambah Override
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-5 md:items-end">
+              <div>
+                <Select
+                  value={rateProgram}
+                  onValueChange={(value) => {
+                    setRateProgram(value);
+                    const nextBlocks = expertiseByProgram.get(value) ?? [];
+                    setRateBlock(nextBlocks[0] ?? "");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih program" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rateProgramOptions.map((program: any) => (
+                      <SelectItem key={program.id} value={program.id}>
+                        {program.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={rateBlock} onValueChange={setRateBlock} disabled={!rateProgram || availableRateBlocks.length === 0}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={rateProgram ? "Pilih materi block" : "Pilih program dulu"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRateBlocks.map((block) => (
+                      <SelectItem key={block} value={block}>
+                        {block}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={rateMode} onValueChange={(value) => setRateMode(value as "online" | "offline")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih metode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="offline">Offline</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  placeholder="Rate per sesi"
+                  value={rateAmount}
+                  onChange={(event) => setRateAmount(event.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveRate} disabled={pending} className="flex-1">
+                  <Banknote className="h-4 w-4 mr-1" />
+                  Simpan
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowRateOverrideForm(false)}
+                  disabled={pending}
+                >
+                  Batal
+                </Button>
+              </div>
+            </div>
+          )}
+
           {rates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada rate honorarium.</p>
+            <p className="text-sm text-muted-foreground">Belum ada override rate honorarium.</p>
           ) : (
             <div className="space-y-2">
               {rates.map((rate: any) => (
@@ -421,6 +531,9 @@ export function InstrukturDetail({
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{rate.programName}</Badge>
                       <span className="text-sm">{rate.materiBlock}</span>
+                      <Badge variant="outline">
+                        {modeLabels[(rate.mode === "online" ? "online" : "offline")]}
+                      </Badge>
                     </div>
                     <p className="text-sm font-medium">
                       {formatCurrency(Number(rate.rateAmount ?? 0))}

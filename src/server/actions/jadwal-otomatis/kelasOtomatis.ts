@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, asc, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { db } from "@/server/db";
@@ -8,13 +8,17 @@ import {
   kelasPelatihan,
   classExcludedDates,
   classSessions,
+  honorariumItems,
   programs,
+  sessionAssignments,
   classTypes,
 } from "@/server/db/schema";
 import { requirePermission } from "@/server/actions/auth";
 import {
   kelasOtomatisCreateSchema,
   type KelasOtomatisCreateInput,
+  kelasOtomatisUpdateStartDateSchema,
+  type KelasOtomatisUpdateStartDateInput,
 } from "@/lib/validators/jadwalOtomatis.schema";
 import { generateSchedule } from "./generate";
 
@@ -32,6 +36,24 @@ export type KelasOtomatisRow = {
   totalSessions: number;
   createdAt: Date;
 };
+
+function parseIsoDateToUtc(date: string) {
+  const [yearText, monthText, dayText] = date.split("-");
+  const year = Number.parseInt(yearText ?? "", 10);
+  const month = Number.parseInt(monthText ?? "", 10);
+  const day = Number.parseInt(dayText ?? "", 10);
+  return Date.UTC(year, month - 1, day);
+}
+
+function dateDiffInDays(fromDate: string, toDate: string) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((parseIsoDateToUtc(toDate) - parseIsoDateToUtc(fromDate)) / msPerDay);
+}
+
+function shiftIsoDate(date: string, offsetDays: number) {
+  const utcMs = parseIsoDateToUtc(date) + offsetDays * 24 * 60 * 60 * 1000;
+  return new Date(utcMs).toISOString().slice(0, 10);
+}
 
 export async function listKelasOtomatis(): Promise<KelasOtomatisRow[]> {
   await requirePermission("jadwalUjian", "view");
@@ -173,4 +195,137 @@ export async function deleteKelasOtomatis(id: string) {
 
   revalidatePath("/jadwal-otomatis");
   return { ok: true as const };
+}
+
+export async function updateKelasOtomatisStartDate(data: KelasOtomatisUpdateStartDateInput) {
+  await requirePermission("jadwalUjian", "manage");
+  const parsed = kelasOtomatisUpdateStartDateSchema.parse(data);
+
+  const kelas = await db
+    .select({
+      id: kelasPelatihan.id,
+      programId: kelasPelatihan.programId,
+      classTypeId: kelasPelatihan.classTypeId,
+      startDate: kelasPelatihan.startDate,
+      status: kelasPelatihan.status,
+    })
+    .from(kelasPelatihan)
+    .where(eq(kelasPelatihan.id, parsed.id))
+    .then((rows) => rows[0] ?? null);
+
+  if (!kelas) {
+    return { ok: false as const, error: "Kelas tidak ditemukan." };
+  }
+
+  if (kelas.status !== "active") {
+    return { ok: false as const, error: "Hanya kelas aktif yang dapat diubah tanggal mulainya." };
+  }
+
+  if (kelas.startDate === parsed.startDate) {
+    return { ok: true as const, unchanged: true as const };
+  }
+
+  const startDateOffsetDays = dateDiffInDays(kelas.startDate, parsed.startDate);
+
+  const linkedHonorarium = await db
+    .select({ id: honorariumItems.id })
+    .from(honorariumItems)
+    .where(eq(honorariumItems.kelasId, parsed.id))
+    .limit(1);
+
+  if (linkedHonorarium.length > 0) {
+    return {
+      ok: false as const,
+      error:
+        "Kelas sudah masuk perhitungan honorarium. Ubah tanggal mulai diblokir untuk menjaga konsistensi data keuangan.",
+    };
+  }
+
+  if (parsed.exclusionStrategy === "clear") {
+    await db.delete(classExcludedDates).where(eq(classExcludedDates.kelasId, parsed.id));
+  }
+
+  if (parsed.exclusionStrategy === "shift") {
+    const exclusions = await db
+      .select({
+        reason: classExcludedDates.reason,
+        date: classExcludedDates.date,
+      })
+      .from(classExcludedDates)
+      .where(eq(classExcludedDates.kelasId, parsed.id));
+
+    await db.delete(classExcludedDates).where(eq(classExcludedDates.kelasId, parsed.id));
+
+    if (exclusions.length > 0) {
+      const deduplicated = new Map<string, string | null>();
+      for (const exclusion of exclusions) {
+        const shiftedDate = shiftIsoDate(exclusion.date, startDateOffsetDays);
+        if (!deduplicated.has(shiftedDate)) {
+          deduplicated.set(shiftedDate, exclusion.reason ?? "Manual");
+        }
+      }
+
+      await db.insert(classExcludedDates).values(
+        Array.from(deduplicated.entries()).map(([date, reason]) => ({
+          id: nanoid(),
+          kelasId: parsed.id,
+          date,
+          reason,
+        })),
+      );
+    }
+  }
+
+  const sessionRows = await db
+    .select({ id: classSessions.id })
+    .from(classSessions)
+    .where(eq(classSessions.kelasId, parsed.id));
+
+  if (sessionRows.length > 0) {
+    const sessionIds = sessionRows.map((row) => row.id);
+    await db
+      .delete(sessionAssignments)
+      .where(inArray(sessionAssignments.sessionId, sessionIds));
+  }
+
+  await db.delete(classSessions).where(eq(classSessions.kelasId, parsed.id));
+
+  await db
+    .update(kelasPelatihan)
+    .set({
+      startDate: parsed.startDate,
+      endDate: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(kelasPelatihan.id, parsed.id));
+
+  await generateSchedule({
+    kelasId: kelas.id,
+    programId: kelas.programId,
+    classTypeId: kelas.classTypeId,
+    startDate: parsed.startDate,
+  });
+
+  const lastSessions = await db
+    .select({ scheduledDate: classSessions.scheduledDate })
+    .from(classSessions)
+    .where(eq(classSessions.kelasId, parsed.id))
+    .orderBy(asc(classSessions.scheduledDate));
+
+  const lastSession = lastSessions[lastSessions.length - 1];
+  await db
+    .update(kelasPelatihan)
+    .set({
+      endDate: lastSession?.scheduledDate ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(kelasPelatihan.id, parsed.id));
+
+  revalidatePath("/jadwal-otomatis");
+  revalidatePath(`/jadwal-otomatis/${parsed.id}`);
+  return {
+    ok: true as const,
+    exclusionStrategy: parsed.exclusionStrategy,
+    startDateOffsetDays,
+  };
 }
