@@ -1532,6 +1532,143 @@ export const honorariumAuditLogs = pgTable(
   ],
 );
 
+// ─── TABEL PESERTA KELAS (Peserta & Nilai — Program Pelatihan) ──────────────
+
+// 1. Enrollment peserta per kelas pelatihan + cached status
+export const pesertaKelas = pgTable("peserta_kelas", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  kelasId: text("kelas_id")
+    .notNull()
+    .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
+  nama: varchar("nama", { length: 200 }).notNull(),
+  nomorPeserta: varchar("nomor_peserta", { length: 50 }),
+  email: varchar("email", { length: 150 }),
+  telepon: varchar("telepon", { length: 30 }),
+  catatan: text("catatan"),
+  statusEnrollment: varchar("status_enrollment", { length: 20 })
+    .default("aktif").notNull(),
+  statusAkhir: varchar("status_akhir", { length: 30 }),
+  alasanStatus: varchar("alasan_status", { length: 50 }),
+  statusComputedAt: timestamp("status_computed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("pk_kelas_idx").on(t.kelasId),
+  index("pk_status_akhir_idx").on(t.statusAkhir),
+]);
+
+// 2. Absensi kehadiran pelatihan per sesi per peserta
+export const absensiPelatihan = pgTable(
+  "absensi_pelatihan",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    pesertaId: text("peserta_id")
+      .notNull()
+      .references(() => pesertaKelas.id, { onDelete: "cascade" }),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => classSessions.id, { onDelete: "cascade" }),
+    hadir: boolean("hadir").notNull(),
+    catatan: text("catatan"),
+    inputBy: text("input_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_absensi_peserta_session").on(t.pesertaId, t.sessionId),
+    index("absensi_pelatihan_peserta_idx").on(t.pesertaId),
+  ],
+);
+
+// 3. Absensi kehadiran ujian per jadwal ujian per peserta
+export const absensiUjian = pgTable(
+  "absensi_ujian",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    pesertaId: text("peserta_id")
+      .notNull()
+      .references(() => pesertaKelas.id, { onDelete: "cascade" }),
+    jadwalUjianId: text("jadwal_ujian_id")
+      .notNull()
+      .references(() => jadwalUjian.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 20 }).notNull().default("hadir"),
+    catatan: text("catatan"),
+    inputBy: text("input_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_absensi_ujian_peserta").on(t.pesertaId, t.jadwalUjianId),
+    index("absensi_ujian_peserta_idx").on(t.pesertaId),
+  ],
+);
+
+// 4. Nilai ujian per mata pelajaran per peserta
+export const nilaiUjian = pgTable(
+  "nilai_ujian",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    pesertaId: text("peserta_id")
+      .notNull()
+      .references(() => pesertaKelas.id, { onDelete: "cascade" }),
+    jadwalUjianId: text("jadwal_ujian_id")
+      .notNull()
+      .references(() => jadwalUjian.id, { onDelete: "cascade" }),
+    mataPelajaran: varchar("mata_pelajaran", { length: 100 }).notNull(),
+    nilai: varchar("nilai", { length: 2 }).notNull(),
+    isPerbaikan: boolean("is_perbaikan").default(false).notNull(),
+    perbaikanDariId: text("perbaikan_dari_id"),
+    inputBy: text("input_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("uniq_nilai_peserta_ujian_mapel").on(
+      t.pesertaId, t.jadwalUjianId, t.mataPelajaran, t.isPerbaikan
+    ),
+    index("nilai_ujian_peserta_idx").on(t.pesertaId),
+    index("nilai_ujian_jadwal_idx").on(t.jadwalUjianId),
+  ],
+);
+
+// 5. Ujian susulan peserta
+export const ujianSusulanPeserta = pgTable("ujian_susulan_peserta", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  pesertaId: text("peserta_id")
+    .notNull()
+    .references(() => pesertaKelas.id, { onDelete: "cascade" }),
+  jadwalUjianOriginalId: text("jadwal_ujian_original_id")
+    .notNull()
+    .references(() => jadwalUjian.id),
+  tanggalUsulan: date("tanggal_usulan"),
+  tanggalDisepakati: date("tanggal_disepakati"),
+  jamMulai: varchar("jam_mulai", { length: 5 }),
+  jamSelesai: varchar("jam_selesai", { length: 5 }),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  alasanPermohonan: text("alasan_permohonan"),
+  catatanAdmin: text("catatan_admin"),
+  approvedBy: text("approved_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("usp_peserta_idx").on(t.pesertaId),
+  index("usp_original_jadwal_idx").on(t.jadwalUjianOriginalId),
+  index("usp_status_idx").on(t.status),
+]);
+
+// ─── TYPE EXPORTS (Peserta & Nilai) ──────────────────────────────────────────
+
+export type PesertaKelas = typeof pesertaKelas.$inferSelect;
+export type NewPesertaKelas = typeof pesertaKelas.$inferInsert;
+export type AbsensiPelatihan = typeof absensiPelatihan.$inferSelect;
+export type NewAbsensiPelatihan = typeof absensiPelatihan.$inferInsert;
+export type AbsensiUjian = typeof absensiUjian.$inferSelect;
+export type NewAbsensiUjian = typeof absensiUjian.$inferInsert;
+export type NilaiUjian = typeof nilaiUjian.$inferSelect;
+export type NewNilaiUjian = typeof nilaiUjian.$inferInsert;
+export type UjianSusulanPeserta = typeof ujianSusulanPeserta.$inferSelect;
+export type NewUjianSusulanPeserta = typeof ujianSusulanPeserta.$inferInsert;
+
 // ─── TYPE EXPORTS (Jadwal Otomatis Brevet) ────────────────────────────────────
 
 export type Program = typeof programs.$inferSelect;

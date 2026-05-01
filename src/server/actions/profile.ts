@@ -121,6 +121,6 @@ export async function updateMyProfile(formData: FormData) {
   });
 
   revalidatePath("/pengaturan");
-  revalidatePath("/", "layout");
+  revalidatePath("/dashboard");
   return { ok: true as const };
 }

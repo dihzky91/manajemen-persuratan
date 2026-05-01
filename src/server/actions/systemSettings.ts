@@ -1,5 +1,7 @@
 "use server";
 
+import { access } from "node:fs/promises";
+import path from "node:path";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -32,6 +34,61 @@ const FALLBACK: SystemSettingsRow = {
   updatedAt: null,
 };
 
+async function resolveExistingLocalAssetUrl(
+  url: string | null,
+  fallbackUrl: string | null,
+) {
+  if (!url || env.STORAGE_PROVIDER !== "local") return url;
+
+  const publicBaseUrl = (env.STORAGE_PUBLIC_BASE_URL || "/api/files").replace(
+    /\/$/,
+    "",
+  );
+  if (!url.startsWith(`${publicBaseUrl}/`)) return url;
+
+  const key = url.slice(publicBaseUrl.length + 1);
+  const segments = key.split("/").map((segment) => decodeURIComponent(segment));
+  if (
+    !segments.length ||
+    segments.some(
+      (segment) =>
+        !segment ||
+        segment === "." ||
+        segment === ".." ||
+        segment.includes("\0"),
+    )
+  ) {
+    return fallbackUrl;
+  }
+
+  const baseDir = path.resolve(process.cwd(), env.STORAGE_LOCAL_DIR);
+  const candidate = path.resolve(baseDir, ...segments);
+  const baseWithSep = baseDir.endsWith(path.sep) ? baseDir : baseDir + path.sep;
+  if (candidate !== baseDir && !candidate.startsWith(baseWithSep)) {
+    return fallbackUrl;
+  }
+
+  try {
+    await access(candidate);
+    return url;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
+async function withResolvedAssetUrls(
+  settings: SystemSettingsRow,
+): Promise<SystemSettingsRow> {
+  return {
+    ...settings,
+    logoUrl: await resolveExistingLocalAssetUrl(
+      settings.logoUrl,
+      FALLBACK.logoUrl,
+    ),
+    faviconUrl: await resolveExistingLocalAssetUrl(settings.faviconUrl, null),
+  };
+}
+
 // cache() deduplicates DB calls within a single request
 // (dipakai di root layout + dashboard layout sekaligus)
 export const getSystemSettings = cache(async (): Promise<SystemSettingsRow> => {
@@ -49,7 +106,7 @@ export const getSystemSettings = cache(async (): Promise<SystemSettingsRow> => {
       })
       .from(systemSettings)
       .limit(1);
-    return rows[0] ?? FALLBACK;
+    return withResolvedAssetUrls(rows[0] ?? FALLBACK);
   } catch {
     return FALLBACK;
   }
@@ -153,7 +210,7 @@ export async function updateSystemSettings(formData: FormData) {
   });
 
   revalidatePath("/pengaturan");
-  revalidatePath("/", "layout");
+  revalidatePath("/dashboard");
   return { ok: true as const };
 }
 

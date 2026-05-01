@@ -1,13 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTanggalLengkapJakarta } from "@/lib/utils";
 import { getNavigationItem } from "@/components/layout/navigation";
-import { GlobalSearch } from "@/components/search/GlobalSearch";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
+
+const GlobalSearch = dynamic(
+  () => import("@/components/search/GlobalSearch").then((mod) => mod.GlobalSearch),
+  { ssr: false }
+);
+
+const NotificationBell = dynamic(
+  () => import("@/components/notifications/NotificationBell").then((mod) => mod.NotificationBell),
+  { ssr: false }
+);
 
 interface HeaderProps {
   userName?: string | null;

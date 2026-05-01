@@ -642,7 +642,9 @@ export async function getTeachingHistory(instructorId: string) {
       scheduledDate: classSessions.scheduledDate,
       materiName: classSessions.materiName,
       sessionNumber: classSessions.sessionNumber,
+      sessionStatus: classSessions.status,
       isExamDay: classSessions.isExamDay,
+      availabilityStatus: sessionAssignments.availabilityStatus,
       isSubstitute: sql<boolean>`${sessionAssignments.actualInstructorId} is not null`,
       substitutionReason: sessionAssignments.substitutionReason,
     })

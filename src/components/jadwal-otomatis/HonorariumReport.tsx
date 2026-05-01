@@ -130,7 +130,7 @@ export function HonorariumReport({
   }
 
   function handleGenerateDraftBatch() {
-    if (!startDate || !endDate) {
+    if (!batchStartDate || !batchEndDate) {
       toast.error("Pilih periode tanggal terlebih dahulu.");
       return;
     }
@@ -138,8 +138,8 @@ export function HonorariumReport({
     startTransition(async () => {
       try {
         const result = await generateHonorariumBatch({
-          startDate,
-          endDate,
+          startDate: batchStartDate,
+          endDate: batchEndDate,
           internalNotes: "",
         });
 

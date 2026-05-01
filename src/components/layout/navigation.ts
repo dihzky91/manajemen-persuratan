@@ -14,6 +14,7 @@ import {
   FileText,
   Hash,
   Inbox,
+  Landmark,
   LayoutDashboard,
   Mail,
   Megaphone,
@@ -232,6 +233,25 @@ export const navigationSections: NavigationSection[] = [
         active: true,
         allowedRoles: ["admin", "staff"],
         requiredCapability: "jadwal_ujian:manage",
+      },
+    ],
+  },
+  {
+    title: "Keuangan",
+    items: [
+      {
+        href: "/keuangan",
+        label: "Dashboard Keuangan",
+        icon: Landmark,
+        active: true,
+        requiredCapability: "keuangan:view",
+      },
+      {
+        href: "/keuangan/honorarium",
+        label: "Antrian Pembayaran",
+        icon: Banknote,
+        active: true,
+        requiredCapability: "keuangan:view",
       },
     ],
   },

@@ -5,11 +5,11 @@ import { ChevronLeft } from "lucide-react";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { HonorariumBatchDetail } from "@/components/jadwal-otomatis/HonorariumBatchDetail";
 import { Button } from "@/components/ui/button";
-import { getCurrentUserAccess, getSession } from "@/server/actions/auth";
+import { getCurrentUserAccess } from "@/server/actions/auth";
 import { getHonorariumBatchDetail, listHonorariumDeductions } from "@/server/actions/jadwal-otomatis/honorarium";
 
 export const metadata: Metadata = {
-  title: "Detail Batch Honorarium | Manajemen Surat IAI Jakarta",
+  title: "Detail Batch | Keuangan | Manajemen Surat IAI Jakarta",
 };
 
 type PageProps = {
@@ -19,24 +19,21 @@ type PageProps = {
 export default async function Page({ params }: PageProps) {
   const { batchId } = await params;
 
-  const [detail, session, deductions, access] = await Promise.all([
+  const [detail, deductions, access] = await Promise.all([
     getHonorariumBatchDetail(batchId),
-    getSession(),
     listHonorariumDeductions(batchId),
     getCurrentUserAccess(),
   ]);
 
   if (!detail) notFound();
 
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  const canManage = role === "admin" || role === "staff";
-  const isAdmin = role === "admin" || access?.isSuperAdmin === true;
-
+  const isSuperAdmin = access?.isSuperAdmin === true;
   const capabilities = access?.capabilities ?? [];
+
   const canProcess =
-    access?.isSuperAdmin ? true : capabilities.includes("keuangan:process");
+    isSuperAdmin || capabilities.includes("keuangan:process");
   const canPay =
-    access?.isSuperAdmin ? true : capabilities.includes("keuangan:pay");
+    isSuperAdmin || capabilities.includes("keuangan:pay");
 
   return (
     <PageWrapper
@@ -45,9 +42,9 @@ export default async function Page({ params }: PageProps) {
     >
       <div className="mb-5">
         <Button asChild variant="outline" size="sm">
-          <Link href="/jadwal-otomatis/honorarium">
+          <Link href="/keuangan/honorarium">
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Kembali ke Daftar Batch
+            Kembali ke Antrian
           </Link>
         </Button>
       </div>
@@ -55,8 +52,8 @@ export default async function Page({ params }: PageProps) {
       <HonorariumBatchDetail
         initialData={detail}
         initialDeductions={deductions}
-        canManage={canManage}
-        isAdmin={isAdmin}
+        canManage={false}
+        isAdmin={isSuperAdmin}
         canProcess={canProcess}
         canPay={canPay}
       />

@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { headers } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { auth, type AuthSession } from "@/server/auth";
@@ -459,12 +460,12 @@ export async function requirePermission(
   return session;
 }
 
-export async function getCurrentUserAccess(): Promise<{
+export const getCurrentUserAccess = cache(async (): Promise<{
   role: Role | null;
   roleId: number | null;
   isSuperAdmin: boolean;
   capabilities: Capability[];
-} | null> {
+} | null> => {
   const session = await getSession();
   if (!session) return null;
 
@@ -500,13 +501,13 @@ export async function getCurrentUserAccess(): Promise<{
           ]
         : [],
   };
-}
+});
 
 // Ambil session tanpa throw - dipakai di layout/middleware untuk cek login state.
-export async function getSession(): Promise<AuthSession | null> {
+export const getSession = cache(async (): Promise<AuthSession | null> => {
   const headersList = await headers();
   const session = await auth.api.getSession({
     headers: headersList,
   });
   return session ?? null;
-}
+});

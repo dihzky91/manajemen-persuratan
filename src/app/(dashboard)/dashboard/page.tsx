@@ -18,7 +18,8 @@ import { listSuratMasuk } from "@/server/actions/suratMasuk";
 import { getDashboardStats } from "@/server/actions/statistics";
 import { getStatistikUjian } from "@/server/actions/jadwal-ujian/bebanKerja";
 import { formatTanggalWaktuJakarta } from "@/lib/utils";
-import { StatsCharts, StatsSummary } from "@/components/dashboard/StatsCharts";
+import { StatsSummary } from "@/components/dashboard/StatsCharts";
+import { LazyStatsCharts } from "@/components/dashboard/LazyStatsCharts";
 import { UjianDashboardWidget } from "@/components/jadwal-ujian/UjianDashboardWidget";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 
@@ -189,7 +190,7 @@ export default async function DashboardPage() {
       analitik={
         <>
           <StatsSummary stats={stats} />
-          <StatsCharts stats={stats} />
+          <LazyStatsCharts stats={stats} />
         </>
       }
       aktivitas={

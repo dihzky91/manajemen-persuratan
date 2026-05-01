@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -32,6 +32,7 @@ export function LoginPageClient({
   systemIdentity,
 }: LoginPageClientProps) {
   const router = useRouter();
+  const passwordInputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -53,13 +54,14 @@ export function LoginPageClient({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/auth/sign-in/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -70,20 +72,32 @@ export function LoginPageClient({
       }
       try {
         if (remember) {
-          window.localStorage.setItem(REMEMBER_KEY, email);
+          window.localStorage.setItem(REMEMBER_KEY, normalizedEmail);
         } else {
           window.localStorage.removeItem(REMEMBER_KEY);
         }
       } catch {
         // abaikan kegagalan localStorage
       }
-      router.push(redirectTo || "/dashboard");
-      router.refresh();
+      setEmail(normalizedEmail);
+      const destination = redirectTo || "/dashboard";
+      router.push(destination);
+      window.location.assign(destination);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleTogglePasswordVisibility() {
+    setShowPassword((current) => {
+      const next = !current;
+      if (passwordInputRef.current) {
+        passwordInputRef.current.type = next ? "text" : "password";
+      }
+      return next;
+    });
   }
 
   const appName =
@@ -178,6 +192,7 @@ export function LoginPageClient({
                 <Lock className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="password"
+                  ref={passwordInputRef}
                   type={showPassword ? "text" : "password"}
                   required
                   value={password}
@@ -188,8 +203,9 @@ export function LoginPageClient({
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute top-1/2 right-1 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleTogglePasswordVisibility}
+                  className="absolute top-1/2 right-1 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                   aria-label={
                     showPassword
                       ? "Sembunyikan kata sandi"

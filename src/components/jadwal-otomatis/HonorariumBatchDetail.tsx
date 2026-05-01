@@ -36,6 +36,8 @@ interface HonorariumBatchDetailProps {
   initialDeductions: DeductionRow[];
   canManage: boolean;
   isAdmin: boolean;
+  canProcess?: boolean;
+  canPay?: boolean;
 }
 
 function formatCurrency(value: number) {
@@ -100,6 +102,8 @@ export function HonorariumBatchDetail({
   initialDeductions,
   canManage,
   isAdmin,
+  canProcess = false,
+  canPay = false,
 }: HonorariumBatchDetailProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -511,26 +515,26 @@ export function HonorariumBatchDetail({
         </CardContent>
       </Card>
 
-      {canManage ? (
+      {(canManage || canProcess || canPay) ? (
         <Card className="rounded-[28px]">
           <CardHeader className="border-b border-border">
             <CardTitle>Aksi Status</CardTitle>
             <CardDescription>Transisi status batch honorarium sesuai workflow keuangan.</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            {batch.status === "draft" ? (
+            {batch.status === "draft" && canManage ? (
               <Button onClick={handleSubmitToFinance} disabled={pending}>
                 Kirim ke Keuangan
               </Button>
             ) : null}
 
-            {batch.status === "dikirim_ke_keuangan" ? (
+            {batch.status === "dikirim_ke_keuangan" && canProcess ? (
               <Button onClick={handleMarkInProcess} disabled={pending}>
                 Tandai Diproses Keuangan
               </Button>
             ) : null}
 
-            {batch.status === "diproses_keuangan" ? (
+            {batch.status === "diproses_keuangan" && canPay ? (
               <div className="grid gap-3 md:grid-cols-[170px_1fr_170px_auto] md:items-end">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Tanggal Bayar</p>
@@ -561,7 +565,7 @@ export function HonorariumBatchDetail({
               </div>
             ) : null}
 
-            {batch.status === "dibayar" ? (
+            {batch.status === "dibayar" && (canPay || canManage) ? (
               <Button onClick={handleLockBatch} disabled={pending}>
                 Lock Batch
               </Button>

@@ -91,6 +91,7 @@ interface JadwalDetailProps {
   instructors: Instructor[];
   materiBlocks: string[];
   canManage: boolean;
+  mode?: "informasi" | "jadwal" | "instruktur" | "full";
 }
 
 const STATUS_COLORS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -156,6 +157,7 @@ export function JadwalDetail({
   instructors,
   materiBlocks,
   canManage,
+  mode = "full",
 }: JadwalDetailProps) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -503,62 +505,57 @@ export function JadwalDetail({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button variant="outline" onClick={handleExportPdf} disabled={exportPending}>
-          <Download className="h-4 w-4 mr-1" />
-          {exportPending ? "Mengekspor..." : "Export PDF"}
-        </Button>
-      </div>
+      {(mode === "full" || mode === "informasi") && (
+        <Card className="rounded-[28px]">
+          <CardHeader className="border-b border-border">
+            <CardTitle>Informasi Kelas</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div>
+                <p className="text-sm text-muted-foreground">Program</p>
+                <p className="font-medium">{kelas.programName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tipe Kelas</p>
+                <p className="font-medium">{kelas.classTypeName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tanggal Mulai</p>
+                <p className="font-medium">{formatDate(kelas.startDate)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tanggal Selesai</p>
+                <p className="font-medium">{kelas.endDate ? formatDate(kelas.endDate) : "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Metode</p>
+                <Badge variant={kelas.mode === "online" ? "secondary" : "default"}>
+                  {kelas.mode === "online" ? "Online" : "Offline"}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Lokasi</p>
+                <p className="font-medium">{kelas.lokasi ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Badge variant={STATUS_COLORS[kelas.status] ?? "outline"}>{kelas.status}</Badge>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Sesi</p>
+                <p className="font-medium">{sessionCount}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Ujian</p>
+                <p className="font-medium">{examCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card className="rounded-[28px]">
-        <CardHeader className="border-b border-border">
-          <CardTitle>Informasi Kelas</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Program</p>
-              <p className="font-medium">{kelas.programName}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Tipe Kelas</p>
-              <p className="font-medium">{kelas.classTypeName}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Tanggal Mulai</p>
-              <p className="font-medium">{formatDate(kelas.startDate)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Tanggal Selesai</p>
-              <p className="font-medium">{kelas.endDate ? formatDate(kelas.endDate) : "-"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Metode</p>
-              <Badge variant={kelas.mode === "online" ? "secondary" : "default"}>
-                {kelas.mode === "online" ? "Online" : "Offline"}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Lokasi</p>
-              <p className="font-medium">{kelas.lokasi ?? "-"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Status</p>
-              <Badge variant={STATUS_COLORS[kelas.status] ?? "outline"}>{kelas.status}</Badge>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Sesi</p>
-              <p className="font-medium">{sessionCount}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Ujian</p>
-              <p className="font-medium">{examCount}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {canManage ? (
+      {(mode === "full" || mode === "instruktur") && canManage ? (
         <Card className="rounded-[28px]">
           <CardHeader className="border-b border-border">
             <CardTitle>Assign Instruktur</CardTitle>
@@ -694,10 +691,17 @@ export function JadwalDetail({
         </Card>
       ) : null}
 
-      <Card className="rounded-[28px]">
-        <CardHeader className="border-b border-border">
-          <CardTitle>Jadwal Kelas</CardTitle>
-        </CardHeader>
+      {(mode === "full" || mode === "jadwal") && (
+        <Card className="rounded-[28px]">
+          <CardHeader className="border-b border-border">
+            <div className="flex items-center justify-between">
+              <CardTitle>Jadwal Kelas</CardTitle>
+              <Button variant="outline" onClick={handleExportPdf} disabled={exportPending} size="sm">
+                <Download className="h-4 w-4 mr-1" />
+                {exportPending ? "Mengekspor..." : "Export PDF"}
+              </Button>
+            </div>
+          </CardHeader>
         <CardContent className="pt-6 p-0">
           <div className="overflow-x-auto">
               <div className="flex items-center gap-2 px-6 py-2 border-b border-border">
@@ -924,6 +928,8 @@ export function JadwalDetail({
           </div>
         </CardContent>
       </Card>
+      )}
+
     </div>
   );
 }

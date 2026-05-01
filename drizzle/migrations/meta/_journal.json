@@ -225,6 +225,13 @@
       "when": 1777403600000,
       "tag": "0032_phase4_honorarium",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1777652666657,
+      "tag": "0032_bored_stark_industries",
+      "breakpoints": true
     }
   ]
 }

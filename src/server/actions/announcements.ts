@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { and, asc, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
@@ -177,10 +178,10 @@ export async function listAnnouncementInbox(): Promise<AnnouncementInboxRow[]> {
     }));
 }
 
-export async function countUnreadAnnouncements(): Promise<number> {
+export const countUnreadAnnouncements = cache(async (): Promise<number> => {
   const rows = await listAnnouncementInbox();
   return rows.filter((row) => !row.isRead || row.needsAcknowledgement).length;
-}
+});
 
 export async function listAnnouncementManage(): Promise<AnnouncementManageRow[]> {
   await requirePermission("announcement", "manage");

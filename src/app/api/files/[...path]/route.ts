@@ -23,6 +23,15 @@ const MIME_BY_EXT: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
 };
 
+const PUBLIC_SYSTEM_IDENTITY_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".svg",
+  ".ico",
+]);
+
 function resolveBaseDir() {
   // Turbopack NFT tidak bisa statically analyze path.resolve dengan env dinamis;
   // tandai ignore agar trace tidak ikut menyertakan seluruh project.
@@ -53,18 +62,23 @@ function resolveSafePath(segments: string[]): string | null {
   return candidate;
 }
 
+function isPublicSystemIdentityAsset(segments: string[], safePath: string) {
+  const prefix = env.STORAGE_ENV_PREFIX;
+  const isSystemIdentityPath = prefix
+    ? segments[0] === prefix && segments[1] === "system-identity"
+    : segments[0] === "system-identity";
+
+  if (!isSystemIdentityPath) return false;
+
+  return PUBLIC_SYSTEM_IDENTITY_EXTENSIONS.has(
+    path.extname(safePath).toLowerCase(),
+  );
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
-
   const { path: segments } = await context.params;
   const safePath = resolveSafePath(segments);
   if (!safePath) {
@@ -72,6 +86,14 @@ export async function GET(
       { error: "Bad request" },
       { status: 400 },
     );
+  }
+
+  const isPublicAsset = isPublicSystemIdentityAsset(segments, safePath);
+  if (!isPublicAsset) {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   let stats;
@@ -109,7 +131,7 @@ export async function GET(
     "Content-Type": contentType,
     "Content-Length": String(stats.size),
     "Content-Disposition": `${dispositionType}; filename="${encodeURIComponent(fileName)}"`,
-    "Cache-Control": "private, no-store",
+    "Cache-Control": isPublicAsset ? "public, max-age=3600" : "private, no-store",
     "X-Content-Type-Options": "nosniff",
   });
 

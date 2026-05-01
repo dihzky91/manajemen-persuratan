@@ -5,7 +5,8 @@
       "Bash(grep -n '$hooks\\\\|Hooks' 'D:\\\\laragon\\\\www\\\\riserscrm\\\\app\\\\Config\\\\Services.php')",
       "Bash(grep -r '$hooks\\\\s*=' 'D:\\\\laragon\\\\www\\\\riserscrm' '--include=*.php')",
       "Bash(xargs grep *)",
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

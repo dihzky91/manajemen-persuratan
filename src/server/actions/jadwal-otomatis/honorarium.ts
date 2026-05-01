@@ -4,7 +4,7 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requirePermission, requireRole, requireSession } from "@/server/actions/auth";
+import { requireCapability, requirePermission, requireRole, requireSession } from "@/server/actions/auth";
 import { db } from "@/server/db";
 import {
   classSessions,
@@ -135,16 +135,22 @@ function batchStatusLabel(status: HonorariumBatchStatus) {
   return status;
 }
 
-function formatDateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
-
 function defaultDateRange() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const partMap = new Map(parts.map((part) => [part.type, part.value]));
+  const year = partMap.get("year") ?? String(now.getFullYear());
+  const month = partMap.get("month") ?? String(now.getMonth() + 1).padStart(2, "0");
+  const day = partMap.get("day") ?? String(now.getDate()).padStart(2, "0");
+
   return {
-    startDate: formatDateOnly(start),
-    endDate: formatDateOnly(now),
+    startDate: `${year}-${month}-01`,
+    endDate: `${year}-${month}-${day}`,
   };
 }
 
@@ -968,66 +974,64 @@ async function transitionBatchStatus(params: {
 }) {
   let documentNumberForNotification = "";
 
-  await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select({
-        id: honorariumBatches.id,
-        documentNumber: honorariumBatches.documentNumber,
-        status: honorariumBatches.status,
-        internalNotes: honorariumBatches.internalNotes,
-      })
-      .from(honorariumBatches)
-      .where(eq(honorariumBatches.id, params.batchId))
-      .limit(1);
+  const [existing] = await db
+    .select({
+      id: honorariumBatches.id,
+      documentNumber: honorariumBatches.documentNumber,
+      status: honorariumBatches.status,
+      internalNotes: honorariumBatches.internalNotes,
+    })
+    .from(honorariumBatches)
+    .where(eq(honorariumBatches.id, params.batchId))
+    .limit(1);
 
-    if (!existing) {
-      throw new Error("Batch honorarium tidak ditemukan.");
-    }
-    documentNumberForNotification = existing.documentNumber;
+  if (!existing) {
+    throw new Error("Batch honorarium tidak ditemukan.");
+  }
+  documentNumberForNotification = existing.documentNumber;
 
-    if (existing.status !== params.from) {
-      throw new Error(
-        `Status batch harus ${params.from}, status saat ini ${existing.status}.`,
-      );
-    }
+  if (existing.status !== params.from) {
+    throw new Error(
+      `Status batch harus ${params.from}, status saat ini ${existing.status}.`,
+    );
+  }
 
-    const updatePayload: Partial<typeof honorariumBatches.$inferInsert> = {
-      status: params.to,
-      internalNotes: mergeNotes(existing.internalNotes, params.note),
-      updatedAt: new Date(),
-    };
+  const updatePayload: Partial<typeof honorariumBatches.$inferInsert> = {
+    status: params.to,
+    internalNotes: mergeNotes(existing.internalNotes, params.note),
+    updatedAt: new Date(),
+  };
 
-    if (params.submittedAt !== undefined) updatePayload.submittedAt = params.submittedAt;
-    if (params.paidAt !== undefined) updatePayload.paidAt = params.paidAt;
-    if (params.paidBy !== undefined) updatePayload.paidBy = params.paidBy;
-    if (params.lockedAt !== undefined) updatePayload.lockedAt = params.lockedAt;
+  if (params.submittedAt !== undefined) updatePayload.submittedAt = params.submittedAt;
+  if (params.paidAt !== undefined) updatePayload.paidAt = params.paidAt;
+  if (params.paidBy !== undefined) updatePayload.paidBy = params.paidBy;
+  if (params.lockedAt !== undefined) updatePayload.lockedAt = params.lockedAt;
 
-    const [updated] = await tx
-      .update(honorariumBatches)
-      .set(updatePayload)
-      .where(
-        and(
-          eq(honorariumBatches.id, params.batchId),
-          eq(honorariumBatches.status, params.from),
-        ),
-      )
-      .returning({ id: honorariumBatches.id });
+  const [updated] = await db
+    .update(honorariumBatches)
+    .set(updatePayload)
+    .where(
+      and(
+        eq(honorariumBatches.id, params.batchId),
+        eq(honorariumBatches.status, params.from),
+      ),
+    )
+    .returning({ id: honorariumBatches.id });
 
-    if (!updated) {
-      throw new Error("Batch gagal diperbarui karena status berubah.");
-    }
+  if (!updated) {
+    throw new Error("Batch gagal diperbarui karena status berubah.");
+  }
 
-    await tx.insert(honorariumAuditLogs).values({
-      id: nanoid(),
-      batchId: params.batchId,
-      actorId: params.actorId,
-      action: params.action,
-      payload: {
-        from: params.from,
-        to: params.to,
-        ...(params.payload ?? {}),
-      },
-    });
+  await db.insert(honorariumAuditLogs).values({
+    id: nanoid(),
+    batchId: params.batchId,
+    actorId: params.actorId,
+    action: params.action,
+    payload: {
+      from: params.from,
+      to: params.to,
+      ...(params.payload ?? {}),
+    },
   });
 
   revalidatePath("/jadwal-otomatis/honorarium");
@@ -1488,7 +1492,7 @@ export async function submitHonorariumBatchToFinance(batchId: string) {
 }
 
 export async function markHonorariumBatchInProcess(batchId: string) {
-  const session = await requirePermission("jadwalUjian", "manage");
+  const session = await requireCapability("keuangan:process");
   const parsed = batchIdSchema.parse({ batchId });
 
   await transitionBatchStatus({
@@ -1503,7 +1507,7 @@ export async function markHonorariumBatchInProcess(batchId: string) {
 }
 
 export async function markHonorariumBatchPaid(data: z.infer<typeof markBatchPaidSchema>) {
-  const session = await requirePermission("jadwalUjian", "manage");
+  const session = await requireCapability("keuangan:pay");
   const parsed = markBatchPaidSchema.parse(data);
 
   await transitionBatchStatus({
@@ -1525,7 +1529,7 @@ export async function markHonorariumBatchPaid(data: z.infer<typeof markBatchPaid
 }
 
 export async function lockHonorariumBatch(batchId: string) {
-  const session = await requirePermission("jadwalUjian", "manage");
+  const session = await requireCapability("keuangan:pay");
   const parsed = batchIdSchema.parse({ batchId });
   const validation = await validateBatchCompletenessBeforeLock(parsed.batchId);
   if (validation.errors.length > 0) {
@@ -1682,31 +1686,29 @@ export async function reopenHonorariumBatch(data: z.infer<typeof reopenBatchSche
     throw new Error(`Batch dengan status ${existing.status} tidak bisa di-reopen.`);
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(honorariumBatches)
-      .set({
-        status: "draft",
-        internalNotes: mergeNotes(existing.internalNotes, `[REOPEN] ${parsed.reason}`),
-        submittedAt: null,
-        paidAt: null,
-        lockedAt: null,
-        paidBy: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(honorariumBatches.id, parsed.batchId));
+  await db
+    .update(honorariumBatches)
+    .set({
+      status: "draft",
+      internalNotes: mergeNotes(existing.internalNotes, `[REOPEN] ${parsed.reason}`),
+      submittedAt: null,
+      paidAt: null,
+      lockedAt: null,
+      paidBy: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(honorariumBatches.id, parsed.batchId));
 
-    await tx.insert(honorariumAuditLogs).values({
-      id: nanoid(),
-      batchId: parsed.batchId,
-      actorId: session.user.id,
-      action: "batch_reopened",
-      payload: {
-        from: existing.status,
-        to: "draft",
-        reason: parsed.reason,
-      },
-    });
+  await db.insert(honorariumAuditLogs).values({
+    id: nanoid(),
+    batchId: parsed.batchId,
+    actorId: session.user.id,
+    action: "batch_reopened",
+    payload: {
+      from: existing.status,
+      to: "draft",
+      reason: parsed.reason,
+    },
   });
 
   revalidatePath("/jadwal-otomatis/honorarium");

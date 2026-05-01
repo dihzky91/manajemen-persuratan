@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
@@ -137,7 +138,7 @@ export async function listDisposisiTimeline(): Promise<DisposisiTimelineRow[]> {
   return hydrateTimelineRows(rows);
 }
 
-export async function countUnreadDisposisi(): Promise<number> {
+export const countUnreadDisposisi = cache(async (): Promise<number> => {
   const session = await requireSession();
   const [row] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -150,7 +151,7 @@ export async function countUnreadDisposisi(): Promise<number> {
     );
 
   return row?.total ?? 0;
-}
+});
 
 export async function listDisposisiRecipients(): Promise<DisposisiRecipientOption[]> {
   const session = await requireSession();

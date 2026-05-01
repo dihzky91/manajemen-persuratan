@@ -1,9 +1,11 @@
 # Modul Peserta & Nilai — Program Pelatihan
 
-> **Status:** Perencanaan
+> **Status:** ✅ SELESAI — Implementasi + Post-review Bug Fixes
 > **Depends on:** Integrasi Jadwal Otomatis → Ujian selesai (lihat `INTEGRASI_JADWAL_OTOMATIS_UJIAN.md`)
 > **Target program:** Brevet AB, Brevet C, BFA
 > **Dibuat:** 2026-04-30
+> **Implementasi selesai:** 2026-05-01 (DeepSeek agent)
+> **Bug fixes selesai:** 2026-05-02 (post-review Claude Sonnet 4.6)
 
 ---
 
@@ -615,27 +617,80 @@ Update sidemenu dari dua item terpisah menjadi satu group:
 ## Checklist Progress
 
 ### Pre-requisite
-- [ ] Integrasi Jadwal Otomatis → Ujian selesai (Fase 1 & 2 dari `INTEGRASI_JADWAL_OTOMATIS_UJIAN.md`)
+- [x] Integrasi Jadwal Otomatis → Ujian selesai (Fase 1 & 2 dari `INTEGRASI_JADWAL_OTOMATIS_UJIAN.md`)
 
 ### Fase 1 — Schema
-- [ ] 5 tabel baru di schema.ts
-- [ ] Generate & run migration
+- [x] 5 tabel baru di schema.ts (`pesertaKelas`, `absensiPelatihan`, `absensiUjian`, `nilaiUjian`, `ujianSusulanPeserta`)
+- [x] Generate & run migration (`0032_bored_stark_industries.sql`)
 
 ### Fase 2 — Server Actions
-- [ ] Enrollment
-- [ ] Absensi pelatihan
-- [ ] Absensi ujian
-- [ ] Nilai ujian
-- [ ] Ujian susulan
-- [ ] Ujian perbaikan
-- [ ] `recomputeStatusPeserta`
-- [ ] Export rekap
+- [x] Enrollment (`enrollment.ts`)
+- [x] Absensi pelatihan (`absensi-pelatihan.ts`)
+- [x] Absensi ujian (`absensi-ujian.ts`)
+- [x] Nilai ujian (`nilai-ujian.ts`)
+- [x] Ujian susulan (`ujian-susulan.ts`)
+- [x] Ujian perbaikan (`inputNilaiPerbaikan` di `nilai-ujian.ts`)
+- [x] `recomputeStatusPeserta` (`recompute-status.ts`)
+- [x] Export rekap (`export-rekap.ts`)
 
 ### Fase 3 — UI
-- [ ] Tab Peserta & Nilai
-- [ ] 4 sub-tab (Daftar, Absensi Pelatihan, Nilai Ujian, Rekap)
-- [ ] Export Excel
+- [x] Tab Peserta & Nilai (`PesertaDanNilaiTab.tsx`)
+- [x] 4 sub-tab (Daftar Peserta, Absensi Pelatihan, Absensi & Nilai Ujian, Status & Rekap)
+- [x] Export Excel (xlsx dynamic import)
 
 ### Navigasi
-- [ ] Group "Program Pelatihan" di sidemenu
-- [ ] Rename label "Jadwal Kelas"
+- [x] Label "Jadwal Kelas" sudah ada di sidemenu (tidak perlu perubahan)
+
+---
+
+## Post-Review Bug Fixes (2026-05-02)
+
+Setelah implementasi selesai, dilakukan kroscek menyeluruh. Ditemukan **5 CRITICAL**, **14 WARNING**, **13 MINOR**. Semua CRITICAL dan sebagian besar WARNING telah diperbaiki:
+
+### CRITICAL Fixed
+
+| # | File | Bug | Fix |
+|---|------|-----|-----|
+| C1 | `enrollment.ts` | `getPesertaByKelas` pakai `with: { absensiPelatihan, absensiUjian, nilaiUjian }` tanpa `relations()` → throw runtime | Hapus `with` clause; data absensi/nilai diload terpisah per sub-tab |
+| C2 | `ujian-susulan.ts` | `&&` (JS operator) alih-alih `and()` Drizzle → WHERE clause hanya filter kolom kedua → update kena semua peserta di jadwal yang sama (data corruption) | Ganti ke `and(eq(...), eq(...))` + import `and` |
+| C3 | `ujian-susulan.ts` | State transitions tidak di-enforce — `selesaikan` bisa dipanggil dari `pending`, `batal` bisa kena `selesai` | Tambah kondisi status di WHERE: `approve` hanya dari `pending`, `selesaikan` hanya dari `disetujui`, `batalkan` dari `pending\|disetujui` |
+| C4 | `PesertaDanNilaiTab.tsx` + semua mutation actions | Client kirim literal `"system"` sebagai `userId` → FK violation ke `users(id)` → semua mutation gagal | Hapus `userId` param dari semua action signatures; resolve `session.user.id` di dalam server action via `requirePermission` |
+| C5 | `PesertaDanNilaiTab.tsx` | `loadPeserta()` dipanggil langsung di render body → infinite re-render loop | Pindah ke `useEffect(() => { loadPeserta(); }, [loadPeserta])` |
+
+### WARNING Fixed
+
+| # | File | Bug | Fix |
+|---|------|-----|-----|
+| W1 | `recompute-status.ts`, `export-rekap.ts` | `hadirSesi` hitung semua absensi tanpa filter sesi cancelled/exam-day → persentase bisa inflasi | `hadirSesi` kini JOIN `classSessions` + filter `isExamDay=false` + `status != 'cancelled'` + `kelasId` |
+| W2 | `recompute-status.ts` | `totalSesi === 0` → divide-by-zero, pct=0, peserta salah masuk `telah_mengikuti` sebelum ada sesi | Guard: jika `totalSesi === 0`, set `statusAkhir = null` (dalam proses) |
+| W5 | `nilai-ujian.ts` | `inputNilaiPerbaikan` plain `INSERT` tanpa conflict target → throw jika re-run untuk mapel yang sama | Tambah `onConflictDoUpdate` dengan target yang sama (`pesertaId, jadwalUjianId, mataPelajaran, isPerbaikan`) |
+| W6 | `absensi-pelatihan.ts` | Loop insert sequential, tanpa atomicity → partial failure bisa tinggalkan data inconsistent | Wrap semua insert dalam `db.transaction()` |
+| W8 | `absensi-pelatihan.ts`, `absensi-ujian.ts`, `nilai-ujian.ts` | `inArray(col, [])` → SQL invalid jika `pesertaList` kosong | Guard: early return `{ ..., list: [] }` jika `pesertaList.length === 0` |
+| W10 | `enrollment.ts` | `deletePeserta` hard delete → cascade hapus semua absensi/nilai historis | `deletePeserta` kini soft delete via `updateStatusEnrollment("mengundurkan_diri")` |
+| W11 | `PesertaDanNilaiTab.tsx` | `prompt()` untuk input nilai perbaikan & tanggal susulan → tidak accessible, no validation, crash di webview | Ganti dengan inline form state: `perbaikanEdit` (select A/B/C + confirm/cancel), `susulanEdit` (date input + confirm/cancel) |
+| W12 | semua actions | `revalidatePath` inconsistent: beberapa pakai route tidak exist (`/jadwal-ujian/...`), `ujian-susulan.ts` tidak revalidate sama sekali | Standarisasi ke `/jadwal-otomatis/${kelasId}`; lookup chain `jadwalUjianId → kelasUjian → kelasPelatihanId`; susulan lookup dari `pesertaId → pesertaKelas.kelasId` |
+| W14 | `absensi-ujian.ts` | `inputAbsensiUjian` tidak panggil `recomputeStatusPeserta` | Tambah loop recompute setelah upsert |
+| M6 | `absensi-ujian.ts` | `inputAbsensiUjian` tidak validasi `jadwalUjianId` exists → FK violation opaque | Tambah lookup + early return `{ ok: false, error: "Jadwal ujian tidak ditemukan." }` |
+
+### Tidak Difix (Accepted Risk)
+
+| # | Alasan |
+|---|--------|
+| W3 | `lulus` bisa granted sebelum semua sesi selesai — **by design**, status dihitung dari data yang sudah ada |
+| W4 | Unique index `(pesertaId, jadwalUjianId, mataPelajaran, isPerbaikan)` batasi 1 perbaikan per mapel — W5 fix via `onConflictDoUpdate` sudah cukup untuk use case saat ini |
+| M12/M13 | Kolom status pakai `varchar` bukan `pgEnum` — perlu migration baru, defer ke refactor berikutnya |
+
+### Files Changed
+
+```
+src/server/actions/jadwal-otomatis/peserta/enrollment.ts
+src/server/actions/jadwal-otomatis/peserta/absensi-pelatihan.ts
+src/server/actions/jadwal-otomatis/peserta/absensi-ujian.ts
+src/server/actions/jadwal-otomatis/peserta/nilai-ujian.ts
+src/server/actions/jadwal-otomatis/peserta/ujian-susulan.ts
+src/server/actions/jadwal-otomatis/peserta/recompute-status.ts
+src/server/actions/jadwal-otomatis/peserta/export-rekap.ts
+src/components/jadwal-otomatis/PesertaDanNilaiTab.tsx
+```
+
+`tsc --noEmit` clean setelah semua fix.

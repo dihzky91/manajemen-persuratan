@@ -59,6 +59,10 @@ export const CAPABILITIES = [
   "search:view",
   "profile:view",
   "profile:edit",
+  "keuangan:view",
+  "keuangan:process",
+  "keuangan:pay",
+  "keuangan:export",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -144,6 +148,15 @@ export const CAPABILITY_GROUPS: Array<{
     ],
   },
   {
+    label: "Keuangan",
+    capabilities: [
+      "keuangan:view",
+      "keuangan:process",
+      "keuangan:pay",
+      "keuangan:export",
+    ],
+  },
+  {
     label: "Sistem",
     capabilities: [
       "pengaturan:view",
@@ -215,6 +228,10 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   "search:view": "Gunakan pencarian",
   "profile:view": "Lihat profil",
   "profile:edit": "Ubah profil",
+  "keuangan:view": "Lihat menu keuangan",
+  "keuangan:process": "Proses pembayaran honorarium",
+  "keuangan:pay": "Konfirmasi & lock pembayaran",
+  "keuangan:export": "Export laporan keuangan",
 };
 
 export const DEFAULT_ROLE_CAPABILITIES: Record<

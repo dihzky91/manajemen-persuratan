@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JadwalDetail } from "@/components/jadwal-otomatis/JadwalDetail";
 import { JadwalUjianIntegrasi } from "@/components/jadwal-otomatis/JadwalUjianIntegrasi";
+import { PesertaDanNilaiTab } from "@/components/jadwal-otomatis/PesertaDanNilaiTab";
 import {
   getKelasOtomatisDetail,
   getSessionsByKelas,
@@ -22,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const kelas = await getKelasOtomatisDetail(id);
   if (!kelas) return { title: "Kelas Tidak Ditemukan" };
   return {
-    title: `${kelas.namaKelas} | Jadwal Otomatis | Manajemen Surat IAI Jakarta`,
+    title: `${kelas.namaKelas} | Jadwal Kelas | Manajemen Surat IAI Jakarta`,
   };
 }
 
@@ -46,28 +48,74 @@ export default async function Page({ params }: Props) {
   const canManage = role === "admin" || role === "staff";
   const hasExamSessions = sessions.some((s) => s.isExamDay);
 
+  const kelasProp = {
+    ...kelas,
+    programName: kelas.programName ?? "",
+    programCode: kelas.programCode ?? "",
+    classTypeName: kelas.classTypeName ?? "",
+    mode: kelas.mode ?? "offline",
+  };
+
   return (
-    <PageWrapper title={kelas.namaKelas} description="Jadwal lengkap kelas pelatihan.">
-      <JadwalDetail
-        kelas={{
-          ...kelas,
-          programName: kelas.programName ?? "",
-          programCode: kelas.programCode ?? "",
-          classTypeName: kelas.classTypeName ?? "",
-          mode: kelas.mode ?? "offline",
-        }}
-        sessions={sessions}
-        assignments={assignments}
-        instructors={instructors}
-        materiBlocks={materiBlocks}
-        canManage={canManage}
-      />
-      <JadwalUjianIntegrasi
-        kelasId={id}
-        canManage={canManage}
-        linkedKelasUjian={linkedKelasUjian}
-        hasExamSessions={hasExamSessions}
-      />
+    <PageWrapper title={kelas.namaKelas} description="Detail lengkap kelas pelatihan.">
+      <Tabs defaultValue="informasi" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="informasi">Informasi Kelas</TabsTrigger>
+          <TabsTrigger value="jadwal">Jadwal Sesi</TabsTrigger>
+          <TabsTrigger value="instruktur">Instruktur</TabsTrigger>
+          <TabsTrigger value="peserta">Peserta &amp; Nilai</TabsTrigger>
+          <TabsTrigger value="ujian">Jadwal Ujian</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="informasi">
+          <JadwalDetail
+            kelas={kelasProp}
+            sessions={sessions}
+            assignments={assignments}
+            instructors={instructors}
+            materiBlocks={materiBlocks}
+            canManage={canManage}
+            mode="informasi"
+          />
+        </TabsContent>
+
+        <TabsContent value="jadwal">
+          <JadwalDetail
+            kelas={kelasProp}
+            sessions={sessions}
+            assignments={assignments}
+            instructors={instructors}
+            materiBlocks={materiBlocks}
+            canManage={canManage}
+            mode="jadwal"
+          />
+        </TabsContent>
+
+        <TabsContent value="instruktur">
+          <JadwalDetail
+            kelas={kelasProp}
+            sessions={sessions}
+            assignments={assignments}
+            instructors={instructors}
+            materiBlocks={materiBlocks}
+            canManage={canManage}
+            mode="instruktur"
+          />
+        </TabsContent>
+
+        <TabsContent value="peserta">
+          <PesertaDanNilaiTab kelasId={id} canManage={canManage} />
+        </TabsContent>
+
+        <TabsContent value="ujian">
+          <JadwalUjianIntegrasi
+            kelasId={id}
+            canManage={canManage}
+            linkedKelasUjian={linkedKelasUjian}
+            hasExamSessions={hasExamSessions}
+          />
+        </TabsContent>
+      </Tabs>
     </PageWrapper>
   );
 }

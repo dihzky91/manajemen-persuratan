@@ -40,6 +40,20 @@ const modeLabels: Record<"online" | "offline", string> = {
   offline: "Offline",
 };
 
+const sessionStatusVariants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  scheduled: "default",
+  completed: "secondary",
+  cancelled: "destructive",
+  makeup: "outline",
+};
+
+const availabilityStatusLabels: Record<string, string> = {
+  pending_wa_confirmation: "Menunggu WA",
+  accepted: "Diterima",
+  rejected: "Ditolak",
+  no_response: "No Response",
+};
+
 interface Props {
   instructor: any;
   expertise: any[];
@@ -615,13 +629,14 @@ export function InstrukturDetail({
                   <th className="text-left px-6 py-3 font-medium text-muted-foreground">Kelas</th>
                   <th className="text-left px-6 py-3 font-medium text-muted-foreground">Program</th>
                   <th className="text-left px-6 py-3 font-medium text-muted-foreground">Materi/Sesi</th>
-                  <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status Sesi</th>
+                  <th className="text-left px-6 py-3 font-medium text-muted-foreground">Penugasan</th>
                 </tr>
               </thead>
               <tbody>
                 {history.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                       Belum ada histori mengajar.
                     </td>
                   </tr>
@@ -635,6 +650,11 @@ export function InstrukturDetail({
                         {item.isExamDay ? "Ujian" : item.materiName ?? `Sesi ${item.sessionNumber}`}
                       </td>
                       <td className="px-6 py-3">
+                        <Badge variant={sessionStatusVariants[item.sessionStatus] ?? "outline"}>
+                          {item.sessionStatus}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-3">
                         {item.isSubstitute ? (
                           <Badge variant="outline" className="border-amber-300 text-amber-700">
                             Substitusi
@@ -642,6 +662,11 @@ export function InstrukturDetail({
                         ) : (
                           <Badge variant="secondary">Planned</Badge>
                         )}
+                        {item.availabilityStatus ? (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {availabilityStatusLabels[item.availabilityStatus] ?? item.availabilityStatus}
+                          </span>
+                        ) : null}
                       </td>
                     </tr>
                   ))
