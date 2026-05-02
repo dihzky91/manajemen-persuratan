@@ -5,7 +5,7 @@ import { getSession } from "@/server/actions/auth";
 import { listDivisi } from "@/server/actions/divisi";
 
 export const metadata: Metadata = {
-  title: "Divisi | Manajemen Surat IAI Jakarta",
+  title: "Divisi | ARKA",
 };
 
 export default async function Page() {
@@ -16,7 +16,7 @@ export default async function Page() {
   return (
     <PageWrapper
       title="Divisi"
-      description="Daftar divisi organisasi IAI Wilayah DKI Jakarta."
+      description="Daftar divisi organisasi IAI Wilayah Jakarta."
     >
       <DivisiManager initialData={data} canManage={canManage} />
     </PageWrapper>

@@ -6,10 +6,14 @@ import { PageWrapper } from "@/components/layout/PageWrapper";
 import { HonorariumBatchDetail } from "@/components/jadwal-otomatis/HonorariumBatchDetail";
 import { Button } from "@/components/ui/button";
 import { getCurrentUserAccess, getSession } from "@/server/actions/auth";
-import { getHonorariumBatchDetail, listHonorariumDeductions } from "@/server/actions/jadwal-otomatis/honorarium";
+import {
+  getHonorariumBatchDetail,
+  listHonorariumDeductions,
+} from "@/server/actions/jadwal-otomatis/honorarium";
+import { getSystemSettings } from "@/server/actions/systemSettings";
 
 export const metadata: Metadata = {
-  title: "Detail Batch Honorarium | Manajemen Surat IAI Jakarta",
+  title: "Detail Batch Honorarium | ARKA",
 };
 
 type PageProps = {
@@ -19,12 +23,14 @@ type PageProps = {
 export default async function Page({ params }: PageProps) {
   const { batchId } = await params;
 
-  const [detail, session, deductions, access] = await Promise.all([
-    getHonorariumBatchDetail(batchId),
-    getSession(),
-    listHonorariumDeductions(batchId),
-    getCurrentUserAccess(),
-  ]);
+  const [detail, session, deductions, access, systemSettings] =
+    await Promise.all([
+      getHonorariumBatchDetail(batchId),
+      getSession(),
+      listHonorariumDeductions(batchId),
+      getCurrentUserAccess(),
+      getSystemSettings(),
+    ]);
 
   if (!detail) notFound();
 
@@ -33,10 +39,12 @@ export default async function Page({ params }: PageProps) {
   const isAdmin = role === "admin" || access?.isSuperAdmin === true;
 
   const capabilities = access?.capabilities ?? [];
-  const canProcess =
-    access?.isSuperAdmin ? true : capabilities.includes("keuangan:process");
-  const canPay =
-    access?.isSuperAdmin ? true : capabilities.includes("keuangan:pay");
+  const canProcess = access?.isSuperAdmin
+    ? true
+    : capabilities.includes("keuangan:process");
+  const canPay = access?.isSuperAdmin
+    ? true
+    : capabilities.includes("keuangan:pay");
 
   return (
     <PageWrapper
@@ -59,6 +67,10 @@ export default async function Page({ params }: PageProps) {
         isAdmin={isAdmin}
         canProcess={canProcess}
         canPay={canPay}
+        systemIdentity={{
+          namaSistem: systemSettings.namaSistem,
+          logoUrl: systemSettings.logoUrl,
+        }}
       />
     </PageWrapper>
   );

@@ -6,22 +6,24 @@ import { getSuratKeluarVerificationById } from "@/server/actions/suratKeluar";
 import { formatTanggal } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Verifikasi Surat Keluar | Manajemen Surat IAI Jakarta",
+  title: "Verifikasi Surat Keluar | ARKA",
 };
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-function getVerificationStatus(status: string | null, qrCodeUrl: string | null) {
+function getVerificationStatus(
+  status: string | null,
+  qrCodeUrl: string | null,
+) {
   if (status === "dibatalkan") {
     return {
       label: "Tidak valid",
       tone: "destructive" as const,
       description: "Surat ini sudah dibatalkan di sistem.",
       accent: "from-red-500/18 via-red-500/8 to-transparent",
-      panelClass:
-        "border-red-200 bg-red-50 text-red-900 shadow-red-100/60",
+      panelClass: "border-red-200 bg-red-50 text-red-900 shadow-red-100/60",
     };
   }
 
@@ -40,7 +42,7 @@ function getVerificationStatus(status: string | null, qrCodeUrl: string | null) 
     return {
       label: "Valid",
       tone: "default" as const,
-      description: "Surat tercatat resmi di sistem manajemen surat.",
+      description: "Surat tercatat resmi di ARKA.",
       accent: "from-emerald-500/18 via-emerald-500/8 to-transparent",
       panelClass:
         "border-emerald-200 bg-emerald-50 text-emerald-950 shadow-emerald-100/60",
@@ -57,7 +59,9 @@ function getVerificationStatus(status: string | null, qrCodeUrl: string | null) 
   };
 }
 
-export default async function VerificationSuratKeluarPage({ params }: PageProps) {
+export default async function VerificationSuratKeluarPage({
+  params,
+}: PageProps) {
   const { id } = await params;
   const surat = await getSuratKeluarVerificationById(id);
 
@@ -95,12 +99,22 @@ export default async function VerificationSuratKeluarPage({ params }: PageProps)
           </p>
 
           <div className="mt-8 space-y-4 rounded-[24px] border border-border bg-slate-50 px-5 py-5">
-            <DetailRow label="Nomor Surat" value={surat.nomorSurat ?? "-"} mono />
-            <DetailRow label="Tanggal Surat" value={formatTanggal(surat.tanggalSurat)} />
+            <DetailRow
+              label="Nomor Surat"
+              value={surat.nomorSurat ?? "-"}
+              mono
+            />
+            <DetailRow
+              label="Tanggal Surat"
+              value={formatTanggal(surat.tanggalSurat)}
+            />
             <DetailRow label="Perihal" value={surat.perihal} />
             <DetailRow label="Ditujukan Kepada" value={surat.tujuan} />
             <DetailRow label="Penandatangan" value={surat.pejabatNama ?? "-"} />
-            <DetailRow label="Status Sistem" value={humanizeStatus(surat.status)} />
+            <DetailRow
+              label="Status Sistem"
+              value={humanizeStatus(surat.status)}
+            />
           </div>
 
           <div className="mt-6">
@@ -122,7 +136,7 @@ export default async function VerificationSuratKeluarPage({ params }: PageProps)
         </section>
 
         <footer className="mt-8 text-center text-xs tracking-[0.2em] text-muted-foreground uppercase">
-          Sistem Verifikasi Persuratan IAI Wilayah DKI Jakarta
+          Sistem Verifikasi ARKA
         </footer>
       </div>
     </main>
@@ -141,7 +155,9 @@ function InfoItem({
   className?: string;
 }) {
   return (
-    <div className={`rounded-2xl border border-border bg-background px-4 py-4 ${className ?? ""}`}>
+    <div
+      className={`rounded-2xl border border-border bg-background px-4 py-4 ${className ?? ""}`}
+    >
       <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
         {label}
       </p>
@@ -174,7 +190,9 @@ function DetailRow({
   return (
     <div className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0 sm:grid sm:grid-cols-[170px_1fr] sm:gap-4">
       <p className="text-sm text-slate-500">{label}</p>
-      <p className={`mt-1 text-base text-slate-950 sm:mt-0 ${mono ? "font-mono font-semibold" : "font-medium"}`}>
+      <p
+        className={`mt-1 text-base text-slate-950 sm:mt-0 ${mono ? "font-mono font-semibold" : "font-medium"}`}
+      >
         {value}
       </p>
     </div>

@@ -6,7 +6,7 @@ import { listPejabatAktif } from "@/server/actions/suratKeluar";
 import { listSuratMou } from "@/server/actions/suratMou";
 
 export const metadata: Metadata = {
-  title: "Surat MOU | Manajemen Surat IAI Jakarta",
+  title: "Surat MOU | ARKA",
 };
 
 export default async function Page() {
@@ -18,8 +18,15 @@ export default async function Page() {
   const role = (session?.user as { role?: string } | undefined)?.role ?? null;
 
   return (
-    <PageWrapper title="Surat MOU" description="Daftar Memorandum of Understanding.">
-      <SuratMouManager initialData={data} pejabatList={pejabatList} role={role} />
+    <PageWrapper
+      title="Surat MOU"
+      description="Daftar Memorandum of Understanding."
+    >
+      <SuratMouManager
+        initialData={data}
+        pejabatList={pejabatList}
+        role={role}
+      />
     </PageWrapper>
   );
 }

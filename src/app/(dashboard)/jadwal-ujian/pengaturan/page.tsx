@@ -6,7 +6,7 @@ import { getSession } from "@/server/actions/auth";
 import { listKonfig } from "@/server/actions/jadwal-ujian/config";
 
 export const metadata: Metadata = {
-  title: "Pengaturan Jadwal Ujian | Manajemen Surat IAI Jakarta",
+  title: "Pengaturan Jadwal Ujian | ARKA",
 };
 
 export default async function Page() {

@@ -14,7 +14,12 @@ import {
 
 const styles = StyleSheet.create({
   page: { padding: 48, fontSize: 11, fontFamily: "Helvetica", lineHeight: 1.5 },
-  header: { marginBottom: 24, borderBottom: 2, borderColor: "#000", paddingBottom: 12 },
+  header: {
+    marginBottom: 24,
+    borderBottom: 2,
+    borderColor: "#000",
+    paddingBottom: 12,
+  },
   orgName: { fontSize: 14, fontWeight: "bold", textAlign: "center" },
   orgSub: { fontSize: 10, textAlign: "center", marginTop: 2 },
   metaRow: { flexDirection: "row", marginTop: 24 },
@@ -50,13 +55,15 @@ export function SuratKeluarDocument(props: SuratKeluarPdfProps) {
             {props.organisasi ?? "IKATAN AKUNTAN INDONESIA"}
           </Text>
           <Text style={styles.orgSub}>
-            {props.organisasiSub ?? "Wilayah DKI Jakarta"}
+            {props.organisasiSub ?? "Wilayah Jakarta"}
           </Text>
         </View>
 
         <View style={styles.metaRow}>
           <Text style={styles.metaLabel}>Nomor</Text>
-          <Text style={styles.metaValue}>: {props.nomorSurat ?? "(akan diisi)"}</Text>
+          <Text style={styles.metaValue}>
+            : {props.nomorSurat ?? "(akan diisi)"}
+          </Text>
         </View>
         <View style={styles.metaRow}>
           <Text style={styles.metaLabel}>Tanggal</Text>
@@ -69,7 +76,7 @@ export function SuratKeluarDocument(props: SuratKeluarPdfProps) {
         {props.tujuanAlamat ? (
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}> </Text>
-            <Text style={styles.metaValue}>  {props.tujuanAlamat}</Text>
+            <Text style={styles.metaValue}> {props.tujuanAlamat}</Text>
           </View>
         ) : null}
 

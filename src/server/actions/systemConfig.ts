@@ -9,6 +9,7 @@ import { requirePermission, requireSession } from "./auth";
 import { sendEmail } from "@/lib/email/mailjet";
 import { getStorageProvider } from "@/lib/storage";
 import { env } from "@/lib/env";
+import { APP_BRAND_FULL_NAME } from "@/lib/branding";
 
 // ─── Update non-secret config (admin only) ────────────────────────────────────
 
@@ -86,7 +87,7 @@ export async function testEmailConnection() {
     await sendEmail({
       to: session.user.email,
       toName: session.user.name ?? "Admin",
-      subject: "[TEST] Koneksi Mailjet — Manajemen Surat IAI Jakarta",
+      subject: `[TEST] Koneksi Mailjet - ${APP_BRAND_FULL_NAME}`,
       htmlBody: `
         <h2>Test Email Berhasil</h2>
         <p>Halo ${session.user.name ?? "Admin"},</p>

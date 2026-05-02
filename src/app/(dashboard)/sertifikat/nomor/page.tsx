@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { BatchTable } from "@/components/sertifikat/BatchTable";
-import { listBatches, getCertDashboardStats } from "@/server/actions/sertifikat/nomor/batches";
+import {
+  listBatches,
+  getCertDashboardStats,
+} from "@/server/actions/sertifikat/nomor/batches";
 import { listCertificatePrograms } from "@/server/actions/sertifikat/nomor/programs";
 import { listCertificateClassTypes } from "@/server/actions/sertifikat/nomor/classTypes";
 import { Hash, Layers, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Penomoran Sertifikat | Manajemen Surat IAI Jakarta",
-  description: "Kelola batch penomoran sertifikat formal Brevet AB, Brevet C, BFA, dan program lainnya.",
+  title: "Penomoran Sertifikat | ARKA",
+  description:
+    "Kelola batch penomoran sertifikat formal Brevet AB, Brevet C, BFA, dan program lainnya.",
 };
 
 export default async function Page() {
@@ -50,7 +54,9 @@ export default async function Page() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Sertifikat</p>
-            <p className="text-2xl font-bold">{stats.totalCertificates.toLocaleString("id-ID")}</p>
+            <p className="text-2xl font-bold">
+              {stats.totalCertificates.toLocaleString("id-ID")}
+            </p>
           </div>
         </div>
       </div>

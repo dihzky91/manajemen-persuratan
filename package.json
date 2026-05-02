@@ -1,8 +1,8 @@
 {
-  "name": "manajemen-surat",
+  "name": "arka-iai-jakarta",
   "private": true,
   "version": "0.1.0",
-  "description": "Sistem Manajemen Surat & Kepegawaian IAI Wilayah DKI Jakarta",
+  "description": "ARKA - Aplikasi Ruang Kerja Administrasi IAI Wilayah Jakarta",
   "scripts": {
     "dev": "next dev --port 6700",
     "build": "next build",

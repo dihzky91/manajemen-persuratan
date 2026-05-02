@@ -9,7 +9,7 @@ import { VerificationSearchForm } from "@/components/sertifikat/VerificationSear
 import { verifyByNoSertifikat } from "@/server/actions/sertifikat/verifikasi";
 
 export const metadata: Metadata = {
-  title: "Hasil Verifikasi Dokumen | IAI Jakarta",
+  title: "Hasil Verifikasi Dokumen | ARKA",
   robots: { index: false, follow: false },
 };
 
@@ -56,7 +56,7 @@ export default async function Page({ params }: PageProps) {
 
         {result.found ? (
           <p className="mb-6 text-center text-slate-600">
-            Manajemen Eksekutif Ikatan Akuntan Indonesia Wilayah DKI Jakarta
+            Manajemen Eksekutif Ikatan Akuntan Indonesia Wilayah Jakarta
             menyatakan bahwa:
           </p>
         ) : null}
@@ -96,7 +96,11 @@ export default async function Page({ params }: PageProps) {
 
                     <div className="grid grid-cols-1 gap-x-12 gap-y-6 md:grid-cols-2">
                       <div className="space-y-6">
-                        <Detail label="Kegiatan" value={result.data.kegiatan.namaKegiatan} strong />
+                        <Detail
+                          label="Kegiatan"
+                          value={result.data.kegiatan.namaKegiatan}
+                          strong
+                        />
                         <div>
                           <p className="mb-2 text-xs font-bold tracking-wide text-slate-400 uppercase">
                             Kategori
@@ -135,7 +139,11 @@ export default async function Page({ params }: PageProps) {
                             strong
                           />
                         </div>
-                        <Detail label="Lokasi" value={result.data.kegiatan.lokasi ?? "-"} strong />
+                        <Detail
+                          label="Lokasi"
+                          value={result.data.kegiatan.lokasi ?? "-"}
+                          strong
+                        />
                       </div>
                     </div>
 
@@ -193,7 +201,7 @@ export default async function Page({ params }: PageProps) {
         ) : null}
 
         <footer className="mt-20 mb-8 text-center text-sm font-medium text-slate-500">
-          &copy; {new Date().getFullYear()} IAI Wilayah DKI Jakarta.
+          &copy; {new Date().getFullYear()} IAI Wilayah Jakarta.
         </footer>
       </div>
     </main>
@@ -214,7 +222,11 @@ function Detail({
       <p className="mb-1 text-xs font-bold tracking-wide text-slate-400 uppercase">
         {label}
       </p>
-      <p className={strong ? "text-lg font-bold text-slate-950" : "text-slate-800"}>
+      <p
+        className={
+          strong ? "text-lg font-bold text-slate-950" : "text-slate-800"
+        }
+      >
         {value}
       </p>
     </div>

@@ -5,7 +5,13 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Eye, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,8 +23,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { listHonorariumBatches } from "@/server/actions/jadwal-otomatis/honorarium";
 import type { HonorariumBatchRow } from "@/server/actions/jadwal-otomatis/honorarium";
+import { formatTanggalPendek } from "@/lib/utils";
 
-type BatchStatusFilter = "" | "dikirim_ke_keuangan" | "diproses_keuangan" | "dibayar" | "locked";
+type BatchStatusFilter =
+  | "all"
+  | "dikirim_ke_keuangan"
+  | "diproses_keuangan"
+  | "dibayar"
+  | "locked";
 
 interface FinanceBatchListProps {
   initialBatches: HonorariumBatchRow[];
@@ -37,9 +49,12 @@ function statusLabel(status: string) {
   return status;
 }
 
-function statusVariant(status: string): "default" | "secondary" | "outline" | "destructive" {
+function statusVariant(
+  status: string,
+): "default" | "secondary" | "outline" | "destructive" {
   if (status === "locked" || status === "dibayar") return "default";
-  if (status === "dikirim_ke_keuangan" || status === "diproses_keuangan") return "secondary";
+  if (status === "dikirim_ke_keuangan" || status === "diproses_keuangan")
+    return "secondary";
   return "outline";
 }
 
@@ -48,7 +63,7 @@ export function FinanceBatchList({ initialBatches }: FinanceBatchListProps) {
   const [batches, setBatches] = useState(initialBatches);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [statusFilter, setStatusFilter] = useState<BatchStatusFilter>("");
+  const [statusFilter, setStatusFilter] = useState<BatchStatusFilter>("all");
 
   function handleApplyFilter() {
     startTransition(async () => {
@@ -56,13 +71,15 @@ export function FinanceBatchList({ initialBatches }: FinanceBatchListProps) {
         const result = await listHonorariumBatches({
           startDate: startDate || undefined,
           endDate: endDate || undefined,
-          status: statusFilter || undefined,
+          status: statusFilter === "all" ? undefined : statusFilter,
           financeOnly: true,
         });
         setBatches(result);
         toast.success("Antrian diperbarui.");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Filter tidak valid.");
+        toast.error(
+          error instanceof Error ? error.message : "Filter tidak valid.",
+        );
       }
     });
   }
@@ -79,20 +96,39 @@ export function FinanceBatchList({ initialBatches }: FinanceBatchListProps) {
         <div className="grid gap-3 md:grid-cols-[160px_160px_200px_auto]">
           <div>
             <p className="text-xs text-muted-foreground mb-1">Tanggal Mulai</p>
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">Tanggal Akhir</p>
-            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">Status</p>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BatchStatusFilter)}>
-              <SelectTrigger><SelectValue placeholder="Semua status" /></SelectTrigger>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) =>
+                setStatusFilter(value as BatchStatusFilter)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Semua status" />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Semua status</SelectItem>
-                <SelectItem value="dikirim_ke_keuangan">Dikirim ke Keuangan</SelectItem>
-                <SelectItem value="diproses_keuangan">Diproses Keuangan</SelectItem>
+                <SelectItem value="all">Semua status</SelectItem>
+                <SelectItem value="dikirim_ke_keuangan">
+                  Dikirim ke Keuangan
+                </SelectItem>
+                <SelectItem value="diproses_keuangan">
+                  Diproses Keuangan
+                </SelectItem>
                 <SelectItem value="dibayar">Dibayar</SelectItem>
                 <SelectItem value="locked">Locked</SelectItem>
               </SelectContent>
@@ -110,30 +146,54 @@ export function FinanceBatchList({ initialBatches }: FinanceBatchListProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">No. Dokumen</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Periode</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sesi</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Net</th>
-                <th className="px-4 py-3 text-center font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Tgl Kirim</th>
-                <th className="px-4 py-3 text-center font-medium text-muted-foreground">Aksi</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  No. Dokumen
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  Periode
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                  Sesi
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                  Net
+                </th>
+                <th className="px-4 py-3 text-center font-medium text-muted-foreground">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                  Tgl Kirim
+                </th>
+                <th className="px-4 py-3 text-center font-medium text-muted-foreground">
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody>
               {batches.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-8 text-center text-muted-foreground"
+                  >
                     Belum ada batch masuk ke antrian keuangan.
                   </td>
                 </tr>
               ) : (
                 batches.map((batch) => (
-                  <tr key={batch.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="px-4 py-3 font-medium">{batch.documentNumber}</td>
+                  <tr
+                    key={batch.id}
+                    className="border-b border-border hover:bg-muted/50"
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      {batch.documentNumber}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {batch.periodStart} s.d. {batch.periodEnd}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{batch.itemCount}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {batch.itemCount}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
                       {formatCurrency(batch.netAmount)}
                     </td>
@@ -144,7 +204,7 @@ export function FinanceBatchList({ initialBatches }: FinanceBatchListProps) {
                     </td>
                     <td className="px-4 py-3 text-right text-muted-foreground">
                       {batch.submittedAt
-                        ? new Date(batch.submittedAt).toLocaleDateString("id-ID")
+                        ? formatTanggalPendek(batch.submittedAt)
                         : "-"}
                     </td>
                     <td className="px-4 py-3 text-center">

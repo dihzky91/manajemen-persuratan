@@ -8,7 +8,7 @@ import { getPenugasanByUjian } from "@/server/actions/jadwal-ujian/penugasan";
 import { listPengawas } from "@/server/actions/jadwal-ujian/pengawas";
 
 export const metadata: Metadata = {
-  title: "Detail Ujian | Manajemen Surat IAI Jakarta",
+  title: "Detail Ujian | ARKA",
 };
 
 type PageProps = {
@@ -18,15 +18,17 @@ type PageProps = {
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
 
-  const [session, ujian, penugasanList, pengawasList, ujianList] = await Promise.all([
-    getSession(),
-    getUjianById(id),
-    getPenugasanByUjian(id),
-    listPengawas(),
-    listUjian({ page: 1, pageSize: 5000 }),
-  ]);
+  const [session, ujian, penugasanList, pengawasList, ujianList] =
+    await Promise.all([
+      getSession(),
+      getUjianById(id),
+      getPenugasanByUjian(id),
+      listPengawas(),
+      listUjian({ page: 1, pageSize: 5000 }),
+    ]);
 
-  const resolvedUjian = ujian ?? ujianList.rows.find((row) => row.id === id) ?? null;
+  const resolvedUjian =
+    ujian ?? ujianList.rows.find((row) => row.id === id) ?? null;
   if (!resolvedUjian) notFound();
 
   const role = (session?.user as { role?: string } | undefined)?.role;

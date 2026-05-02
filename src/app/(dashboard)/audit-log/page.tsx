@@ -6,7 +6,7 @@ import { getSession } from "@/server/actions/auth";
 import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Audit Log — Manajemen Surat IAI Jakarta",
+  title: "Audit Log — ARKA",
   description: "Riwayat seluruh aktivitas dan aksi pengguna di sistem.",
 };
 
@@ -42,14 +42,22 @@ export default async function AuditLogPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Audit Log</h1>
           <p className="text-sm text-muted-foreground">
-            Riwayat seluruh aktivitas pengguna di sistem — hanya dapat dilihat oleh Admin.
+            Riwayat seluruh aktivitas pengguna di sistem — hanya dapat dilihat
+            oleh Admin.
           </p>
         </div>
       </div>
 
       {/* Manager */}
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Memuat log…</div>}>
-        <AuditLogManager initialData={initialData} entitasTypes={entitasTypes} />
+      <Suspense
+        fallback={
+          <div className="text-sm text-muted-foreground">Memuat log…</div>
+        }
+      >
+        <AuditLogManager
+          initialData={initialData}
+          entitasTypes={entitasTypes}
+        />
       </Suspense>
     </div>
   );

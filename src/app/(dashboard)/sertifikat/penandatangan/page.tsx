@@ -4,7 +4,7 @@ import { SignatoryManager } from "@/components/sertifikat/SignatoryManager";
 import { listSignatories } from "@/server/actions/sertifikat/signatories";
 
 export const metadata: Metadata = {
-  title: "Penandatangan Sertifikat | Manajemen Surat IAI Jakarta",
+  title: "Penandatangan Sertifikat | ARKA",
 };
 
 export default async function Page() {

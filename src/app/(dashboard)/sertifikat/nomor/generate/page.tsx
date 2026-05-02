@@ -5,11 +5,15 @@ import { PageWrapper } from "@/components/layout/PageWrapper";
 import { GenerateBatchForm } from "@/components/sertifikat/GenerateBatchForm";
 import { Button } from "@/components/ui/button";
 import { listCertificatePrograms } from "@/server/actions/sertifikat/nomor/programs";
-import { listCertificateClassTypes, getSerialConfig } from "@/server/actions/sertifikat/nomor/classTypes";
+import {
+  listCertificateClassTypes,
+  getSerialConfig,
+} from "@/server/actions/sertifikat/nomor/classTypes";
 
 export const metadata: Metadata = {
-  title: "Generate Batch Sertifikat | Manajemen Surat IAI Jakarta",
-  description: "Generate batch nomor sertifikat baru dengan sistem serial berkesinambungan.",
+  title: "Generate Batch Sertifikat | ARKA",
+  description:
+    "Generate batch nomor sertifikat baru dengan sistem serial berkesinambungan.",
 };
 
 export default async function Page() {

@@ -4,10 +4,19 @@ import { useRef, useState, useTransition } from "react";
 import { Building2, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { updateSystemSettings, type SystemSettingsRow } from "@/server/actions/systemSettings";
+import {
+  updateSystemSettings,
+  type SystemSettingsRow,
+} from "@/server/actions/systemSettings";
 
 interface Props {
   initial: SystemSettingsRow;
@@ -16,8 +25,12 @@ interface Props {
 
 export function IdentitasSistemCard({ initial, isAdmin }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [logoPreview, setLogoPreview] = useState<string | null>(initial.logoUrl);
-  const [faviconPreview, setFaviconPreview] = useState<string | null>(initial.faviconUrl);
+  const [logoPreview, setLogoPreview] = useState<string | null>(
+    initial.logoUrl,
+  );
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(
+    initial.faviconUrl,
+  );
   const formRef = useRef<HTMLFormElement>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -43,7 +56,8 @@ export function IdentitasSistemCard({ initial, isAdmin }: Props) {
           <div>
             <CardTitle>Identitas Sistem</CardTitle>
             <CardDescription>
-              Nama, singkatan, logo, dan favicon yang tampil di seluruh aplikasi.
+              Nama, singkatan, logo, dan favicon yang tampil di seluruh
+              aplikasi.
             </CardDescription>
           </div>
         </div>
@@ -62,7 +76,7 @@ export function IdentitasSistemCard({ initial, isAdmin }: Props) {
                   id="namaSistem"
                   name="namaSistem"
                   defaultValue={initial.namaSistem}
-                  placeholder="contoh: IAI Jakarta"
+                  placeholder="contoh: ARKA"
                   maxLength={200}
                   required
                 />
@@ -70,13 +84,15 @@ export function IdentitasSistemCard({ initial, isAdmin }: Props) {
               <div className="space-y-2">
                 <Label htmlFor="singkatan">
                   Singkatan{" "}
-                  <span className="text-xs font-normal text-muted-foreground">(opsional)</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (opsional)
+                  </span>
                 </Label>
                 <Input
                   id="singkatan"
                   name="singkatan"
                   defaultValue={initial.singkatan ?? ""}
-                  placeholder="contoh: IAI-JKT"
+                  placeholder="contoh: ARKA"
                   maxLength={20}
                 />
               </div>
@@ -136,7 +152,11 @@ function FileUploadField({
         <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/30">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt={`${label} preview`} className="h-full w-full object-contain" />
+            <img
+              src={preview}
+              alt={`${label} preview`}
+              className="h-full w-full object-contain"
+            />
           ) : (
             <Upload className="h-5 w-5 text-muted-foreground" />
           )}

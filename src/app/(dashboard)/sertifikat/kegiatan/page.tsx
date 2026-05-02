@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { EventManager } from "@/components/sertifikat/EventManager";
-import { listEventTemplateOptions, listEvents } from "@/server/actions/sertifikat/events";
+import {
+  listEventTemplateOptions,
+  listEvents,
+} from "@/server/actions/sertifikat/events";
 import { listSignatories } from "@/server/actions/sertifikat/signatories";
 
 export const metadata: Metadata = {
-  title: "Kegiatan Sertifikat | Manajemen Surat IAI Jakarta",
+  title: "Kegiatan Sertifikat | ARKA",
 };
 
 export default async function Page() {

@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const kelas = await getKelasOtomatisDetail(id);
   if (!kelas) return { title: "Kelas Tidak Ditemukan" };
   return {
-    title: `${kelas.namaKelas} | Jadwal Kelas | Manajemen Surat IAI Jakarta`,
+    title: `${kelas.namaKelas} | Jadwal Kelas | ARKA`,
   };
 }
 
@@ -34,15 +34,21 @@ export default async function Page({ params }: Props) {
 
   if (!kelas) notFound();
 
-  const [sessions, assignments, instructors, materiBlocks, linkedKelasUjian, session] =
-    await Promise.all([
-      getSessionsByKelas(id),
-      getAssignmentsByKelas(id),
-      listInstructors(),
-      getMateriBlocksByProgram(kelas.programId),
-      getKelasUjianByPelatihan(id),
-      getSession(),
-    ]);
+  const [
+    sessions,
+    assignments,
+    instructors,
+    materiBlocks,
+    linkedKelasUjian,
+    session,
+  ] = await Promise.all([
+    getSessionsByKelas(id),
+    getAssignmentsByKelas(id),
+    listInstructors(),
+    getMateriBlocksByProgram(kelas.programId),
+    getKelasUjianByPelatihan(id),
+    getSession(),
+  ]);
 
   const role = (session?.user as { role?: string } | undefined)?.role;
   const canManage = role === "admin" || role === "staff";
@@ -57,7 +63,10 @@ export default async function Page({ params }: Props) {
   };
 
   return (
-    <PageWrapper title={kelas.namaKelas} description="Detail lengkap kelas pelatihan.">
+    <PageWrapper
+      title={kelas.namaKelas}
+      description="Detail lengkap kelas pelatihan."
+    >
       <Tabs defaultValue="informasi" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="informasi">Informasi Kelas</TabsTrigger>

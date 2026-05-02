@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { VerificationSearchForm } from "@/components/sertifikat/VerificationSearchForm";
 
 export const metadata: Metadata = {
-  title: "Verifikasi Dokumen | IAI Jakarta",
+  title: "Verifikasi Dokumen | ARKA",
 };
 
 export default function Page() {
@@ -38,14 +38,14 @@ export default function Page() {
             <div className="p-8 text-center text-slate-600">
               <p className="text-sm leading-6">
                 Masukkan nomor sertifikat untuk memastikan dokumen tercatat di
-                arsip elektronik IAI Wilayah DKI Jakarta.
+                arsip elektronik IAI Wilayah Jakarta.
               </p>
             </div>
           </CardContent>
         </Card>
 
         <footer className="mt-20 text-center text-sm font-medium text-slate-500">
-          &copy; {new Date().getFullYear()} IAI Wilayah DKI Jakarta.
+          &copy; {new Date().getFullYear()} IAI Wilayah Jakarta.
         </footer>
       </div>
     </main>

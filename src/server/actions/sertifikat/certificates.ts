@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { createHash } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
@@ -20,9 +20,12 @@ import {
   type TemplateFieldMap,
 } from "@/server/db/schema";
 import { requirePermission } from "../auth";
-import { checkSertifikatRateLimit, formatRetryAfter } from "@/lib/rate-limit/user-bucket";
+import {
+  checkSertifikatRateLimit,
+  formatRetryAfter,
+} from "@/lib/rate-limit/user-bucket";
 
-type TemplateKategori = typeof certificateTemplates.$inferSelect["kategori"];
+type TemplateKategori = (typeof certificateTemplates.$inferSelect)["kategori"];
 
 type PdfResult = {
   fileName: string;
@@ -52,7 +55,8 @@ function formatTanggalIndonesia(value: string) {
 }
 
 function buildVerificationUrl(noSertifikat: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "";
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "";
   return `${baseUrl}/verifikasi/${encodeURIComponent(noSertifikat)}`;
 }
 
@@ -67,8 +71,13 @@ function escapeHtml(value: string) {
 async function loadTemplateImage(imageUrl: string) {
   if (imageUrl.startsWith("/templates/")) {
     const bytes = await readFile(path.join(process.cwd(), "public", imageUrl));
-    const mime = imageUrl.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
-    return { bytes: new Uint8Array(bytes), mime: mime as "image/png" | "image/jpeg" };
+    const mime = imageUrl.toLowerCase().endsWith(".png")
+      ? "image/png"
+      : "image/jpeg";
+    return {
+      bytes: new Uint8Array(bytes),
+      mime: mime as "image/png" | "image/jpeg",
+    };
   }
 
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
@@ -76,7 +85,10 @@ async function loadTemplateImage(imageUrl: string) {
     if (!response.ok) throw new Error("Gagal membaca gambar template.");
     const contentType = response.headers.get("content-type") ?? "";
     const mime = contentType.includes("png") ? "image/png" : "image/jpeg";
-    return { bytes: new Uint8Array(await response.arrayBuffer()), mime: mime as "image/png" | "image/jpeg" };
+    return {
+      bytes: new Uint8Array(await response.arrayBuffer()),
+      mime: mime as "image/png" | "image/jpeg",
+    };
   }
 
   throw new Error("Lokasi gambar template tidak valid.");
@@ -111,7 +123,9 @@ async function resolveTemplate(event: {
   return defaultTemplate ?? null;
 }
 
-async function buildParticipantCertificate(participantId: number): Promise<PdfResult> {
+async function buildParticipantCertificate(
+  participantId: number,
+): Promise<PdfResult> {
   const [row] = await db
     .select({
       participantId: participants.id,
@@ -144,7 +158,9 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
 
   const template = await resolveTemplate(row);
   if (!template) {
-    throw new Error("Belum ada template untuk kategori ini. Silakan upload template di /sertifikat/template.");
+    throw new Error(
+      "Belum ada template untuk kategori ini. Silakan upload template di /sertifikat/template.",
+    );
   }
 
   const signatureRows = await db
@@ -158,10 +174,13 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
     .orderBy(asc(eventSignatories.urutan));
 
   const image = await loadTemplateImage(template.imageUrl);
-  const qrCodeDataUrl = await QRCode.toDataURL(buildVerificationUrl(row.noSertifikat), {
-    width: 512,
-    margin: 1,
-  });
+  const qrCodeDataUrl = await QRCode.toDataURL(
+    buildVerificationUrl(row.noSertifikat),
+    {
+      width: 512,
+      margin: 1,
+    },
+  );
   const tanggalKegiatan =
     row.tanggalMulai === row.tanggalSelesai
       ? formatTanggalIndonesia(row.tanggalMulai)
@@ -196,7 +215,11 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
   if (!isRevoked) {
     await db
       .update(participants)
-      .set({ lastPdfHash: pdfHash, lastPdfGeneratedAt: new Date(), updatedAt: new Date() })
+      .set({
+        lastPdfHash: pdfHash,
+        lastPdfGeneratedAt: new Date(),
+        updatedAt: new Date(),
+      })
       .where(eq(participants.id, row.participantId));
   }
 
@@ -215,14 +238,23 @@ async function buildParticipantCertificate(participantId: number): Promise<PdfRe
   };
 }
 
-export async function generateCertificatePdf(participantId: number): Promise<
-  { ok: true; data: { fileName: string; pdfBase64: string } } | { ok: false; error: string }
+export async function generateCertificatePdf(
+  participantId: number,
+): Promise<
+  | { ok: true; data: { fileName: string; pdfBase64: string } }
+  | { ok: false; error: string }
 > {
   const session = await requirePermission("sertifikat", "manage");
 
-  const limit = checkSertifikatRateLimit(session.user.id, "certificate_download");
+  const limit = checkSertifikatRateLimit(
+    session.user.id,
+    "certificate_download",
+  );
   if (!limit.ok) {
-    return { ok: false, error: `Terlalu banyak request download. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+    return {
+      ok: false,
+      error: `Terlalu banyak request download. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.`,
+    };
   }
 
   try {
@@ -232,22 +264,41 @@ export async function generateCertificatePdf(participantId: number): Promise<
       aksi: "GENERATE_CERTIFICATE_PDF",
       entitasType: "sertifikat_participant",
       entitasId: String(result.participantId),
-      detail: { noSertifikat: result.noSertifikat, pdfHash: result.pdfHash, isRevoked: result.isRevoked },
+      detail: {
+        noSertifikat: result.noSertifikat,
+        pdfHash: result.pdfHash,
+        isRevoked: result.isRevoked,
+      },
     });
-    return { ok: true, data: { fileName: result.fileName, pdfBase64: result.pdfBase64 } };
+    return {
+      ok: true,
+      data: { fileName: result.fileName, pdfBase64: result.pdfBase64 },
+    };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Gagal membuat PDF." };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Gagal membuat PDF.",
+    };
   }
 }
 
-export async function generateBulkCertificatesZip(eventId: number): Promise<
-  { ok: true; data: { fileName: string; zipBase64: string } } | { ok: false; error: string }
+export async function generateBulkCertificatesZip(
+  eventId: number,
+): Promise<
+  | { ok: true; data: { fileName: string; zipBase64: string } }
+  | { ok: false; error: string }
 > {
   const session = await requirePermission("sertifikat", "manage");
 
-  const limit = checkSertifikatRateLimit(session.user.id, "certificate_bulk_download");
+  const limit = checkSertifikatRateLimit(
+    session.user.id,
+    "certificate_bulk_download",
+  );
   if (!limit.ok) {
-    return { ok: false, error: `Terlalu banyak request bulk download. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+    return {
+      ok: false,
+      error: `Terlalu banyak request bulk download. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.`,
+    };
   }
 
   try {
@@ -287,7 +338,10 @@ export async function generateBulkCertificatesZip(eventId: number): Promise<
       },
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Gagal membuat ZIP." };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Gagal membuat ZIP.",
+    };
   }
 }
 
@@ -297,7 +351,8 @@ async function sendCertificateEmailInternal(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const certificate = await buildParticipantCertificate(participantId);
-    if (!certificate.email) return { ok: false, error: "Peserta belum punya email." };
+    if (!certificate.email)
+      return { ok: false, error: "Peserta belum punya email." };
 
     const verificationUrl = buildVerificationUrl(certificate.noSertifikat);
     const escapedName = escapeHtml(certificate.namaPeserta);
@@ -313,14 +368,14 @@ async function sendCertificateEmailInternal(
         <p>Terlampir sertifikat untuk kegiatan <strong>${escapedEvent}</strong> yang diselenggarakan pada ${escapeHtml(certificate.tanggalKegiatan)}.</p>
         <p><strong>Nomor sertifikat:</strong> ${escapedNo}</p>
         <p>Verifikasi sertifikat dapat dilakukan melalui tautan berikut:<br/><a href="${verificationUrl}">${verificationUrl}</a></p>
-        <p>Hormat kami,<br/>IAI Wilayah DKI Jakarta</p>
+        <p>Hormat kami,<br/>IAI Wilayah Jakarta</p>
       `,
       textBody: [
         `Yth. ${certificate.namaPeserta},`,
         `Terlampir sertifikat untuk kegiatan ${certificate.namaKegiatan}.`,
         `Nomor sertifikat: ${certificate.noSertifikat}`,
         `Verifikasi: ${verificationUrl}`,
-        `IAI Wilayah DKI Jakarta`,
+        `IAI Wilayah Jakarta`,
       ].join("\n"),
       attachments: [
         {
@@ -341,35 +396,55 @@ async function sendCertificateEmailInternal(
       aksi: "SEND_CERTIFICATE_EMAIL",
       entitasType: "sertifikat_participant",
       entitasId: String(participantId),
-      detail: { noSertifikat: certificate.noSertifikat, email: certificate.email },
+      detail: {
+        noSertifikat: certificate.noSertifikat,
+        email: certificate.email,
+      },
     });
 
     revalidatePath(`/sertifikat/kegiatan/${certificate.eventId}`);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Gagal mengirim email." };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Gagal mengirim email.",
+    };
   }
 }
 
-export async function sendCertificateEmail(participantId: number): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendCertificateEmail(
+  participantId: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await requirePermission("sertifikat", "manage");
 
   const limit = checkSertifikatRateLimit(session.user.id, "certificate_email");
   if (!limit.ok) {
-    return { ok: false, error: `Terlalu banyak request email. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+    return {
+      ok: false,
+      error: `Terlalu banyak request email. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.`,
+    };
   }
 
   return sendCertificateEmailInternal(participantId, session.user.id);
 }
 
-export async function sendBulkCertificateEmails(eventId: number): Promise<
-  { ok: true; data: { sent: number; skipped: number; failed: number } } | { ok: false; error: string }
+export async function sendBulkCertificateEmails(
+  eventId: number,
+): Promise<
+  | { ok: true; data: { sent: number; skipped: number; failed: number } }
+  | { ok: false; error: string }
 > {
   const session = await requirePermission("sertifikat", "manage");
 
-  const limit = checkSertifikatRateLimit(session.user.id, "certificate_bulk_email");
+  const limit = checkSertifikatRateLimit(
+    session.user.id,
+    "certificate_bulk_email",
+  );
   if (!limit.ok) {
-    return { ok: false, error: `Terlalu banyak request bulk email. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.` };
+    return {
+      ok: false,
+      error: `Terlalu banyak request bulk email. Coba lagi dalam ${formatRetryAfter(limit.retryAfterMs)}.`,
+    };
   }
 
   const rows = await db

@@ -88,10 +88,7 @@ export const statusEventEnum = pgEnum("status_event", [
   "arsip",
 ]);
 
-export const statusPesertaEnum = pgEnum("status_peserta", [
-  "aktif",
-  "dicabut",
-]);
+export const statusPesertaEnum = pgEnum("status_peserta", ["aktif", "dicabut"]);
 
 export type TemplateFieldKey =
   | "namaPeserta"
@@ -122,7 +119,9 @@ export type TemplateFieldPosition = {
   align: "left" | "center" | "right";
 };
 
-export type TemplateFieldMap = Partial<Record<TemplateFieldKey, TemplateFieldPosition>>;
+export type TemplateFieldMap = Partial<
+  Record<TemplateFieldKey, TemplateFieldPosition>
+>;
 
 // ─── DIVISI ──────────────────────────────────────────────────────────────────
 
@@ -519,7 +518,7 @@ export const auditLog = pgTable("audit_log", {
 
 export const systemSettings = pgTable("system_settings", {
   id: serial("id").primaryKey(),
-  namaSistem: varchar("nama_sistem", { length: 200 }).notNull().default("IAI Jakarta"),
+  namaSistem: varchar("nama_sistem", { length: 200 }).notNull().default("ARKA"),
   singkatan: varchar("singkatan", { length: 20 }),
   logoUrl: text("logo_url"),
   faviconUrl: text("favicon_url"),
@@ -573,18 +572,38 @@ export const notificationPreferences = pgTable("notification_preferences", {
     .unique(),
   // In-app notification toggles
   inAppDisposisiBaru: boolean("in_app_disposisi_baru").default(true).notNull(),
-  inAppDisposisiDeadline: boolean("in_app_disposisi_deadline").default(true).notNull(),
-  inAppSuratKeluarApproval: boolean("in_app_surat_keluar_approval").default(true).notNull(),
-  inAppSuratKeluarRevisi: boolean("in_app_surat_keluar_revisi").default(true).notNull(),
-  inAppSuratKeluarSelesai: boolean("in_app_surat_keluar_selesai").default(true).notNull(),
-  inAppSuratMasukBaru: boolean("in_app_surat_masuk_baru").default(true).notNull(),
+  inAppDisposisiDeadline: boolean("in_app_disposisi_deadline")
+    .default(true)
+    .notNull(),
+  inAppSuratKeluarApproval: boolean("in_app_surat_keluar_approval")
+    .default(true)
+    .notNull(),
+  inAppSuratKeluarRevisi: boolean("in_app_surat_keluar_revisi")
+    .default(true)
+    .notNull(),
+  inAppSuratKeluarSelesai: boolean("in_app_surat_keluar_selesai")
+    .default(true)
+    .notNull(),
+  inAppSuratMasukBaru: boolean("in_app_surat_masuk_baru")
+    .default(true)
+    .notNull(),
   // Email notification toggles
   emailDisposisiBaru: boolean("email_disposisi_baru").default(true).notNull(),
-  emailDisposisiDeadline: boolean("email_disposisi_deadline").default(true).notNull(),
-  emailSuratKeluarApproval: boolean("email_surat_keluar_approval").default(false).notNull(),
-  emailSuratKeluarRevisi: boolean("email_surat_keluar_revisi").default(false).notNull(),
-  emailSuratKeluarSelesai: boolean("email_surat_keluar_selesai").default(false).notNull(),
-  emailSuratMasukBaru: boolean("email_surat_masuk_baru").default(false).notNull(),
+  emailDisposisiDeadline: boolean("email_disposisi_deadline")
+    .default(true)
+    .notNull(),
+  emailSuratKeluarApproval: boolean("email_surat_keluar_approval")
+    .default(false)
+    .notNull(),
+  emailSuratKeluarRevisi: boolean("email_surat_keluar_revisi")
+    .default(false)
+    .notNull(),
+  emailSuratKeluarSelesai: boolean("email_surat_keluar_selesai")
+    .default(false)
+    .notNull(),
+  emailSuratMasukBaru: boolean("email_surat_masuk_baru")
+    .default(false)
+    .notNull(),
   // Reminder threshold (hari sebelum deadline)
   deadlineReminderDays: integer("deadline_reminder_days").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -713,7 +732,9 @@ export const participants = pgTable(
     role: varchar("role", { length: 50 }).default("Peserta").notNull(),
     email: varchar("email", { length: 150 }),
     emailSentAt: timestamp("email_sent_at"),
-    statusPeserta: statusPesertaEnum("status_peserta").default("aktif").notNull(),
+    statusPeserta: statusPesertaEnum("status_peserta")
+      .default("aktif")
+      .notNull(),
     revokedAt: timestamp("revoked_at"),
     revokedBy: text("revoked_by").references(() => users.id),
     revokeReason: text("revoke_reason"),
@@ -746,7 +767,9 @@ export const participantRevisions = pgTable(
     createdAt: timestamp("created_at").defaultNow(),
   },
   (t) => ({
-    participantIdx: index("participant_revisions_participant_idx").on(t.participantId),
+    participantIdx: index("participant_revisions_participant_idx").on(
+      t.participantId,
+    ),
   }),
 );
 
@@ -757,7 +780,7 @@ export const jadwalUjianConfig = pgTable(
   "jadwal_ujian_config",
   {
     id: text("id").primaryKey(),
-    jenis: varchar("jenis", { length: 20 }).notNull(),  // "program" | "tipe" | "mode"
+    jenis: varchar("jenis", { length: 20 }).notNull(), // "program" | "tipe" | "mode"
     nilai: varchar("nilai", { length: 100 }).notNull(),
     urutan: integer("urutan").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -781,8 +804,10 @@ export const kelasUjian = pgTable("kelas_ujian", {
   mode: varchar("mode", { length: 50 }).notNull(),
   lokasi: varchar("lokasi", { length: 300 }),
   catatan: text("catatan"),
-  kelasPelatihanId: text("kelas_pelatihan_id")
-    .references(() => kelasPelatihan.id, { onDelete: "set null" }),
+  kelasPelatihanId: text("kelas_pelatihan_id").references(
+    () => kelasPelatihan.id,
+    { onDelete: "set null" },
+  ),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -840,7 +865,9 @@ export const adminJaga = pgTable(
     konflik: boolean("konflik").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [uniqueIndex("uniq_admin_jaga_ujian_pengawas").on(t.ujianId, t.pengawasId)],
+  (t) => [
+    uniqueIndex("uniq_admin_jaga_ujian_pengawas").on(t.ujianId, t.pengawasId),
+  ],
 );
 
 export const jadwalAdminJaga = pgTable("jadwal_admin_jaga", {
@@ -934,7 +961,9 @@ export const userInvitationStatusEnum = pgEnum("user_invitation_status", [
 export const userInvitations = pgTable(
   "user_invitations",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     email: varchar("email", { length: 150 }).notNull(),
     namaLengkap: varchar("nama_lengkap", { length: 200 }).notNull(),
     role: roleEnum("role").default("staff").notNull(),
@@ -981,14 +1010,18 @@ export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type NewCalendarEvent = typeof calendarEvents.$inferInsert;
-export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
-export type NewNotificationPreferences = typeof notificationPreferences.$inferInsert;
+export type NotificationPreferences =
+  typeof notificationPreferences.$inferSelect;
+export type NewNotificationPreferences =
+  typeof notificationPreferences.$inferInsert;
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;
 export type CertificateTemplate = typeof certificateTemplates.$inferSelect;
 export type NewCertificateTemplate = typeof certificateTemplates.$inferInsert;
-export type EventCertificateCounter = typeof eventCertificateCounters.$inferSelect;
-export type NewEventCertificateCounter = typeof eventCertificateCounters.$inferInsert;
+export type EventCertificateCounter =
+  typeof eventCertificateCounters.$inferSelect;
+export type NewEventCertificateCounter =
+  typeof eventCertificateCounters.$inferInsert;
 export type Signatory = typeof signatories.$inferSelect;
 export type NewSignatory = typeof signatories.$inferInsert;
 export type EventSignatory = typeof eventSignatories.$inferSelect;
@@ -1024,25 +1057,29 @@ export type NewUserInvitation = typeof userInvitations.$inferInsert;
 // dengan sistem serial counter global yang berkesinambungan antar batch.
 
 export const certificatePrograms = pgTable("certificate_programs", {
-  id:        text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name:      varchar("name", { length: 200 }).notNull().unique(),
-  code:      varchar("code", { length: 50 }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: varchar("name", { length: 200 }).notNull().unique(),
+  code: varchar("code", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const certificateClassTypes = pgTable("certificate_class_types", {
-  id:        text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name:      varchar("name", { length: 200 }).notNull(),
-  code:      varchar("code", { length: 2 }).notNull().unique(), // "01", "02", "03"
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: varchar("name", { length: 200 }).notNull(),
+  code: varchar("code", { length: 2 }).notNull().unique(), // "01", "02", "03"
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Singleton config — hanya 1 baris: { key: 'last_serial_number', value: '0' }
 export const certificateSerialConfig = pgTable("certificate_serial_config", {
-  key:       text("key").primaryKey(),
-  value:     text("value").notNull(),
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -1055,22 +1092,28 @@ export const certificateBatchStatusEnum = pgEnum("certificate_batch_status", [
 export const certificateBatches = pgTable(
   "certificate_batches",
   {
-    id:                     text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-    programId:              text("program_id")
-                              .notNull()
-                              .references(() => certificatePrograms.id),
-    classTypeId:            text("class_type_id")
-                              .notNull()
-                              .references(() => certificateClassTypes.id),
-    angkatan:               integer("angkatan").notNull(),                // contoh: 223
-    quantityRequested:      integer("quantity_requested").notNull(),
-    firstCertificateNumber: varchar("first_certificate_number", { length: 50 }).notNull(),
-    lastCertificateNumber:  varchar("last_certificate_number", { length: 50 }).notNull(),
-    status:                 certificateBatchStatusEnum("status").default("active").notNull(),
-    notes:                  text("notes"),
-    createdBy:              text("created_by").references(() => users.id),
-    createdAt:              timestamp("created_at").defaultNow().notNull(),
-    updatedAt:              timestamp("updated_at").defaultNow().notNull(),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    programId: text("program_id")
+      .notNull()
+      .references(() => certificatePrograms.id),
+    classTypeId: text("class_type_id")
+      .notNull()
+      .references(() => certificateClassTypes.id),
+    angkatan: integer("angkatan").notNull(), // contoh: 223
+    quantityRequested: integer("quantity_requested").notNull(),
+    firstCertificateNumber: varchar("first_certificate_number", {
+      length: 50,
+    }).notNull(),
+    lastCertificateNumber: varchar("last_certificate_number", {
+      length: 50,
+    }).notNull(),
+    status: certificateBatchStatusEnum("status").default("active").notNull(),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
     index("cert_batches_program_idx").on(t.programId),
@@ -1087,16 +1130,18 @@ export const certificateItemStatusEnum = pgEnum("certificate_item_status", [
 export const certificateItems = pgTable(
   "certificate_items",
   {
-    id:            text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-    batchId:       text("batch_id")
-                     .notNull()
-                     .references(() => certificateBatches.id, { onDelete: "cascade" }),
-    fullNumber:    varchar("full_number", { length: 50 }).notNull().unique(), // "22301.3386"
-    angkatan:      integer("angkatan").notNull(),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => certificateBatches.id, { onDelete: "cascade" }),
+    fullNumber: varchar("full_number", { length: 50 }).notNull().unique(), // "22301.3386"
+    angkatan: integer("angkatan").notNull(),
     classTypeCode: varchar("class_type_code", { length: 2 }).notNull(),
-    serialNumber:  integer("serial_number").notNull(),
-    status:        certificateItemStatusEnum("status").default("active").notNull(),
-    createdAt:     timestamp("created_at").defaultNow().notNull(),
+    serialNumber: integer("serial_number").notNull(),
+    status: certificateItemStatusEnum("status").default("active").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
     index("cert_items_batch_idx").on(t.batchId),
@@ -1116,7 +1161,9 @@ export const classSessionStatusEnum = pgEnum("class_session_status", [
 ]);
 
 export const programs = pgTable("programs", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   code: varchar("code", { length: 20 }).notNull().unique(),
   name: varchar("name", { length: 100 }).notNull(),
   totalSessions: integer("total_sessions").notNull(),
@@ -1128,7 +1175,9 @@ export const programs = pgTable("programs", {
 
 // Tipe kelas yang tersedia: weekend_pagi, weekend_siang, weekday_selasa_kamis, weekday_senin_rabu_jumat
 export const classTypes = pgTable("class_types", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   code: varchar("code", { length: 30 }).notNull().unique(),
   name: varchar("name", { length: 100 }).notNull(),
   activeDays: varchar("active_days", { length: 100 }).notNull(), // "Sat,Sun" | "Tue,Thu" | "Mon,Wed,Fri"
@@ -1143,7 +1192,9 @@ export const classTypes = pgTable("class_types", {
 export const curriculumTemplate = pgTable(
   "curriculum_template",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     programId: text("program_id")
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
@@ -1152,16 +1203,16 @@ export const curriculumTemplate = pgTable(
     materiName: varchar("materi_name", { length: 200 }).notNull(),
     slot: integer("slot").notNull(), // 1 atau 2
   },
-  (t) => [
-    index("ct_program_session").on(t.programId, t.sessionNumber),
-  ],
+  (t) => [index("ct_program_session").on(t.programId, t.sessionNumber)],
 );
 
 // Definisi titik ujian per program
 export const curriculumExamPoints = pgTable(
   "curriculum_exam_points",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     programId: text("program_id")
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
@@ -1171,16 +1222,16 @@ export const curriculumExamPoints = pgTable(
     examSubjects: text("exam_subjects").array().notNull(),
     hasExam: boolean("has_exam").default(true).notNull(),
   },
-  (t) => [
-    index("cep_program_session").on(t.programId, t.afterSessionNumber),
-  ],
+  (t) => [index("cep_program_session").on(t.programId, t.afterSessionNumber)],
 );
 
 // Libur nasional
 export const nationalHolidays = pgTable(
   "national_holidays",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     date: date("date").notNull(),
     name: varchar("name", { length: 200 }).notNull(),
     year: integer("year").notNull(),
@@ -1193,7 +1244,9 @@ export const nationalHolidays = pgTable(
 
 // Kelas pelatihan (bukan kelas ujian dari jadwal_ujian module)
 export const kelasPelatihan = pgTable("kelas_pelatihan", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   namaKelas: varchar("nama_kelas", { length: 200 }).notNull(),
   programId: text("program_id")
     .notNull()
@@ -1214,23 +1267,25 @@ export const kelasPelatihan = pgTable("kelas_pelatihan", {
 export const classExcludedDates = pgTable(
   "class_excluded_dates",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     kelasId: text("kelas_id")
       .notNull()
       .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
     reason: varchar("reason", { length: 200 }),
   },
-  (t) => [
-    uniqueIndex("uniq_kelas_excluded_date").on(t.kelasId, t.date),
-  ],
+  (t) => [uniqueIndex("uniq_kelas_excluded_date").on(t.kelasId, t.date)],
 );
 
 // Sesi kelas yang di-generate
 export const classSessions = pgTable(
   "class_sessions",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     kelasId: text("kelas_id")
       .notNull()
       .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
@@ -1258,7 +1313,9 @@ export const classSessions = pgTable(
 export const makeupSessions = pgTable(
   "makeup_sessions",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     originalSessionId: text("original_session_id")
       .notNull()
       .references(() => classSessions.id, { onDelete: "cascade" }),
@@ -1290,7 +1347,9 @@ export const makeupSessions = pgTable(
 // ─── INSTRUKTUR (Phase 2) ─────────────────────────────────────────────────────
 
 export const instructors = pgTable("instructors", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: varchar("name", { length: 200 }).notNull(),
   email: varchar("email", { length: 150 }),
   phone: varchar("phone", { length: 30 }),
@@ -1303,7 +1362,9 @@ export const instructors = pgTable("instructors", {
 export const instructorExpertise = pgTable(
   "instructor_expertise",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     instructorId: text("instructor_id")
       .notNull()
       .references(() => instructors.id, { onDelete: "cascade" }),
@@ -1314,7 +1375,11 @@ export const instructorExpertise = pgTable(
     level: varchar("level", { length: 20 }).default("middle").notNull(),
   },
   (t) => [
-    uniqueIndex("uniq_instructor_expertise").on(t.instructorId, t.programId, t.materiBlock),
+    uniqueIndex("uniq_instructor_expertise").on(
+      t.instructorId,
+      t.programId,
+      t.materiBlock,
+    ),
     index("ie_program_block").on(t.programId, t.materiBlock),
   ],
 );
@@ -1323,7 +1388,9 @@ export const instructorExpertise = pgTable(
 export const instructorUnavailability = pgTable(
   "instructor_unavailability",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     instructorId: text("instructor_id")
       .notNull()
       .references(() => instructors.id, { onDelete: "cascade" }),
@@ -1340,15 +1407,18 @@ export const instructorUnavailability = pgTable(
 export const sessionAssignments = pgTable(
   "session_assignments",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     sessionId: text("session_id")
       .notNull()
       .references(() => classSessions.id, { onDelete: "cascade" }),
     plannedInstructorId: text("planned_instructor_id")
       .notNull()
       .references(() => instructors.id),
-    actualInstructorId: text("actual_instructor_id")
-      .references(() => instructors.id),
+    actualInstructorId: text("actual_instructor_id").references(
+      () => instructors.id,
+    ),
     substitutionReason: varchar("substitution_reason", { length: 300 }),
     availabilityStatus: varchar("availability_status", { length: 30 })
       .default("pending_wa_confirmation")
@@ -1359,7 +1429,10 @@ export const sessionAssignments = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("uniq_session_instructor").on(t.sessionId, t.plannedInstructorId),
+    uniqueIndex("uniq_session_instructor").on(
+      t.sessionId,
+      t.plannedInstructorId,
+    ),
     index("sa_instructor_idx").on(t.plannedInstructorId),
     index("sa_actual_instructor_idx").on(t.actualInstructorId),
   ],
@@ -1369,7 +1442,9 @@ export const sessionAssignments = pgTable(
 export const instructorRates = pgTable(
   "instructor_rates",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     instructorId: text("instructor_id")
       .notNull()
       .references(() => instructors.id, { onDelete: "cascade" }),
@@ -1383,7 +1458,12 @@ export const instructorRates = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("uniq_instructor_rate").on(t.instructorId, t.programId, t.materiBlock, t.mode),
+    uniqueIndex("uniq_instructor_rate").on(
+      t.instructorId,
+      t.programId,
+      t.materiBlock,
+      t.mode,
+    ),
     index("ir_instructor_idx").on(t.instructorId),
     index("ir_program_idx").on(t.programId),
   ],
@@ -1393,17 +1473,27 @@ export const instructorRates = pgTable(
 export const honorariumRateRules = pgTable(
   "honorarium_rate_rules",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     programId: text("program_id")
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
     level: varchar("level", { length: 20 }).notNull(), // basic | middle | senior
     mode: varchar("mode", { length: 10 }).notNull(), // online | offline
-    honorPerSession: numeric("honor_per_session", { precision: 12, scale: 2 }).notNull(),
-    transportAmount: numeric("transport_amount", { precision: 12, scale: 2 }).notNull(),
+    honorPerSession: numeric("honor_per_session", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    transportAmount: numeric("transport_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
     effectiveFrom: date("effective_from").notNull(),
     effectiveTo: date("effective_to"),
-    locationScope: varchar("location_scope", { length: 200 }).default("").notNull(),
+    locationScope: varchar("location_scope", { length: 200 })
+      .default("")
+      .notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     notes: varchar("notes", { length: 300 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1427,8 +1517,12 @@ export const honorariumRateRules = pgTable(
 export const honorariumBatches = pgTable(
   "honorarium_batches",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-    documentNumber: varchar("document_number", { length: 80 }).notNull().unique(),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    documentNumber: varchar("document_number", { length: 80 })
+      .notNull()
+      .unique(),
     periodStart: date("period_start").notNull(),
     periodEnd: date("period_end").notNull(),
     status: varchar("status", { length: 40 }).default("draft").notNull(),
@@ -1453,7 +1547,9 @@ export const honorariumBatches = pgTable(
 export const honorariumItems = pgTable(
   "honorarium_items",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     batchId: text("batch_id")
       .notNull()
       .references(() => honorariumBatches.id, { onDelete: "cascade" }),
@@ -1473,18 +1569,26 @@ export const honorariumItems = pgTable(
     paidInstructorId: text("paid_instructor_id")
       .notNull()
       .references(() => instructors.id),
-    paidInstructorName: varchar("paid_instructor_name", { length: 200 }).notNull(),
+    paidInstructorName: varchar("paid_instructor_name", {
+      length: 200,
+    }).notNull(),
     source: varchar("source", { length: 20 }).notNull(), // planned | actual
     materiBlock: varchar("materi_block", { length: 100 }).notNull(),
     expertiseLevelSnapshot: varchar("expertise_level_snapshot", { length: 20 })
       .default("middle")
       .notNull(),
-    rateSnapshot: numeric("rate_snapshot", { precision: 12, scale: 2 }).notNull(),
+    rateSnapshot: numeric("rate_snapshot", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("uniq_honorarium_batch_assignment").on(t.batchId, t.assignmentId),
+    uniqueIndex("uniq_honorarium_batch_assignment").on(
+      t.batchId,
+      t.assignmentId,
+    ),
     index("hi_batch_idx").on(t.batchId),
     index("hi_instructor_idx").on(t.paidInstructorId),
     index("hi_date_idx").on(t.scheduledDate),
@@ -1495,7 +1599,9 @@ export const honorariumItems = pgTable(
 export const honorariumDeductions = pgTable(
   "honorarium_deductions",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     batchId: text("batch_id")
       .notNull()
       .references(() => honorariumBatches.id, { onDelete: "cascade" }),
@@ -1517,7 +1623,9 @@ export const honorariumDeductions = pgTable(
 export const honorariumAuditLogs = pgTable(
   "honorarium_audit_logs",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     batchId: text("batch_id")
       .notNull()
       .references(() => honorariumBatches.id, { onDelete: "cascade" }),
@@ -1535,33 +1643,42 @@ export const honorariumAuditLogs = pgTable(
 // ─── TABEL PESERTA KELAS (Peserta & Nilai — Program Pelatihan) ──────────────
 
 // 1. Enrollment peserta per kelas pelatihan + cached status
-export const pesertaKelas = pgTable("peserta_kelas", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  kelasId: text("kelas_id")
-    .notNull()
-    .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
-  nama: varchar("nama", { length: 200 }).notNull(),
-  nomorPeserta: varchar("nomor_peserta", { length: 50 }),
-  email: varchar("email", { length: 150 }),
-  telepon: varchar("telepon", { length: 30 }),
-  catatan: text("catatan"),
-  statusEnrollment: varchar("status_enrollment", { length: 20 })
-    .default("aktif").notNull(),
-  statusAkhir: varchar("status_akhir", { length: 30 }),
-  alasanStatus: varchar("alasan_status", { length: 50 }),
-  statusComputedAt: timestamp("status_computed_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (t) => [
-  index("pk_kelas_idx").on(t.kelasId),
-  index("pk_status_akhir_idx").on(t.statusAkhir),
-]);
+export const pesertaKelas = pgTable(
+  "peserta_kelas",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    kelasId: text("kelas_id")
+      .notNull()
+      .references(() => kelasPelatihan.id, { onDelete: "cascade" }),
+    nama: varchar("nama", { length: 200 }).notNull(),
+    nomorPeserta: varchar("nomor_peserta", { length: 50 }),
+    email: varchar("email", { length: 150 }),
+    telepon: varchar("telepon", { length: 30 }),
+    catatan: text("catatan"),
+    statusEnrollment: varchar("status_enrollment", { length: 20 })
+      .default("aktif")
+      .notNull(),
+    statusAkhir: varchar("status_akhir", { length: 30 }),
+    alasanStatus: varchar("alasan_status", { length: 50 }),
+    statusComputedAt: timestamp("status_computed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("pk_kelas_idx").on(t.kelasId),
+    index("pk_status_akhir_idx").on(t.statusAkhir),
+  ],
+);
 
 // 2. Absensi kehadiran pelatihan per sesi per peserta
 export const absensiPelatihan = pgTable(
   "absensi_pelatihan",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     pesertaId: text("peserta_id")
       .notNull()
       .references(() => pesertaKelas.id, { onDelete: "cascade" }),
@@ -1584,7 +1701,9 @@ export const absensiPelatihan = pgTable(
 export const absensiUjian = pgTable(
   "absensi_ujian",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     pesertaId: text("peserta_id")
       .notNull()
       .references(() => pesertaKelas.id, { onDelete: "cascade" }),
@@ -1607,7 +1726,9 @@ export const absensiUjian = pgTable(
 export const nilaiUjian = pgTable(
   "nilai_ujian",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     pesertaId: text("peserta_id")
       .notNull()
       .references(() => pesertaKelas.id, { onDelete: "cascade" }),
@@ -1624,7 +1745,10 @@ export const nilaiUjian = pgTable(
   },
   (t) => [
     uniqueIndex("uniq_nilai_peserta_ujian_mapel").on(
-      t.pesertaId, t.jadwalUjianId, t.mataPelajaran, t.isPerbaikan
+      t.pesertaId,
+      t.jadwalUjianId,
+      t.mataPelajaran,
+      t.isPerbaikan,
     ),
     index("nilai_ujian_peserta_idx").on(t.pesertaId),
     index("nilai_ujian_jadwal_idx").on(t.jadwalUjianId),
@@ -1632,29 +1756,35 @@ export const nilaiUjian = pgTable(
 );
 
 // 5. Ujian susulan peserta
-export const ujianSusulanPeserta = pgTable("ujian_susulan_peserta", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  pesertaId: text("peserta_id")
-    .notNull()
-    .references(() => pesertaKelas.id, { onDelete: "cascade" }),
-  jadwalUjianOriginalId: text("jadwal_ujian_original_id")
-    .notNull()
-    .references(() => jadwalUjian.id),
-  tanggalUsulan: date("tanggal_usulan"),
-  tanggalDisepakati: date("tanggal_disepakati"),
-  jamMulai: varchar("jam_mulai", { length: 5 }),
-  jamSelesai: varchar("jam_selesai", { length: 5 }),
-  status: varchar("status", { length: 20 }).default("pending").notNull(),
-  alasanPermohonan: text("alasan_permohonan"),
-  catatanAdmin: text("catatan_admin"),
-  approvedBy: text("approved_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (t) => [
-  index("usp_peserta_idx").on(t.pesertaId),
-  index("usp_original_jadwal_idx").on(t.jadwalUjianOriginalId),
-  index("usp_status_idx").on(t.status),
-]);
+export const ujianSusulanPeserta = pgTable(
+  "ujian_susulan_peserta",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    pesertaId: text("peserta_id")
+      .notNull()
+      .references(() => pesertaKelas.id, { onDelete: "cascade" }),
+    jadwalUjianOriginalId: text("jadwal_ujian_original_id")
+      .notNull()
+      .references(() => jadwalUjian.id),
+    tanggalUsulan: date("tanggal_usulan"),
+    tanggalDisepakati: date("tanggal_disepakati"),
+    jamMulai: varchar("jam_mulai", { length: 5 }),
+    jamSelesai: varchar("jam_selesai", { length: 5 }),
+    status: varchar("status", { length: 20 }).default("pending").notNull(),
+    alasanPermohonan: text("alasan_permohonan"),
+    catatanAdmin: text("catatan_admin"),
+    approvedBy: text("approved_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("usp_peserta_idx").on(t.pesertaId),
+    index("usp_original_jadwal_idx").on(t.jadwalUjianOriginalId),
+    index("usp_status_idx").on(t.status),
+  ],
+);
 
 // ─── TYPE EXPORTS (Peserta & Nilai) ──────────────────────────────────────────
 
@@ -1693,8 +1823,10 @@ export type Instructor = typeof instructors.$inferSelect;
 export type NewInstructor = typeof instructors.$inferInsert;
 export type InstructorExpertise = typeof instructorExpertise.$inferSelect;
 export type NewInstructorExpertise = typeof instructorExpertise.$inferInsert;
-export type InstructorUnavailability = typeof instructorUnavailability.$inferSelect;
-export type NewInstructorUnavailability = typeof instructorUnavailability.$inferInsert;
+export type InstructorUnavailability =
+  typeof instructorUnavailability.$inferSelect;
+export type NewInstructorUnavailability =
+  typeof instructorUnavailability.$inferInsert;
 export type SessionAssignment = typeof sessionAssignments.$inferSelect;
 export type NewSessionAssignment = typeof sessionAssignments.$inferInsert;
 export type InstructorRate = typeof instructorRates.$inferSelect;

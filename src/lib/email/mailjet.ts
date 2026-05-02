@@ -1,4 +1,5 @@
 import Mailjet from "node-mailjet";
+import { APP_BRAND_FULL_NAME } from "@/lib/branding";
 import { env } from "@/lib/env";
 
 let client: ReturnType<typeof Mailjet.apiConnect> | null = null;
@@ -30,30 +31,31 @@ export type EmailPayload = {
 export async function sendEmail(payload: EmailPayload): Promise<void> {
   const mj = getClient();
   if (!mj) {
-    console.warn("[mailjet] Env kosong — email tidak dikirim:", payload.subject);
+    console.warn(
+      "[mailjet] Env kosong — email tidak dikirim:",
+      payload.subject,
+    );
     return;
   }
-  await mj
-    .post("send", { version: "v3.1" })
-    .request({
-      Messages: [
-        {
-          From: {
-            Email: env.MAILJET_FROM_EMAIL,
-            Name: env.MAILJET_FROM_NAME,
-          },
-          To: [{ Email: payload.to, Name: payload.toName ?? payload.to }],
-          Subject: payload.subject,
-          HTMLPart: payload.htmlBody,
-          TextPart: payload.textBody,
-          Attachments: payload.attachments?.map((attachment) => ({
-            ContentType: attachment.contentType,
-            Filename: attachment.filename,
-            Base64Content: attachment.base64Content,
-          })),
+  await mj.post("send", { version: "v3.1" }).request({
+    Messages: [
+      {
+        From: {
+          Email: env.MAILJET_FROM_EMAIL,
+          Name: env.MAILJET_FROM_NAME,
         },
-      ],
-    });
+        To: [{ Email: payload.to, Name: payload.toName ?? payload.to }],
+        Subject: payload.subject,
+        HTMLPart: payload.htmlBody,
+        TextPart: payload.textBody,
+        Attachments: payload.attachments?.map((attachment) => ({
+          ContentType: attachment.contentType,
+          Filename: attachment.filename,
+          Base64Content: attachment.base64Content,
+        })),
+      },
+    ],
+  });
 }
 
 // Template: undangan aktivasi akun untuk pegawai baru (set kata sandi pertama).
@@ -62,23 +64,23 @@ export function buildInviteEmail(args: {
   resetUrl: string;
   inviterName?: string | null;
 }): Pick<EmailPayload, "subject" | "htmlBody" | "textBody"> {
-  const subject = "Undangan Aktivasi Akun — Manajemen Surat IAI Jakarta";
+  const subject = `Undangan Aktivasi Akun - ${APP_BRAND_FULL_NAME}`;
   const inviterLine = args.inviterName
     ? `<p>Akun Anda dibuat oleh <strong>${args.inviterName}</strong>.</p>`
     : "";
   const htmlBody = `
     <p>Yth. ${args.namaLengkap},</p>
-    <p>Selamat datang di Sistem Manajemen Surat IAI Wilayah DKI Jakarta.</p>
+    <p>Selamat datang di ${APP_BRAND_FULL_NAME}.</p>
     ${inviterLine}
     <p>Silakan klik tombol di bawah untuk membuat kata sandi dan mengaktifkan akun Anda. Tautan ini berlaku terbatas (default 1 jam).</p>
     <p><a href="${args.resetUrl}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;border-radius:6px;text-decoration:none">Aktivasi Akun</a></p>
     <p>Jika tombol tidak berfungsi, salin URL berikut: <br/><a href="${args.resetUrl}">${args.resetUrl}</a></p>
     <p>Jika Anda tidak meminta akses ini, abaikan email ini.</p>
-    <p>— Sistem Manajemen Surat IAI Wilayah DKI Jakarta</p>
+    <p>- ${APP_BRAND_FULL_NAME}</p>
   `;
   const textBody = [
     `Yth. ${args.namaLengkap},`,
-    `Selamat datang di Sistem Manajemen Surat IAI Wilayah DKI Jakarta.`,
+    `Selamat datang di ${APP_BRAND_FULL_NAME}.`,
     args.inviterName ? `Akun Anda dibuat oleh ${args.inviterName}.` : "",
     `Aktivasi akun: ${args.resetUrl}`,
     `Jika Anda tidak meminta akses, abaikan email ini.`,
@@ -93,7 +95,7 @@ export function buildResetPasswordEmail(args: {
   namaLengkap: string;
   resetUrl: string;
 }): Pick<EmailPayload, "subject" | "htmlBody" | "textBody"> {
-  const subject = "Reset Kata Sandi — Manajemen Surat IAI Jakarta";
+  const subject = `Reset Kata Sandi - ${APP_BRAND_FULL_NAME}`;
   const htmlBody = `
     <p>Yth. ${args.namaLengkap},</p>
     <p>Kami menerima permintaan reset kata sandi untuk akun Anda.</p>
@@ -101,7 +103,7 @@ export function buildResetPasswordEmail(args: {
     <p><a href="${args.resetUrl}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;border-radius:6px;text-decoration:none">Reset Kata Sandi</a></p>
     <p>Jika tombol tidak berfungsi, salin URL berikut: <br/><a href="${args.resetUrl}">${args.resetUrl}</a></p>
     <p>Jika Anda tidak meminta reset, abaikan email ini — kata sandi Anda tetap aman.</p>
-    <p>— Sistem Manajemen Surat IAI Wilayah DKI Jakarta</p>
+    <p>- ${APP_BRAND_FULL_NAME}</p>
   `;
   const textBody = [
     `Yth. ${args.namaLengkap},`,
@@ -135,7 +137,7 @@ export function buildDisposisiEmail(args: {
     ${instruksiLine}
     ${batasWaktuLine}
     <p><a href="${args.inboxUrl}">Buka Inbox Disposisi</a></p>
-    <p>— Sistem Manajemen Surat IAI Wilayah DKI Jakarta</p>
+    <p>- ${APP_BRAND_FULL_NAME}</p>
   `;
   const textBody = [
     `Yth. ${args.penerimaNama},`,

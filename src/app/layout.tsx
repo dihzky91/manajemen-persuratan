@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import { APP_BRAND_DESCRIPTION } from "@/lib/branding";
 import { getSystemSettings } from "@/server/actions/systemSettings";
 import "@/styles/globals.css";
 
@@ -7,7 +8,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSystemSettings();
   return {
     title: settings.namaSistem,
-    description: "Sistem Manajemen Surat & Kepegawaian IAI Wilayah DKI Jakarta",
+    description: APP_BRAND_DESCRIPTION,
     ...(settings.faviconUrl && {
       icons: { icon: settings.faviconUrl },
     }),

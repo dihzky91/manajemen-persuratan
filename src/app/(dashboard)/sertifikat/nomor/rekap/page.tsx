@@ -8,8 +8,9 @@ import {
 } from "@/server/actions/sertifikat/nomor/batches";
 
 export const metadata: Metadata = {
-  title: "Rekap Tahunan Sertifikat | Manajemen Surat IAI Jakarta",
-  description: "Rekap statistik penomoran sertifikat per tahun, program, dan jenis kelas.",
+  title: "Rekap Tahunan Sertifikat | ARKA",
+  description:
+    "Rekap statistik penomoran sertifikat per tahun, program, dan jenis kelas.",
 };
 
 export default async function Page() {
@@ -32,7 +33,9 @@ export default async function Page() {
       description="Statistik penomoran sertifikat formal dikelompokkan per tahun, program, dan jenis kelas."
     >
       <YearlyReportView
-        availableYears={availableYears.length > 0 ? availableYears : [currentYear]}
+        availableYears={
+          availableYears.length > 0 ? availableYears : [currentYear]
+        }
         initialYear={initialYear}
         initialStats={initialStats}
         initialDetailStats={initialDetailStats}

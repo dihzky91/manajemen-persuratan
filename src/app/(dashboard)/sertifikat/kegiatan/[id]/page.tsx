@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { ParticipantManager } from "@/components/sertifikat/ParticipantManager";
-import { getEvent, getEventQuickStats } from "@/server/actions/sertifikat/events";
+import {
+  getEvent,
+  getEventQuickStats,
+} from "@/server/actions/sertifikat/events";
 import { listByEvent } from "@/server/actions/sertifikat/participants";
 
 export const metadata: Metadata = {
-  title: "Detail Kegiatan Sertifikat | Manajemen Surat IAI Jakarta",
+  title: "Detail Kegiatan Sertifikat | ARKA",
 };
 
 type PageProps = {
@@ -31,7 +34,11 @@ export default async function Page({ params }: PageProps) {
       title="Detail Kegiatan"
       description="Kelola peserta, import data, dan QR verifikasi untuk kegiatan ini."
     >
-      <ParticipantManager event={event} initialParticipants={participantList} initialStats={initialStats} />
+      <ParticipantManager
+        event={event}
+        initialParticipants={participantList}
+        initialStats={initialStats}
+      />
     </PageWrapper>
   );
 }

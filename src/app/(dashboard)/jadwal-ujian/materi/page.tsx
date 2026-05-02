@@ -6,7 +6,7 @@ import { listMateri } from "@/server/actions/jadwal-ujian/materi";
 import { getKonfigByJenis } from "@/server/actions/jadwal-ujian/config";
 
 export const metadata: Metadata = {
-  title: "Materi Ujian | Manajemen Surat IAI Jakarta",
+  title: "Materi Ujian | ARKA",
 };
 
 export default async function Page() {
@@ -23,7 +23,11 @@ export default async function Page() {
       title="Daftar Materi Ujian"
       description="Kelola master mata ujian yang tersedia saat membuat jadwal ujian."
     >
-      <MateriManager initialData={data} canManage={canManage} programOptions={programOptions} />
+      <MateriManager
+        initialData={data}
+        canManage={canManage}
+        programOptions={programOptions}
+      />
     </PageWrapper>
   );
 }

@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { CalendarDashboard } from "@/components/calendar/CalendarDashboard";
-import { getCalendarEvents, backfillCalendarEvents } from "@/server/actions/calendar";
+import {
+  getCalendarEvents,
+  backfillCalendarEvents,
+} from "@/server/actions/calendar";
 import { getSession } from "@/server/actions/auth";
 
 export const metadata: Metadata = {
-  title: "Kalender | Manajemen Surat IAI Jakarta",
+  title: "Kalender | ARKA",
 };
 
 export default async function CalendarPage() {

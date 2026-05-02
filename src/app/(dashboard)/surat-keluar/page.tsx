@@ -9,7 +9,7 @@ import {
 } from "@/server/actions/suratKeluar";
 
 export const metadata: Metadata = {
-  title: "Arsip Surat Keluar | Manajemen Surat IAI Jakarta",
+  title: "Arsip Surat Keluar | ARKA",
 };
 
 export default async function Page() {
@@ -20,8 +20,7 @@ export default async function Page() {
     listDivisiOptions(),
   ]);
 
-  const role =
-    (session?.user as { role?: string } | undefined)?.role ?? null;
+  const role = (session?.user as { role?: string } | undefined)?.role ?? null;
 
   return (
     <PageWrapper

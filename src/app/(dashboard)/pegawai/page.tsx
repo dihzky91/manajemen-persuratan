@@ -6,7 +6,7 @@ import { listDivisi } from "@/server/actions/divisi";
 import { getPegawaiById, listPegawai } from "@/server/actions/pegawai";
 
 export const metadata: Metadata = {
-  title: "Data Pegawai | Manajemen Surat IAI Jakarta",
+  title: "Data Pegawai | ARKA",
 };
 
 export default async function Page() {
@@ -26,16 +26,24 @@ export default async function Page() {
     }),
   );
 
-  const sessionUser = session?.user as { id?: string; role?: string } | undefined;
+  const sessionUser = session?.user as
+    | { id?: string; role?: string }
+    | undefined;
   const role = sessionUser?.role;
   const canManage = role === "admin";
   const currentUserId = sessionUser?.id ?? null;
 
   return (
-    <PageWrapper title="Data Pegawai" description="Daftar dan manajemen pegawai.">
+    <PageWrapper
+      title="Data Pegawai"
+      description="Daftar dan manajemen pegawai."
+    >
       <PegawaiManager
         initialData={detailRows}
-        divisiOptions={divisiRows.map((row) => ({ id: row.id, nama: row.nama }))}
+        divisiOptions={divisiRows.map((row) => ({
+          id: row.id,
+          nama: row.nama,
+        }))}
         canManage={canManage}
         currentUserId={currentUserId}
       />

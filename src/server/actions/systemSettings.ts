@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { systemSettings, auditLog } from "@/server/db/schema";
 import { systemSettingsUpdateSchema } from "@/lib/validators/systemSettings.schema";
+import { APP_BRAND_NAME } from "@/lib/branding";
 import { getCurrentUserAccess, requirePermission, getSession } from "./auth";
 import { getStorageProvider } from "@/lib/storage";
 import { env } from "@/lib/env";
@@ -25,7 +26,7 @@ export type SystemSettingsRow = {
 
 const FALLBACK: SystemSettingsRow = {
   id: 0,
-  namaSistem: process.env.NEXT_PUBLIC_APP_NAME ?? "IAI Jakarta",
+  namaSistem: process.env.NEXT_PUBLIC_APP_NAME ?? APP_BRAND_NAME,
   singkatan: null,
   logoUrl: "/iai-logo.png",
   faviconUrl: null,
@@ -100,19 +101,32 @@ export const getSystemSettings = cache(async (): Promise<SystemSettingsRow> => {
         singkatan: systemSettings.singkatan,
         logoUrl: systemSettings.logoUrl,
         faviconUrl: systemSettings.faviconUrl,
-        defaultDisposisiDeadlineDays: systemSettings.defaultDisposisiDeadlineDays,
+        defaultDisposisiDeadlineDays:
+          systemSettings.defaultDisposisiDeadlineDays,
         notificationEmailEnabled: systemSettings.notificationEmailEnabled,
         updatedAt: systemSettings.updatedAt,
       })
       .from(systemSettings)
       .limit(1);
-    return withResolvedAssetUrls(rows[0] ?? FALLBACK);
+    const settings = rows[0] ?? FALLBACK;
+    return withResolvedAssetUrls({
+      ...settings,
+      namaSistem:
+        settings.namaSistem === "IAI Jakarta"
+          ? APP_BRAND_NAME
+          : settings.namaSistem,
+    });
   } catch {
     return FALLBACK;
   }
 });
 
-const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+const ALLOWED_LOGO_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+];
 const ALLOWED_FAVICON_TYPES = [
   "image/x-icon",
   "image/vnd.microsoft.icon",
@@ -137,10 +151,16 @@ export async function updateSystemSettings(formData: FormData) {
   const logoFile = formData.get("logo") as File | null;
   if (logoFile && logoFile.size > 0) {
     if (!ALLOWED_LOGO_TYPES.includes(logoFile.type)) {
-      return { ok: false as const, error: "Format logo tidak didukung. Gunakan PNG, JPG, WebP, atau SVG." };
+      return {
+        ok: false as const,
+        error: "Format logo tidak didukung. Gunakan PNG, JPG, WebP, atau SVG.",
+      };
     }
     if (logoFile.size > maxBytes) {
-      return { ok: false as const, error: `Logo melebihi batas ${env.STORAGE_MAX_FILE_MB} MB.` };
+      return {
+        ok: false as const,
+        error: `Logo melebihi batas ${env.STORAGE_MAX_FILE_MB} MB.`,
+      };
     }
     const result = await storage.upload({
       body: Buffer.from(await logoFile.arrayBuffer()),
@@ -155,10 +175,16 @@ export async function updateSystemSettings(formData: FormData) {
   const faviconFile = formData.get("favicon") as File | null;
   if (faviconFile && faviconFile.size > 0) {
     if (!ALLOWED_FAVICON_TYPES.includes(faviconFile.type)) {
-      return { ok: false as const, error: "Format favicon tidak didukung. Gunakan ICO, PNG, atau SVG." };
+      return {
+        ok: false as const,
+        error: "Format favicon tidak didukung. Gunakan ICO, PNG, atau SVG.",
+      };
     }
     if (faviconFile.size > maxBytes) {
-      return { ok: false as const, error: `Favicon melebihi batas ${env.STORAGE_MAX_FILE_MB} MB.` };
+      return {
+        ok: false as const,
+        error: `Favicon melebihi batas ${env.STORAGE_MAX_FILE_MB} MB.`,
+      };
     }
     const result = await storage.upload({
       body: Buffer.from(await faviconFile.arrayBuffer()),
@@ -192,7 +218,10 @@ export async function updateSystemSettings(formData: FormData) {
       .returning({ id: systemSettings.id });
     rowId = rows[0]!.id;
   } else {
-    await db.update(systemSettings).set(updates).where(eq(systemSettings.id, existing[0]!.id));
+    await db
+      .update(systemSettings)
+      .set(updates)
+      .where(eq(systemSettings.id, existing[0]!.id));
     rowId = existing[0]!.id;
   }
 

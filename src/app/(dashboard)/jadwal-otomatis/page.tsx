@@ -8,7 +8,7 @@ import { listKelasOtomatis } from "@/server/actions/jadwal-otomatis/kelasOtomati
 import { getSession } from "@/server/actions/auth";
 
 export const metadata: Metadata = {
-  title: "Jadwal Otomatis | Manajemen Surat IAI Jakarta",
+  title: "Jadwal Otomatis | ARKA",
 };
 
 export default async function Page() {

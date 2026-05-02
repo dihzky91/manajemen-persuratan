@@ -4,7 +4,7 @@ import { BebanKerjaChart } from "@/components/jadwal-ujian/BebanKerjaChart";
 import { getBebanKerja } from "@/server/actions/jadwal-ujian/bebanKerja";
 
 export const metadata: Metadata = {
-  title: "Beban Kerja Pengawas | Manajemen Surat IAI Jakarta",
+  title: "Beban Kerja Pengawas | ARKA",
 };
 
 export default async function Page() {

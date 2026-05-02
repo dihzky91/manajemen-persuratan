@@ -5,7 +5,7 @@ import { listPrograms } from "@/server/actions/jadwal-otomatis/programs";
 import { listClassTypes } from "@/server/actions/jadwal-otomatis/classTypes";
 
 export const metadata: Metadata = {
-  title: "Buat Kelas Baru | Jadwal Otomatis | Manajemen Surat IAI Jakarta",
+  title: "Buat Kelas Baru | Jadwal Otomatis | ARKA",
 };
 
 export default async function Page() {

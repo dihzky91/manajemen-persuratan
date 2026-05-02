@@ -8,10 +8,16 @@ import { SistemStatusSection } from "@/components/pengaturan/SistemStatusSection
 import { ManajemenUserCard } from "@/components/pengaturan/ManajemenUserCard";
 import { RoleManagementCard } from "@/components/pengaturan/RoleManagementCard";
 import { PengaturanTabs } from "@/components/pengaturan/PengaturanTabs";
-import { getSystemSettings, getSessionRole } from "@/server/actions/systemSettings";
+import {
+  getSystemSettings,
+  getSessionRole,
+} from "@/server/actions/systemSettings";
 import { getMyProfile } from "@/server/actions/profile";
 import { getMyNotificationPreferences } from "@/server/actions/notificationPreferences";
-import { listInvitations, listUsersForManagement } from "@/server/actions/invitations";
+import {
+  listInvitations,
+  listUsersForManagement,
+} from "@/server/actions/invitations";
 import { listDivisi } from "@/server/actions/divisi";
 import {
   listCapabilityMetadata,
@@ -20,7 +26,7 @@ import {
 } from "@/server/actions/roles";
 
 export const metadata: Metadata = {
-  title: "Pengaturan | Manajemen Surat IAI Jakarta",
+  title: "Pengaturan | ARKA",
 };
 
 export default async function PengaturanPage() {
@@ -43,13 +49,24 @@ export default async function PengaturanPage() {
   let divisiOptions: Array<{ id: number; nama: string }> = [];
   let roleOptions: Awaited<ReturnType<typeof listRoleOptions>> = [];
   let roleRows: Awaited<ReturnType<typeof listRoleManagementRows>> = [];
-  let capabilityMetadata: Awaited<ReturnType<typeof listCapabilityMetadata>> | null = null;
+  let capabilityMetadata: Awaited<
+    ReturnType<typeof listCapabilityMetadata>
+  > | null = null;
 
   if (isAdmin) {
-    [invitations, userRows, divisiOptions, roleOptions, roleRows, capabilityMetadata] = await Promise.all([
+    [
+      invitations,
+      userRows,
+      divisiOptions,
+      roleOptions,
+      roleRows,
+      capabilityMetadata,
+    ] = await Promise.all([
       listInvitations(),
       listUsersForManagement(),
-      listDivisi().then((rows) => rows.map((r) => ({ id: r.id, nama: r.nama }))),
+      listDivisi().then((rows) =>
+        rows.map((r) => ({ id: r.id, nama: r.nama })),
+      ),
       listRoleOptions(),
       listRoleManagementRows(),
       listCapabilityMetadata(),
@@ -65,10 +82,7 @@ export default async function PengaturanPage() {
         profil={<ProfilAkunCard initial={profile} />}
         notifikasi={<NotifikasiPreferencesCard initial={notifPrefs} />}
         identitas={
-          <IdentitasSistemCard
-            initial={systemSettingsData}
-            isAdmin={isAdmin}
-          />
+          <IdentitasSistemCard initial={systemSettingsData} isAdmin={isAdmin} />
         }
         sistem={
           <SistemStatusSection

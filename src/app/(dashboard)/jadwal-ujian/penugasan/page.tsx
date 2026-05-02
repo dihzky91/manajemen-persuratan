@@ -5,7 +5,7 @@ import { listPengawas } from "@/server/actions/jadwal-ujian/pengawas";
 import { getPenugasanByPengawas } from "@/server/actions/jadwal-ujian/penugasan";
 
 export const metadata: Metadata = {
-  title: "Jadwal Pengawas | Manajemen Surat IAI Jakarta",
+  title: "Jadwal Pengawas | ARKA",
 };
 
 export default async function Page() {

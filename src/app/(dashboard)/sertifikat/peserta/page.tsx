@@ -4,7 +4,7 @@ import { GlobalParticipantSearch } from "@/components/sertifikat/GlobalParticipa
 import { searchAllParticipants } from "@/server/actions/sertifikat/participants";
 
 export const metadata: Metadata = {
-  title: "Cari Peserta | Manajemen Surat IAI Jakarta",
+  title: "Cari Peserta | ARKA",
 };
 
 export default async function Page() {

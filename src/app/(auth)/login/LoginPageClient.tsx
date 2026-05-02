@@ -16,6 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  APP_BRAND_NAME,
+  APP_BRAND_TAGLINE,
+  APP_ORGANIZATION_NAME,
+} from "@/lib/branding";
 
 const REMEMBER_KEY = "iaij.login.rememberedEmail";
 
@@ -103,7 +108,7 @@ export function LoginPageClient({
   const appName =
     systemIdentity.namaSistem ||
     process.env.NEXT_PUBLIC_APP_NAME ||
-    "Manajemen Surat IAI Jakarta";
+    APP_BRAND_NAME;
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "v1.0.0";
   const year = new Date().getFullYear();
 
@@ -144,7 +149,7 @@ export function LoginPageClient({
             {appName}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            IAI Wilayah DKI Jakarta
+            {APP_BRAND_TAGLINE}
           </p>
         </div>
 
@@ -278,7 +283,9 @@ export function LoginPageClient({
 
         {/* Footer */}
         <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-          <span>© {year} IAI Wilayah DKI Jakarta</span>
+          <span>
+            © {year} {APP_ORGANIZATION_NAME}
+          </span>
           <span className="font-mono">{appVersion}</span>
         </div>
       </div>

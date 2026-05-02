@@ -9,7 +9,7 @@ import {
 } from "@/server/actions/announcements";
 
 export const metadata: Metadata = {
-  title: "Pengumuman | Manajemen Surat IAI Jakarta",
+  title: "Pengumuman | ARKA",
 };
 
 export default async function Page() {

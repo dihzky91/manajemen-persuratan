@@ -6,7 +6,7 @@ import { listPegawaiReference } from "@/server/actions/pegawai";
 import { listPejabat } from "@/server/actions/pejabat";
 
 export const metadata: Metadata = {
-  title: "Pejabat Penandatangan | Manajemen Surat IAI Jakarta",
+  title: "Pejabat Penandatangan | ARKA",
 };
 
 export default async function Page() {
@@ -19,7 +19,10 @@ export default async function Page() {
   const canManage = role === "admin";
 
   return (
-    <PageWrapper title="Pejabat Penandatangan" description="Daftar pejabat penandatangan surat.">
+    <PageWrapper
+      title="Pejabat Penandatangan"
+      description="Daftar pejabat penandatangan surat."
+    >
       <PejabatManager
         initialData={data}
         canManage={canManage}

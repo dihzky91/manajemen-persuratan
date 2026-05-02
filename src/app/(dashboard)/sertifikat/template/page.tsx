@@ -4,7 +4,7 @@ import { TemplateManager } from "@/components/sertifikat/TemplateManager";
 import { listTemplates } from "@/server/actions/sertifikat/templates";
 
 export const metadata: Metadata = {
-  title: "Template Sertifikat | Manajemen Surat IAI Jakarta",
+  title: "Template Sertifikat | ARKA",
 };
 
 export default async function Page() {

@@ -1,11 +1,14 @@
-# Manajemen Persuratan
+# ARKA
 
-Sistem manajemen surat, kepegawaian, sertifikat, dan kegiatan internal untuk **IAI Wilayah DKI Jakarta**.  
-Dibangun dengan **Next.js App Router** — mendukung digitalisasi operasional organisasi secara end-to-end.
+**Aplikasi Ruang Kerja Administrasi**
+
+Platform internal untuk layanan, kolaborasi, dan tata kelola **IAI Wilayah Jakarta**.
+Dibangun dengan **Next.js App Router** untuk mendukung operasional organisasi secara end-to-end.
 
 ## Modul
 
 **Persuratan & Arsip**
+
 - Surat Keluar — workflow 5 tahap (draft → persetujuan → reviu → pengarsipan → selesai)
 - Surat Masuk + Disposisi berantai (chain/tree)
 - Surat Keputusan (SK)
@@ -14,11 +17,13 @@ Dibangun dengan **Next.js App Router** — mendukung digitalisasi operasional or
 - Pejabat Penandatangan
 
 **Kepegawaian**
+
 - Data Pegawai — 7 tab (profil, kelengkapan, keluarga, pendidikan, pekerjaan, kesehatan, integritas)
 - Divisi
 - QR Contact Pegawai (vCard)
 
 **Sertifikat & Kegiatan**
+
 - Event / Kegiatan — CRUD + filter + server-side pagination
 - Template Sertifikat — drag-drop editor visual (react-rnd)
 - Peserta — import bulk CSV/XLSX, QR per peserta, PDF, email
@@ -28,6 +33,7 @@ Dibangun dengan **Next.js App Router** — mendukung digitalisasi operasional or
 - Revokasi sertifikat + soft delete
 
 **Fitur Lain**
+
 - Jadwal Otomatis Brevet
 - Jadwal Ujian
 - Kalender Kegiatan
@@ -39,6 +45,7 @@ Dibangun dengan **Next.js App Router** — mendukung digitalisasi operasional or
 - Bulk nomor surat
 
 **Verifikasi Publik (QR)**
+
 - `/verifikasi/surat-keluar/[id]`
 - `/verifikasi/surat-keputusan/[id]`
 - `/verifikasi/surat-mou/[id]`
@@ -46,22 +53,22 @@ Dibangun dengan **Next.js App Router** — mendukung digitalisasi operasional or
 
 ## Tech Stack
 
-| Kategori | Teknologi |
-|---|---|
-| Framework | Next.js 16 (App Router), React 19, TypeScript strict |
-| Database | PostgreSQL (Neon), Drizzle ORM + Drizzle Kit |
-| Auth | Better Auth (session-based, RBAC: admin/pejabat/staff/viewer) |
-| UI | Tailwind CSS, shadcn/ui, Radix UI, Lucide Icons, Sonner |
-| Form | React Hook Form + Zod |
-| Table | TanStack Table (server-side pagination, filter, sorting) |
-| Charts | Recharts |
-| PDF | @react-pdf/renderer, pdf-lib, jspdf + jspdf-autotable |
-| QR | qrcode |
-| File | papaparse (CSV), xlsx (XLSX), jszip (ZIP) |
-| Upload | Cloudinary (production) / local storage (development) |
-| Email | Mailjet (node-mailjet) |
-| Editor | Tiptap (WYSIWYG) |
-| Date | date-fns |
+| Kategori  | Teknologi                                                     |
+| --------- | ------------------------------------------------------------- |
+| Framework | Next.js 16 (App Router), React 19, TypeScript strict          |
+| Database  | PostgreSQL (Neon), Drizzle ORM + Drizzle Kit                  |
+| Auth      | Better Auth (session-based, RBAC: admin/pejabat/staff/viewer) |
+| UI        | Tailwind CSS, shadcn/ui, Radix UI, Lucide Icons, Sonner       |
+| Form      | React Hook Form + Zod                                         |
+| Table     | TanStack Table (server-side pagination, filter, sorting)      |
+| Charts    | Recharts                                                      |
+| PDF       | @react-pdf/renderer, pdf-lib, jspdf + jspdf-autotable         |
+| QR        | qrcode                                                        |
+| File      | papaparse (CSV), xlsx (XLSX), jszip (ZIP)                     |
+| Upload    | Cloudinary (production) / local storage (development)         |
+| Email     | Mailjet (node-mailjet)                                        |
+| Editor    | Tiptap (WYSIWYG)                                              |
+| Date      | date-fns                                                      |
 
 ## Status
 

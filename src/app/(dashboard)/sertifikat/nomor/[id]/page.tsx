@@ -9,7 +9,7 @@ import { getBatch } from "@/server/actions/sertifikat/nomor/batches";
 import { requirePermission } from "@/server/actions/auth";
 
 export const metadata: Metadata = {
-  title: "Detail Batch Sertifikat | Manajemen Surat IAI Jakarta",
+  title: "Detail Batch Sertifikat | ARKA",
 };
 
 type PageProps = {
@@ -26,7 +26,8 @@ export default async function Page({ params }: PageProps) {
 
   if (!batch) notFound();
 
-  const userRole = ((session.user as { role?: string }).role ?? "staff") as string;
+  const userRole = ((session.user as { role?: string }).role ??
+    "staff") as string;
 
   return (
     <PageWrapper

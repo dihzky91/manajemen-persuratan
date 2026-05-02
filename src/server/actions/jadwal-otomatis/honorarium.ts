@@ -4,8 +4,14 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireCapability, requirePermission, requireRole, requireSession } from "@/server/actions/auth";
+import {
+  requireCapability,
+  requirePermission,
+  requireRole,
+  requireSession,
+} from "@/server/actions/auth";
 import { db } from "@/server/db";
+import { getTodayIsoInJakarta, APP_TIME_ZONE } from "@/lib/utils";
 import {
   classSessions,
   honorariumAuditLogs,
@@ -64,7 +70,13 @@ const listBatchFilterSchema = z.object({
   startDate: dateSchema.optional().or(z.literal("")),
   endDate: dateSchema.optional().or(z.literal("")),
   status: z
-    .enum(["draft", "dikirim_ke_keuangan", "diproses_keuangan", "dibayar", "locked"])
+    .enum([
+      "draft",
+      "dikirim_ke_keuangan",
+      "diproses_keuangan",
+      "dibayar",
+      "locked",
+    ])
     .optional()
     .or(z.literal("")),
   financeOnly: z.boolean().optional(),
@@ -77,8 +89,19 @@ const batchIdSchema = z.object({
 const markBatchPaidSchema = z.object({
   batchId: z.string().min(1),
   paidDate: dateSchema.optional(),
-  paymentReference: z.string().trim().min(1, "Referensi transfer wajib diisi.").max(200),
-  paymentAmount: z.number().finite().positive("Nominal pembayaran harus lebih dari 0."),
+  paymentReference: z
+    .string()
+    .trim()
+    .min(1, "Referensi transfer wajib diisi.")
+    .max(200),
+  paymentAmount: z
+    .number()
+    .finite()
+    .positive("Nominal pembayaran harus lebih dari 0."),
+});
+
+const correctBatchPaymentSchema = markBatchPaidSchema.extend({
+  reason: z.string().trim().min(1, "Alasan koreksi wajib diisi.").max(500),
 });
 
 const addDeductionSchema = z.object({
@@ -145,7 +168,8 @@ function defaultDateRange() {
   }).formatToParts(now);
   const partMap = new Map(parts.map((part) => [part.type, part.value]));
   const year = partMap.get("year") ?? String(now.getFullYear());
-  const month = partMap.get("month") ?? String(now.getMonth() + 1).padStart(2, "0");
+  const month =
+    partMap.get("month") ?? String(now.getMonth() + 1).padStart(2, "0");
   const day = partMap.get("day") ?? String(now.getDate()).padStart(2, "0");
 
   return {
@@ -169,7 +193,11 @@ type RateRuleCandidate = {
   locationScope: string;
 };
 
-function isDateWithinRange(dateValue: string, start: string, end: string | null) {
+function isDateWithinRange(
+  dateValue: string,
+  start: string,
+  end: string | null,
+) {
   if (dateValue < start) return false;
   if (end && dateValue > end) return false;
   return true;
@@ -196,7 +224,14 @@ function pickRateRule(
     if (rule.programId !== params.programId) return false;
     if (normalizeExpertiseLevel(rule.level) !== params.level) return false;
     if (rule.mode !== params.mode) return false;
-    if (!isDateWithinRange(params.scheduledDate, rule.effectiveFrom, rule.effectiveTo)) return false;
+    if (
+      !isDateWithinRange(
+        params.scheduledDate,
+        rule.effectiveFrom,
+        rule.effectiveTo,
+      )
+    )
+      return false;
     return matchLocationScope(params.lokasi, rule.locationScope);
   });
 
@@ -231,10 +266,16 @@ export async function listInstructorRates(instructorId: string) {
     .from(instructorRates)
     .innerJoin(programs, eq(instructorRates.programId, programs.id))
     .where(eq(instructorRates.instructorId, instructorId))
-    .orderBy(asc(programs.name), asc(instructorRates.materiBlock), asc(instructorRates.mode));
+    .orderBy(
+      asc(programs.name),
+      asc(instructorRates.materiBlock),
+      asc(instructorRates.mode),
+    );
 }
 
-export async function upsertInstructorRate(data: z.infer<typeof upsertRateSchema>) {
+export async function upsertInstructorRate(
+  data: z.infer<typeof upsertRateSchema>,
+) {
   await requirePermission("jadwalUjian", "manage");
   const parsed = upsertRateSchema.parse(data);
 
@@ -326,7 +367,9 @@ export async function listHonorariumRateRules(programId?: string) {
   }));
 }
 
-export async function upsertHonorariumRateRule(data: z.infer<typeof upsertRateRuleSchema>) {
+export async function upsertHonorariumRateRule(
+  data: z.infer<typeof upsertRateRuleSchema>,
+) {
   await requirePermission("jadwalUjian", "manage");
   const parsed = upsertRateRuleSchema.parse(data);
 
@@ -399,7 +442,11 @@ export type HonorariumReportRow = {
   paidInstructorId: string;
   paidInstructorName: string;
   source: "planned" | "actual";
-  availabilityStatus: "pending_wa_confirmation" | "accepted" | "rejected" | "no_response";
+  availabilityStatus:
+    | "pending_wa_confirmation"
+    | "accepted"
+    | "rejected"
+    | "no_response";
   kelasMode: "online" | "offline";
   expertiseLevel: ExpertiseLevel;
   rateSource: "override_instructor" | "matrix_standard" | "missing";
@@ -416,7 +463,9 @@ export type HonorariumSummaryRow = {
   totalAmount: number;
 };
 
-export async function getHonorariumReport(filters?: z.infer<typeof reportFilterSchema>) {
+export async function getHonorariumReport(
+  filters?: z.infer<typeof reportFilterSchema>,
+) {
   await requirePermission("jadwalUjian", "view");
 
   const parsed = reportFilterSchema.parse(filters ?? {});
@@ -443,7 +492,10 @@ export async function getHonorariumReport(filters?: z.infer<typeof reportFilterS
       availabilityStatus: sessionAssignments.availabilityStatus,
     })
     .from(sessionAssignments)
-    .innerJoin(classSessions, eq(sessionAssignments.sessionId, classSessions.id))
+    .innerJoin(
+      classSessions,
+      eq(sessionAssignments.sessionId, classSessions.id),
+    )
     .innerJoin(kelasPelatihan, eq(classSessions.kelasId, kelasPelatihan.id))
     .innerJoin(programs, eq(kelasPelatihan.programId, programs.id))
     .where(
@@ -460,7 +512,8 @@ export async function getHonorariumReport(filters?: z.infer<typeof reportFilterS
     if (row.sessionStatus === "cancelled") return false;
 
     const paidInstructorId = row.actualInstructorId ?? row.plannedInstructorId;
-    if (parsed.instructorId && paidInstructorId !== parsed.instructorId) return false;
+    if (parsed.instructorId && paidInstructorId !== parsed.instructorId)
+      return false;
     if (parsed.programId && row.programId !== parsed.programId) return false;
     return true;
   });
@@ -490,63 +543,68 @@ export async function getHonorariumReport(filters?: z.infer<typeof reportFilterS
     ),
   );
 
-  const programIds = Array.from(new Set(filteredAssignments.map((row) => row.programId)));
+  const programIds = Array.from(
+    new Set(filteredAssignments.map((row) => row.programId)),
+  );
 
-  const [instructorRows, rateRows, expertiseRows, standardRateRows] = await Promise.all([
-    db
-      .select({ id: instructors.id, name: instructors.name })
-      .from(instructors)
-      .where(inArray(instructors.id, instructorIds)),
-    db
-      .select({
-        instructorId: instructorRates.instructorId,
-        programId: instructorRates.programId,
-        materiBlock: instructorRates.materiBlock,
-        mode: instructorRates.mode,
-        rateAmount: instructorRates.rateAmount,
-      })
-      .from(instructorRates)
-      .where(
-        and(
-          inArray(instructorRates.instructorId, instructorIds),
-          inArray(instructorRates.programId, programIds),
+  const [instructorRows, rateRows, expertiseRows, standardRateRows] =
+    await Promise.all([
+      db
+        .select({ id: instructors.id, name: instructors.name })
+        .from(instructors)
+        .where(inArray(instructors.id, instructorIds)),
+      db
+        .select({
+          instructorId: instructorRates.instructorId,
+          programId: instructorRates.programId,
+          materiBlock: instructorRates.materiBlock,
+          mode: instructorRates.mode,
+          rateAmount: instructorRates.rateAmount,
+        })
+        .from(instructorRates)
+        .where(
+          and(
+            inArray(instructorRates.instructorId, instructorIds),
+            inArray(instructorRates.programId, programIds),
+          ),
         ),
-      ),
-    db
-      .select({
-        instructorId: instructorExpertise.instructorId,
-        programId: instructorExpertise.programId,
-        materiBlock: instructorExpertise.materiBlock,
-        level: instructorExpertise.level,
-      })
-      .from(instructorExpertise)
-      .where(
-        and(
-          inArray(instructorExpertise.instructorId, instructorIds),
-          inArray(instructorExpertise.programId, programIds),
+      db
+        .select({
+          instructorId: instructorExpertise.instructorId,
+          programId: instructorExpertise.programId,
+          materiBlock: instructorExpertise.materiBlock,
+          level: instructorExpertise.level,
+        })
+        .from(instructorExpertise)
+        .where(
+          and(
+            inArray(instructorExpertise.instructorId, instructorIds),
+            inArray(instructorExpertise.programId, programIds),
+          ),
         ),
-      ),
-    db
-      .select({
-        programId: honorariumRateRules.programId,
-        level: honorariumRateRules.level,
-        mode: honorariumRateRules.mode,
-        honorPerSession: honorariumRateRules.honorPerSession,
-        transportAmount: honorariumRateRules.transportAmount,
-        effectiveFrom: honorariumRateRules.effectiveFrom,
-        effectiveTo: honorariumRateRules.effectiveTo,
-        locationScope: honorariumRateRules.locationScope,
-      })
-      .from(honorariumRateRules)
-      .where(
-        and(
-          inArray(honorariumRateRules.programId, programIds),
-          eq(honorariumRateRules.isActive, true),
+      db
+        .select({
+          programId: honorariumRateRules.programId,
+          level: honorariumRateRules.level,
+          mode: honorariumRateRules.mode,
+          honorPerSession: honorariumRateRules.honorPerSession,
+          transportAmount: honorariumRateRules.transportAmount,
+          effectiveFrom: honorariumRateRules.effectiveFrom,
+          effectiveTo: honorariumRateRules.effectiveTo,
+          locationScope: honorariumRateRules.locationScope,
+        })
+        .from(honorariumRateRules)
+        .where(
+          and(
+            inArray(honorariumRateRules.programId, programIds),
+            eq(honorariumRateRules.isActive, true),
+          ),
         ),
-      ),
-  ]);
+    ]);
 
-  const instructorNameById = new Map(instructorRows.map((row) => [row.id, row.name]));
+  const instructorNameById = new Map(
+    instructorRows.map((row) => [row.id, row.name]),
+  );
   const rateByKey = new Map(
     rateRows.map((row) => [
       `${row.instructorId}::${row.programId}::${row.materiBlock}::${normalizeMode(row.mode)}`,
@@ -564,11 +622,15 @@ export async function getHonorariumReport(filters?: z.infer<typeof reportFilterS
 
   const rows: HonorariumReportRow[] = filteredAssignments.map((row) => {
     const paidInstructorId = row.actualInstructorId ?? row.plannedInstructorId;
-    const source: "planned" | "actual" = row.actualInstructorId ? "actual" : "planned";
+    const source: "planned" | "actual" = row.actualInstructorId
+      ? "actual"
+      : "planned";
     const materiBlock = row.materiBlock ?? "";
     const kelasMode = normalizeMode(row.kelasMode);
     const expertiseLevel =
-      expertiseByKey.get(`${paidInstructorId}::${row.programId}::${materiBlock}`) ?? "middle";
+      expertiseByKey.get(
+        `${paidInstructorId}::${row.programId}::${materiBlock}`,
+      ) ?? "middle";
 
     const overrideRate = rateByKey.get(
       `${paidInstructorId}::${row.programId}::${materiBlock}::${kelasMode}`,
@@ -612,7 +674,8 @@ export async function getHonorariumReport(filters?: z.infer<typeof reportFilterS
       sessionStatus: row.sessionStatus,
       paidInstructorId,
       paidInstructorName:
-        instructorNameById.get(paidInstructorId) ?? "Instruktur tidak ditemukan",
+        instructorNameById.get(paidInstructorId) ??
+        "Instruktur tidak ditemukan",
       source,
       kelasMode,
       expertiseLevel,
@@ -692,23 +755,37 @@ export async function getHonorariumReport(filters?: z.infer<typeof reportFilterS
 }
 
 function normalizeExpertiseLevel(level: string | null): ExpertiseLevel {
-  if (level === "basic" || level === "middle" || level === "senior") return level;
+  if (level === "basic" || level === "middle" || level === "senior")
+    return level;
   if (level === "intermediate") return "middle";
   if (level === "expert") return "senior";
   return "middle";
 }
 
 function nextHonorariumDocumentNumber() {
+  const { year, month, day } = getJakartaDatePartsFromUtils();
+  return `HON-${year}${month}${day}-${nanoid(6).toUpperCase()}`;
+}
+
+function getJakartaDatePartsFromUtils() {
   const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `HON-${yyyy}${mm}${dd}-${nanoid(6).toUpperCase()}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const year = parts.find((p) => p.type === "year")!.value;
+  const month = parts.find((p) => p.type === "month")!.value;
+  const day = parts.find((p) => p.type === "day")!.value;
+  return { year, month, day };
 }
 
 function getEligibleRows(rows: HonorariumReportRow[]) {
   return rows.filter(
-    (row) => row.sessionStatus === "completed" && row.availabilityStatus === "accepted",
+    (row) =>
+      row.sessionStatus === "completed" &&
+      row.availabilityStatus === "accepted",
   );
 }
 
@@ -721,7 +798,7 @@ function mergeNotes(current: string | null, next: string | undefined) {
 
 function parsePaidDate(value: string | undefined) {
   if (!value) return new Date();
-  const parsed = new Date(`${value}T00:00:00`);
+  const parsed = new Date(`${value}T00:00:00+07:00`);
   if (Number.isNaN(parsed.getTime())) return new Date();
   return parsed;
 }
@@ -732,55 +809,65 @@ function readObject(value: unknown): Record<string, unknown> | null {
 }
 
 async function validateBatchCompletenessBeforeLock(batchId: string) {
-  const [batchRow, itemAggregateRows, recapRows, deductionRows, paidAuditRows] = await Promise.all([
-    db
-      .select({
-        id: honorariumBatches.id,
-        paidAt: honorariumBatches.paidAt,
-        paidBy: honorariumBatches.paidBy,
-      })
-      .from(honorariumBatches)
-      .where(eq(honorariumBatches.id, batchId))
-      .limit(1),
-    db
-      .select({
-        itemCount: sql<number>`COUNT(*)::int`,
-        totalAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
-      })
-      .from(honorariumItems)
-      .where(eq(honorariumItems.batchId, batchId)),
-    db
-      .select({
-        instructorId: honorariumItems.paidInstructorId,
-        instructorName: honorariumItems.paidInstructorName,
-        grossAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
-      })
-      .from(honorariumItems)
-      .where(eq(honorariumItems.batchId, batchId))
-      .groupBy(honorariumItems.paidInstructorId, honorariumItems.paidInstructorName),
-    db
-      .select({
-        instructorId: honorariumDeductions.instructorId,
-        instructorName: instructors.name,
-        amount: honorariumDeductions.amount,
-      })
-      .from(honorariumDeductions)
-      .leftJoin(instructors, eq(honorariumDeductions.instructorId, instructors.id))
-      .where(eq(honorariumDeductions.batchId, batchId)),
-    db
-      .select({
-        payload: honorariumAuditLogs.payload,
-      })
-      .from(honorariumAuditLogs)
-      .where(
-        and(
-          eq(honorariumAuditLogs.batchId, batchId),
-          eq(honorariumAuditLogs.action, "finance_paid"),
+  const [batchRow, itemAggregateRows, recapRows, deductionRows, paidAuditRows] =
+    await Promise.all([
+      db
+        .select({
+          id: honorariumBatches.id,
+          paidAt: honorariumBatches.paidAt,
+          paidBy: honorariumBatches.paidBy,
+        })
+        .from(honorariumBatches)
+        .where(eq(honorariumBatches.id, batchId))
+        .limit(1),
+      db
+        .select({
+          itemCount: sql<number>`COUNT(*)::int`,
+          totalAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
+        })
+        .from(honorariumItems)
+        .where(eq(honorariumItems.batchId, batchId)),
+      db
+        .select({
+          instructorId: honorariumItems.paidInstructorId,
+          instructorName: honorariumItems.paidInstructorName,
+          grossAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
+        })
+        .from(honorariumItems)
+        .where(eq(honorariumItems.batchId, batchId))
+        .groupBy(
+          honorariumItems.paidInstructorId,
+          honorariumItems.paidInstructorName,
         ),
-      )
-      .orderBy(desc(honorariumAuditLogs.createdAt))
-      .limit(1),
-  ]);
+      db
+        .select({
+          instructorId: honorariumDeductions.instructorId,
+          instructorName: instructors.name,
+          amount: honorariumDeductions.amount,
+        })
+        .from(honorariumDeductions)
+        .leftJoin(
+          instructors,
+          eq(honorariumDeductions.instructorId, instructors.id),
+        )
+        .where(eq(honorariumDeductions.batchId, batchId)),
+      db
+        .select({
+          payload: honorariumAuditLogs.payload,
+        })
+        .from(honorariumAuditLogs)
+        .where(
+          and(
+            eq(honorariumAuditLogs.batchId, batchId),
+            inArray(honorariumAuditLogs.action, [
+              "finance_paid",
+              "finance_payment_corrected",
+            ]),
+          ),
+        )
+        .orderBy(desc(honorariumAuditLogs.createdAt))
+        .limit(1),
+    ]);
 
   const errors: string[] = [];
   const batch = batchRow[0];
@@ -789,10 +876,14 @@ async function validateBatchCompletenessBeforeLock(batchId: string) {
   }
 
   if (!batch.paidAt) {
-    errors.push("Tanggal bayar belum tercatat. Tandai batch sebagai dibayar terlebih dahulu.");
+    errors.push(
+      "Tanggal bayar belum tercatat. Tandai batch sebagai dibayar terlebih dahulu.",
+    );
   }
   if (!batch.paidBy) {
-    errors.push("Petugas pembayaran belum tercatat. Ulangi proses tandai dibayar melalui sistem.");
+    errors.push(
+      "Petugas pembayaran belum tercatat. Ulangi proses tandai dibayar melalui sistem.",
+    );
   }
 
   const aggregate = itemAggregateRows[0];
@@ -813,7 +904,10 @@ async function validateBatchCompletenessBeforeLock(batchId: string) {
     });
   }
 
-  const deductionByInstructor = new Map<string, { name: string; total: number }>();
+  const deductionByInstructor = new Map<
+    string,
+    { name: string; total: number }
+  >();
   for (const row of deductionRows) {
     const current = deductionByInstructor.get(row.instructorId);
     deductionByInstructor.set(row.instructorId, {
@@ -839,7 +933,10 @@ async function validateBatchCompletenessBeforeLock(batchId: string) {
 
   const paidPayload = readObject(paidAuditRows[0]?.payload);
   const paymentReference = paidPayload?.paymentReference;
-  if (typeof paymentReference !== "string" || paymentReference.trim().length === 0) {
+  if (
+    typeof paymentReference !== "string" ||
+    paymentReference.trim().length === 0
+  ) {
     errors.push("Referensi transfer belum diisi pada proses tandai dibayar.");
   }
 
@@ -851,7 +948,9 @@ async function validateBatchCompletenessBeforeLock(batchId: string) {
         ? Number.parseFloat(paymentAmountRaw)
         : Number.NaN;
   if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
-    errors.push("Nominal pembayaran belum tercatat pada proses tandai dibayar.");
+    errors.push(
+      "Nominal pembayaran belum tercatat pada proses tandai dibayar.",
+    );
   } else {
     let expectedNet = 0;
     for (const [instructorId, gross] of grossByInstructor.entries()) {
@@ -871,7 +970,10 @@ async function validateBatchCompletenessBeforeLock(batchId: string) {
 
 const HONORARIUM_NOTIFICATION_ROLES: RoleValue[] = ["admin", "staff"];
 
-function buildHonorariumTransitionText(from: HonorariumBatchStatus, to: HonorariumBatchStatus) {
+function buildHonorariumTransitionText(
+  from: HonorariumBatchStatus,
+  to: HonorariumBatchStatus,
+) {
   if (from === "draft" && to === "dikirim_ke_keuangan") {
     return {
       title: "Batch Honorarium Dikirim ke Keuangan",
@@ -942,17 +1044,18 @@ async function notifyHonorariumStatusTransition(params: {
   const template = buildHonorariumTransitionText(params.from, params.to);
   const message = `Batch ${params.documentNumber} ${template.actionText} oleh ${actorName}. Status: ${batchStatusLabel(params.from)} -> ${batchStatusLabel(params.to)}.`;
 
-  const notificationRows: Array<typeof notifications.$inferInsert> = targetUserIds.map((userId) => ({
-    id: nanoid(),
-    userId,
-    type: "system",
-    title: template.title,
-    message,
-    entitasType: "honorarium_batch",
-    entitasId: params.batchId,
-    isRead: false,
-    isEmailSent: false,
-  }));
+  const notificationRows: Array<typeof notifications.$inferInsert> =
+    targetUserIds.map((userId) => ({
+      id: nanoid(),
+      userId,
+      type: "system",
+      title: template.title,
+      message,
+      entitasType: "honorarium_batch",
+      entitasId: params.batchId,
+      isRead: false,
+      isEmailSent: false,
+    }));
 
   await db.insert(notifications).values(notificationRows);
 
@@ -1002,7 +1105,8 @@ async function transitionBatchStatus(params: {
     updatedAt: new Date(),
   };
 
-  if (params.submittedAt !== undefined) updatePayload.submittedAt = params.submittedAt;
+  if (params.submittedAt !== undefined)
+    updatePayload.submittedAt = params.submittedAt;
   if (params.paidAt !== undefined) updatePayload.paidAt = params.paidAt;
   if (params.paidBy !== undefined) updatePayload.paidBy = params.paidBy;
   if (params.lockedAt !== undefined) updatePayload.lockedAt = params.lockedAt;
@@ -1085,8 +1189,12 @@ export async function listHonorariumBatches(
   }
 
   const whereClause = and(
-    parsed.startDate ? gte(honorariumBatches.periodStart, parsed.startDate) : undefined,
-    parsed.endDate ? lte(honorariumBatches.periodEnd, parsed.endDate) : undefined,
+    parsed.startDate
+      ? gte(honorariumBatches.periodStart, parsed.startDate)
+      : undefined,
+    parsed.endDate
+      ? lte(honorariumBatches.periodEnd, parsed.endDate)
+      : undefined,
     parsed.status ? eq(honorariumBatches.status, parsed.status) : undefined,
     parsed.financeOnly
       ? inArray(honorariumBatches.status, [
@@ -1251,64 +1359,74 @@ export async function getHonorariumBatchDetail(
 
   if (!batchRow) return null;
 
-  const [itemRows, recapRows, auditRows, paidByRow, deductionRows] = await Promise.all([
-    db
-      .select({
-        id: honorariumItems.id,
-        scheduledDate: honorariumItems.scheduledDate,
-        programName: programs.name,
-        paidInstructorName: honorariumItems.paidInstructorName,
-        source: honorariumItems.source,
-        materiBlock: honorariumItems.materiBlock,
-        expertiseLevelSnapshot: honorariumItems.expertiseLevelSnapshot,
-        rateSnapshot: honorariumItems.rateSnapshot,
-        amount: honorariumItems.amount,
-      })
-      .from(honorariumItems)
-      .innerJoin(programs, eq(honorariumItems.programId, programs.id))
-      .where(eq(honorariumItems.batchId, parsed.batchId))
-      .orderBy(asc(honorariumItems.scheduledDate), asc(honorariumItems.paidInstructorName)),
-    db
-      .select({
-        instructorId: honorariumItems.paidInstructorId,
-        instructorName: honorariumItems.paidInstructorName,
-        totalSessions: sql<number>`COUNT(*)::int`,
-        grossAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
-      })
-      .from(honorariumItems)
-      .where(eq(honorariumItems.batchId, parsed.batchId))
-      .groupBy(honorariumItems.paidInstructorId, honorariumItems.paidInstructorName)
-      .orderBy(asc(honorariumItems.paidInstructorName)),
-    db
-      .select({
-        id: honorariumAuditLogs.id,
-        actorName: users.namaLengkap,
-        action: honorariumAuditLogs.action,
-        payload: honorariumAuditLogs.payload,
-        createdAt: honorariumAuditLogs.createdAt,
-      })
-      .from(honorariumAuditLogs)
-      .leftJoin(users, eq(honorariumAuditLogs.actorId, users.id))
-      .where(eq(honorariumAuditLogs.batchId, parsed.batchId))
-      .orderBy(desc(honorariumAuditLogs.createdAt)),
-    batchRow.paidBy
-      ? db
-          .select({ name: users.namaLengkap })
-          .from(users)
-          .where(eq(users.id, batchRow.paidBy))
-          .limit(1)
-          .then((rows) => rows[0] ?? null)
-      : Promise.resolve(null),
-    db
-      .select({
-        instructorId: honorariumDeductions.instructorId,
-        amount: honorariumDeductions.amount,
-      })
-      .from(honorariumDeductions)
-      .where(eq(honorariumDeductions.batchId, parsed.batchId)),
-  ]);
+  const [itemRows, recapRows, auditRows, paidByRow, deductionRows] =
+    await Promise.all([
+      db
+        .select({
+          id: honorariumItems.id,
+          scheduledDate: honorariumItems.scheduledDate,
+          programName: programs.name,
+          paidInstructorName: honorariumItems.paidInstructorName,
+          source: honorariumItems.source,
+          materiBlock: honorariumItems.materiBlock,
+          expertiseLevelSnapshot: honorariumItems.expertiseLevelSnapshot,
+          rateSnapshot: honorariumItems.rateSnapshot,
+          amount: honorariumItems.amount,
+        })
+        .from(honorariumItems)
+        .innerJoin(programs, eq(honorariumItems.programId, programs.id))
+        .where(eq(honorariumItems.batchId, parsed.batchId))
+        .orderBy(
+          asc(honorariumItems.scheduledDate),
+          asc(honorariumItems.paidInstructorName),
+        ),
+      db
+        .select({
+          instructorId: honorariumItems.paidInstructorId,
+          instructorName: honorariumItems.paidInstructorName,
+          totalSessions: sql<number>`COUNT(*)::int`,
+          grossAmount: sql<string>`COALESCE(SUM(${honorariumItems.amount}), 0)::text`,
+        })
+        .from(honorariumItems)
+        .where(eq(honorariumItems.batchId, parsed.batchId))
+        .groupBy(
+          honorariumItems.paidInstructorId,
+          honorariumItems.paidInstructorName,
+        )
+        .orderBy(asc(honorariumItems.paidInstructorName)),
+      db
+        .select({
+          id: honorariumAuditLogs.id,
+          actorName: users.namaLengkap,
+          action: honorariumAuditLogs.action,
+          payload: honorariumAuditLogs.payload,
+          createdAt: honorariumAuditLogs.createdAt,
+        })
+        .from(honorariumAuditLogs)
+        .leftJoin(users, eq(honorariumAuditLogs.actorId, users.id))
+        .where(eq(honorariumAuditLogs.batchId, parsed.batchId))
+        .orderBy(desc(honorariumAuditLogs.createdAt)),
+      batchRow.paidBy
+        ? db
+            .select({ name: users.namaLengkap })
+            .from(users)
+            .where(eq(users.id, batchRow.paidBy))
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+      db
+        .select({
+          instructorId: honorariumDeductions.instructorId,
+          amount: honorariumDeductions.amount,
+        })
+        .from(honorariumDeductions)
+        .where(eq(honorariumDeductions.batchId, parsed.batchId)),
+    ]);
 
-  const totalAmount = itemRows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+  const totalAmount = itemRows.reduce(
+    (sum, row) => sum + toNumber(row.amount),
+    0,
+  );
 
   const deductionsByInstructor = new Map<string, number>();
   for (const d of deductionRows) {
@@ -1327,7 +1445,12 @@ export async function getHonorariumBatchDetail(
   });
 
   const netAmount = recaps.reduce((sum, row) => sum + row.netAmount, 0);
-  const paidLog = auditRows.find((row) => row.action === "finance_paid") ?? null;
+  const paidLog =
+    auditRows.find(
+      (row) =>
+        row.action === "finance_payment_corrected" ||
+        row.action === "finance_paid",
+    ) ?? null;
   const paidPayload = readObject(paidLog?.payload);
   const paymentAmountRaw = paidPayload?.paymentAmount;
   const parsedPaymentAmount =
@@ -1336,10 +1459,13 @@ export async function getHonorariumBatchDetail(
       : typeof paymentAmountRaw === "string"
         ? Number.parseFloat(paymentAmountRaw)
         : Number.NaN;
-  const paymentAmount = Number.isFinite(parsedPaymentAmount) ? parsedPaymentAmount : null;
+  const paymentAmount = Number.isFinite(parsedPaymentAmount)
+    ? parsedPaymentAmount
+    : null;
   const paymentReferenceRaw = paidPayload?.paymentReference;
   const paymentReference =
-    typeof paymentReferenceRaw === "string" && paymentReferenceRaw.trim().length > 0
+    typeof paymentReferenceRaw === "string" &&
+    paymentReferenceRaw.trim().length > 0
       ? paymentReferenceRaw.trim()
       : null;
   const difference = paymentAmount === null ? null : paymentAmount - netAmount;
@@ -1385,7 +1511,9 @@ export async function getHonorariumBatchDetail(
   };
 }
 
-export async function generateHonorariumBatch(data: z.infer<typeof generateBatchSchema>) {
+export async function generateHonorariumBatch(
+  data: z.infer<typeof generateBatchSchema>,
+) {
   const session = await requirePermission("jadwalUjian", "manage");
   const parsed = generateBatchSchema.parse(data);
 
@@ -1402,11 +1530,14 @@ export async function generateHonorariumBatch(data: z.infer<typeof generateBatch
   if (eligibleRows.length === 0) {
     return {
       ok: false as const,
-      message: "Tidak ada sesi layak bayar (completed + accepted) pada periode ini.",
+      message:
+        "Tidak ada sesi layak bayar (completed + accepted) pada periode ini.",
     };
   }
 
-  const missingRateRows = eligibleRows.filter((row) => row.rateSource === "missing");
+  const missingRateRows = eligibleRows.filter(
+    (row) => row.rateSource === "missing",
+  );
   if (missingRateRows.length > 0) {
     return {
       ok: false as const,
@@ -1506,7 +1637,9 @@ export async function markHonorariumBatchInProcess(batchId: string) {
   return { ok: true as const };
 }
 
-export async function markHonorariumBatchPaid(data: z.infer<typeof markBatchPaidSchema>) {
+export async function markHonorariumBatchPaid(
+  data: z.infer<typeof markBatchPaidSchema>,
+) {
   const session = await requireCapability("keuangan:pay");
   const parsed = markBatchPaidSchema.parse(data);
 
@@ -1528,12 +1661,103 @@ export async function markHonorariumBatchPaid(data: z.infer<typeof markBatchPaid
   return { ok: true as const };
 }
 
+export async function correctHonorariumBatchPayment(
+  data: z.infer<typeof correctBatchPaymentSchema>,
+) {
+  const session = await requireCapability("keuangan:pay");
+  const parsed = correctBatchPaymentSchema.parse(data);
+
+  const [batch] = await db
+    .select({
+      id: honorariumBatches.id,
+      status: honorariumBatches.status,
+      paidAt: honorariumBatches.paidAt,
+      paidBy: honorariumBatches.paidBy,
+    })
+    .from(honorariumBatches)
+    .where(eq(honorariumBatches.id, parsed.batchId))
+    .limit(1);
+
+  if (!batch) throw new Error("Batch honorarium tidak ditemukan.");
+  if (batch.status !== "dibayar") {
+    throw new Error(
+      "Koreksi pembayaran hanya bisa dilakukan saat status batch Dibayar dan belum Locked.",
+    );
+  }
+
+  const [previousPaymentLog] = await db
+    .select({
+      payload: honorariumAuditLogs.payload,
+    })
+    .from(honorariumAuditLogs)
+    .where(
+      and(
+        eq(honorariumAuditLogs.batchId, parsed.batchId),
+        inArray(honorariumAuditLogs.action, [
+          "finance_paid",
+          "finance_payment_corrected",
+        ]),
+      ),
+    )
+    .orderBy(desc(honorariumAuditLogs.createdAt))
+    .limit(1);
+
+  const previousPayment = readObject(previousPaymentLog?.payload);
+  const paidAt = parsePaidDate(parsed.paidDate);
+
+  const [updated] = await db
+    .update(honorariumBatches)
+    .set({
+      paidAt,
+      paidBy: session.user.id,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(honorariumBatches.id, parsed.batchId),
+        eq(honorariumBatches.status, "dibayar"),
+      ),
+    )
+    .returning({ id: honorariumBatches.id });
+
+  if (!updated) {
+    throw new Error("Batch gagal diperbarui karena status berubah.");
+  }
+
+  await db.insert(honorariumAuditLogs).values({
+    id: nanoid(),
+    batchId: parsed.batchId,
+    actorId: session.user.id,
+    action: "finance_payment_corrected",
+    payload: {
+      paymentReference: parsed.paymentReference,
+      paidDate: parsed.paidDate || null,
+      paymentAmount: parsed.paymentAmount,
+      previousPaymentReference: previousPayment?.paymentReference ?? null,
+      previousPaidDate:
+        previousPayment?.paidDate ?? batch.paidAt?.toISOString() ?? null,
+      previousPaymentAmount: previousPayment?.paymentAmount ?? null,
+      previousPaidBy: batch.paidBy,
+      reason: parsed.reason,
+    },
+  });
+
+  revalidatePath("/jadwal-otomatis/honorarium");
+  revalidatePath(`/jadwal-otomatis/honorarium/${parsed.batchId}`);
+  revalidatePath("/keuangan/honorarium");
+  revalidatePath(`/keuangan/honorarium/${parsed.batchId}`);
+
+  return { ok: true as const };
+}
+
 export async function lockHonorariumBatch(batchId: string) {
   const session = await requireCapability("keuangan:pay");
   const parsed = batchIdSchema.parse({ batchId });
   const validation = await validateBatchCompletenessBeforeLock(parsed.batchId);
   if (validation.errors.length > 0) {
-    throw new Error(`Batch belum bisa di-lock: ${validation.errors.join(" | ")}`);
+    throw new Error(
+      `Batch belum bisa di-lock: ${validation.errors.join(" | ")}`,
+    );
   }
 
   await transitionBatchStatus({
@@ -1550,7 +1774,9 @@ export async function lockHonorariumBatch(batchId: string) {
 
 // ─── DEDUCTIONS ───────────────────────────────────────────────────────────────
 
-export async function addHonorariumDeduction(data: z.infer<typeof addDeductionSchema>) {
+export async function addHonorariumDeduction(
+  data: z.infer<typeof addDeductionSchema>,
+) {
   const session = await requirePermission("jadwalUjian", "manage");
   const parsed = addDeductionSchema.parse(data);
 
@@ -1561,7 +1787,8 @@ export async function addHonorariumDeduction(data: z.infer<typeof addDeductionSc
     .limit(1);
 
   if (!batch) throw new Error("Batch tidak ditemukan.");
-  if (batch.status !== "draft") throw new Error("Potongan hanya bisa ditambahkan saat batch status draft.");
+  if (batch.status !== "draft")
+    throw new Error("Potongan hanya bisa ditambahkan saat batch status draft.");
 
   const id = nanoid();
   await db.insert(honorariumDeductions).values({
@@ -1578,14 +1805,21 @@ export async function addHonorariumDeduction(data: z.infer<typeof addDeductionSc
     batchId: parsed.batchId,
     actorId: session.user.id,
     action: "deduction_added",
-    payload: { deductionId: id, instructorId: parsed.instructorId, type: parsed.deductionType, amount: parsed.amount },
+    payload: {
+      deductionId: id,
+      instructorId: parsed.instructorId,
+      type: parsed.deductionType,
+      amount: parsed.amount,
+    },
   });
 
   revalidatePath(`/jadwal-otomatis/honorarium/${parsed.batchId}`);
   return { ok: true as const, deductionId: id };
 }
 
-export async function removeHonorariumDeduction(data: z.infer<typeof removeDeductionSchema>) {
+export async function removeHonorariumDeduction(
+  data: z.infer<typeof removeDeductionSchema>,
+) {
   const session = await requirePermission("jadwalUjian", "manage");
   const parsed = removeDeductionSchema.parse(data);
 
@@ -1606,9 +1840,12 @@ export async function removeHonorariumDeduction(data: z.infer<typeof removeDeduc
     .where(eq(honorariumBatches.id, deduction.batchId))
     .limit(1);
 
-  if (!batch || batch.status !== "draft") throw new Error("Potongan hanya bisa dihapus saat batch status draft.");
+  if (!batch || batch.status !== "draft")
+    throw new Error("Potongan hanya bisa dihapus saat batch status draft.");
 
-  await db.delete(honorariumDeductions).where(eq(honorariumDeductions.id, parsed.deductionId));
+  await db
+    .delete(honorariumDeductions)
+    .where(eq(honorariumDeductions.id, parsed.deductionId));
 
   await db.insert(honorariumAuditLogs).values({
     id: nanoid(),
@@ -1632,7 +1869,9 @@ export type DeductionRow = {
   createdAt: Date;
 };
 
-export async function listHonorariumDeductions(batchId: string): Promise<DeductionRow[]> {
+export async function listHonorariumDeductions(
+  batchId: string,
+): Promise<DeductionRow[]> {
   await requirePermission("jadwalUjian", "view");
 
   const rows = await db
@@ -1646,7 +1885,10 @@ export async function listHonorariumDeductions(batchId: string): Promise<Deducti
       createdAt: honorariumDeductions.createdAt,
     })
     .from(honorariumDeductions)
-    .innerJoin(instructors, eq(honorariumDeductions.instructorId, instructors.id))
+    .innerJoin(
+      instructors,
+      eq(honorariumDeductions.instructorId, instructors.id),
+    )
     .where(eq(honorariumDeductions.batchId, batchId))
     .orderBy(asc(honorariumDeductions.createdAt));
 
@@ -1665,7 +1907,9 @@ const REOPEN_ALLOWED_FROM: HonorariumBatchStatus[] = [
   "locked",
 ];
 
-export async function reopenHonorariumBatch(data: z.infer<typeof reopenBatchSchema>) {
+export async function reopenHonorariumBatch(
+  data: z.infer<typeof reopenBatchSchema>,
+) {
   // Reopen hanya untuk admin (role guard ketat)
   const session = await requireRole(["admin"]);
   const parsed = reopenBatchSchema.parse(data);
@@ -1683,14 +1927,19 @@ export async function reopenHonorariumBatch(data: z.infer<typeof reopenBatchSche
 
   if (!existing) throw new Error("Batch tidak ditemukan.");
   if (!REOPEN_ALLOWED_FROM.includes(existing.status as HonorariumBatchStatus)) {
-    throw new Error(`Batch dengan status ${existing.status} tidak bisa di-reopen.`);
+    throw new Error(
+      `Batch dengan status ${existing.status} tidak bisa di-reopen.`,
+    );
   }
 
   await db
     .update(honorariumBatches)
     .set({
       status: "draft",
-      internalNotes: mergeNotes(existing.internalNotes, `[REOPEN] ${parsed.reason}`),
+      internalNotes: mergeNotes(
+        existing.internalNotes,
+        `[REOPEN] ${parsed.reason}`,
+      ),
       submittedAt: null,
       paidAt: null,
       lockedAt: null,
@@ -1735,7 +1984,9 @@ type ExportExcelResult =
   | { ok: true; data: { fileName: string; xlsxBase64: string } }
   | { ok: false; error: string };
 
-export async function exportHonorariumBatchExcel(batchId: string): Promise<ExportExcelResult> {
+export async function exportHonorariumBatchExcel(
+  batchId: string,
+): Promise<ExportExcelResult> {
   await requirePermission("jadwalUjian", "view");
 
   const detail = await getHonorariumBatchDetail(batchId);
@@ -1782,27 +2033,53 @@ export async function exportHonorariumBatchExcel(batchId: string): Promise<Expor
         r.netAmount,
       ]),
       [""],
-      ["Diekspor pada", new Date().toLocaleString("id-ID")],
+      [
+        "Diekspor pada",
+        new Date().toLocaleString("id-ID", { timeZone: APP_TIME_ZONE }),
+      ],
     ];
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
-    summarySheet["!cols"] = [{ wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 20 }];
+    summarySheet["!cols"] = [
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 20 },
+    ];
     XLSX.utils.book_append_sheet(wb, summarySheet, "Ringkasan");
 
     // Sheet 2: Detail Potongan
     const deductionRows = deductions.map((d, i) => ({
       "No.": i + 1,
       Instruktur: d.instructorName,
-      "Tipe Potongan": d.deductionType === "pph21" ? "PPh 21" : d.deductionType === "pph23" ? "PPh 23" : "Lainnya",
+      "Tipe Potongan":
+        d.deductionType === "pph21"
+          ? "PPh 21"
+          : d.deductionType === "pph23"
+            ? "PPh 23"
+            : "Lainnya",
       Keterangan: d.description,
       Jumlah: d.amount,
     }));
     const deductionSheet = XLSX.utils.json_to_sheet(
       deductionRows.length > 0
         ? deductionRows
-        : [{ "No.": "", Instruktur: "", "Tipe Potongan": "", Keterangan: "", Jumlah: "" }],
+        : [
+            {
+              "No.": "",
+              Instruktur: "",
+              "Tipe Potongan": "",
+              Keterangan: "",
+              Jumlah: "",
+            },
+          ],
     );
     deductionSheet["!cols"] = [
-      { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 30 }, { wch: 15 },
+      { wch: 5 },
+      { wch: 25 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 15 },
     ];
     XLSX.utils.book_append_sheet(wb, deductionSheet, "Potongan");
 
@@ -1820,8 +2097,15 @@ export async function exportHonorariumBatchExcel(batchId: string): Promise<Expor
     }));
     const itemSheet = XLSX.utils.json_to_sheet(itemRows);
     itemSheet["!cols"] = [
-      { wch: 5 }, { wch: 14 }, { wch: 18 }, { wch: 25 }, { wch: 12 },
-      { wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 14 },
+      { wch: 5 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 25 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 10 },
+      { wch: 14 },
+      { wch: 14 },
     ];
     XLSX.utils.book_append_sheet(wb, itemSheet, "Detail Sesi");
 
@@ -1840,11 +2124,16 @@ export async function exportHonorariumBatchExcel(batchId: string): Promise<Expor
 
     return { ok: true, data: { fileName, xlsxBase64 } };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Gagal export Excel." };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Gagal export Excel.",
+    };
   }
 }
 
-export async function logHonorariumBatchPdfExport(data: z.infer<typeof exportPdfAuditSchema>) {
+export async function logHonorariumBatchPdfExport(
+  data: z.infer<typeof exportPdfAuditSchema>,
+) {
   await requirePermission("jadwalUjian", "view");
   const session = await requireSession();
   const parsed = exportPdfAuditSchema.parse(data);

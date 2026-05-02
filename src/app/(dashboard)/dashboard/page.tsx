@@ -12,7 +12,10 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { countUnreadDisposisi, inboxDisposisi } from "@/server/actions/disposisi";
+import {
+  countUnreadDisposisi,
+  inboxDisposisi,
+} from "@/server/actions/disposisi";
 import { listSuratKeluar } from "@/server/actions/suratKeluar";
 import { listSuratMasuk } from "@/server/actions/suratMasuk";
 import { getDashboardStats } from "@/server/actions/statistics";
@@ -24,29 +27,41 @@ import { UjianDashboardWidget } from "@/components/jadwal-ujian/UjianDashboardWi
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 
 export const metadata: Metadata = {
-  title: "Dashboard | Manajemen Surat IAI Jakarta",
+  title: "Dashboard | ARKA",
 };
 
 export default async function DashboardPage() {
-  const [suratKeluarRows, suratMasukRows, disposisiRows, unreadDisposisiCount, stats, statistikUjian] =
-    await Promise.all([
-      listSuratKeluar(),
-      listSuratMasuk(),
-      inboxDisposisi(),
-      countUnreadDisposisi(),
-      getDashboardStats(),
-      getStatistikUjian(),
-    ]);
+  const [
+    suratKeluarRows,
+    suratMasukRows,
+    disposisiRows,
+    unreadDisposisiCount,
+    stats,
+    statistikUjian,
+  ] = await Promise.all([
+    listSuratKeluar(),
+    listSuratMasuk(),
+    inboxDisposisi(),
+    countUnreadDisposisi(),
+    getDashboardStats(),
+    getStatistikUjian(),
+  ]);
 
-  const suratMasukBaru = suratMasukRows.filter((row) => row.status === "diterima");
-  const suratMasukProses = suratMasukRows.filter((row) => row.status === "diproses");
+  const suratMasukBaru = suratMasukRows.filter(
+    (row) => row.status === "diterima",
+  );
+  const suratMasukProses = suratMasukRows.filter(
+    (row) => row.status === "diproses",
+  );
   const suratKeluarReview = suratKeluarRows.filter((row) =>
     ["permohonan_persetujuan", "reviu"].includes(row.status ?? ""),
   );
   const suratKeluarArsip = suratKeluarRows.filter(
     (row) => row.status === "pengarsipan",
   );
-  const disposisiAktif = disposisiRows.filter((row) => row.status !== "selesai");
+  const disposisiAktif = disposisiRows.filter(
+    (row) => row.status !== "selesai",
+  );
 
   const recentItems = [
     ...suratMasukRows.slice(0, 4).map((row) => ({
@@ -123,7 +138,8 @@ export default async function DashboardPage() {
                     Pekerjaan Perlu Ditindaklanjuti
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Ringkasan antrean operasional dari surat masuk, disposisi, dan surat keluar.
+                    Ringkasan antrean operasional dari surat masuk, disposisi,
+                    dan surat keluar.
                   </p>
                 </div>
                 <Button asChild className="w-full sm:w-auto">
@@ -171,17 +187,39 @@ export default async function DashboardPage() {
             </div>
 
             <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
-              <h2 className="text-lg font-semibold text-foreground">Aksi Cepat</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                Aksi Cepat
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Jalur singkat ke pekerjaan yang paling sering dipakai.
               </p>
 
               <div className="mt-5 grid gap-3 sm:mt-6">
-                <QuickAction href="/surat-masuk" label="Catat surat masuk" icon={Inbox} />
-                <QuickAction href="/surat-keluar" label="Buat surat keluar" icon={Send} />
-                <QuickAction href="/disposisi" label="Buka disposisi" icon={Mail} />
-                <QuickAction href="/nomor-surat" label="Generate nomor surat" icon={FileText} />
-                <QuickAction href="/pengaturan" label="Cek pengaturan sistem" icon={Timer} />
+                <QuickAction
+                  href="/surat-masuk"
+                  label="Catat surat masuk"
+                  icon={Inbox}
+                />
+                <QuickAction
+                  href="/surat-keluar"
+                  label="Buat surat keluar"
+                  icon={Send}
+                />
+                <QuickAction
+                  href="/disposisi"
+                  label="Buka disposisi"
+                  icon={Mail}
+                />
+                <QuickAction
+                  href="/nomor-surat"
+                  label="Generate nomor surat"
+                  icon={FileText}
+                />
+                <QuickAction
+                  href="/pengaturan"
+                  label="Cek pengaturan sistem"
+                  icon={Timer}
+                />
               </div>
             </div>
           </section>
@@ -197,7 +235,9 @@ export default async function DashboardPage() {
         <section className="rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Aktivitas Terbaru</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                Aktivitas Terbaru
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Item terbaru dari modul persuratan yang perlu mudah dipantau.
               </p>
@@ -225,9 +265,14 @@ export default async function DashboardPage() {
                     <p className="mt-2 truncate text-sm font-medium text-foreground">
                       {item.title}
                     </p>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">{item.meta}</p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {item.meta}
+                    </p>
                   </div>
-                  <Badge variant="outline" className="w-fit shrink-0 rounded-full">
+                  <Badge
+                    variant="outline"
+                    className="w-fit shrink-0 rounded-full"
+                  >
                     {item.status}
                   </Badge>
                 </Link>
@@ -272,7 +317,9 @@ function MetricCard({
           <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
             {label}
           </p>
-          <p className="mt-3 text-2xl font-semibold text-foreground sm:text-3xl">{value}</p>
+          <p className="mt-3 text-2xl font-semibold text-foreground sm:text-3xl">
+            {value}
+          </p>
           <p className="mt-2 text-sm leading-5 text-muted-foreground">{hint}</p>
         </div>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:h-11 sm:w-11">
@@ -306,11 +353,16 @@ function WorkItem({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-          <Badge variant={value > 0 ? "default" : "secondary"} className="rounded-full">
+          <Badge
+            variant={value > 0 ? "default" : "secondary"}
+            className="rounded-full"
+          >
             {value}
           </Badge>
         </div>
-        <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          {description}
+        </p>
       </div>
       <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
         <Link href={href}>{action}</Link>
@@ -329,7 +381,11 @@ function QuickAction({
   icon: typeof Inbox;
 }) {
   return (
-    <Button asChild variant="outline" className="h-auto justify-start px-4 py-3 text-left">
+    <Button
+      asChild
+      variant="outline"
+      className="h-auto justify-start px-4 py-3 text-left"
+    >
       <Link href={href}>
         <Icon className="h-4 w-4" />
         {label}

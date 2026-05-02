@@ -4,7 +4,7 @@ import AuditLogManager from "@/components/audit-log/AuditLogManager";
 import { listSertifikatAuditLog } from "@/server/actions/auditLog";
 
 export const metadata: Metadata = {
-  title: "Audit Log Sertifikat | Manajemen Surat IAI Jakarta",
+  title: "Audit Log Sertifikat | ARKA",
 };
 
 const SERTIFIKAT_ENTITY_TYPES = [

@@ -9,7 +9,7 @@ import { listInstructors } from "@/server/actions/jadwal-otomatis/instructors";
 import { listPrograms } from "@/server/actions/jadwal-otomatis/programs";
 
 export const metadata: Metadata = {
-  title: "Honorarium | Jadwal Otomatis | Manajemen Surat IAI Jakarta",
+  title: "Honorarium | Jadwal Otomatis | ARKA",
 };
 
 export default async function Page() {
@@ -28,7 +28,10 @@ export default async function Page() {
       <HonorariumReport
         initialReport={report}
         initialBatches={batches}
-        instructors={instructors.map((item) => ({ id: item.id, name: item.name }))}
+        instructors={instructors.map((item) => ({
+          id: item.id,
+          name: item.name,
+        }))}
         programs={programs.map((item) => ({ id: item.id, name: item.name }))}
       />
     </PageWrapper>

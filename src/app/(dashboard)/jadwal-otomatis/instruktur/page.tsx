@@ -8,14 +8,11 @@ import { listInstructors } from "@/server/actions/jadwal-otomatis/instructors";
 import { getSession } from "@/server/actions/auth";
 
 export const metadata: Metadata = {
-  title: "Instruktur | Jadwal Otomatis | Manajemen Surat IAI Jakarta",
+  title: "Instruktur | Jadwal Otomatis | ARKA",
 };
 
 export default async function Page() {
-  const [session, data] = await Promise.all([
-    getSession(),
-    listInstructors(),
-  ]);
+  const [session, data] = await Promise.all([getSession(), listInstructors()]);
 
   const role = (session?.user as { role?: string } | undefined)?.role;
   const canManage = role === "admin" || role === "staff";

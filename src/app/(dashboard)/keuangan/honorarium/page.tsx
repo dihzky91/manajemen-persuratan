@@ -7,7 +7,7 @@ import { FinanceBatchList } from "@/components/keuangan/FinanceBatchList";
 import { listHonorariumBatches } from "@/server/actions/jadwal-otomatis/honorarium";
 
 export const metadata: Metadata = {
-  title: "Antrian Pembayaran | Keuangan | Manajemen Surat IAI Jakarta",
+  title: "Antrian Pembayaran | Keuangan | ARKA",
 };
 
 export default async function Page() {

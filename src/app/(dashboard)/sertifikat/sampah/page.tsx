@@ -5,7 +5,7 @@ import { listDeletedEvents } from "@/server/actions/sertifikat/events";
 import { listDeletedParticipants } from "@/server/actions/sertifikat/participants";
 
 export const metadata: Metadata = {
-  title: "Sampah Sertifikat | Manajemen Surat IAI Jakarta",
+  title: "Sampah Sertifikat | ARKA",
 };
 
 export default async function Page() {

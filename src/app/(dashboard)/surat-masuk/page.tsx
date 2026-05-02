@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { SuratMasukManager } from "@/components/surat-masuk/SuratMasukManager";
 import { getSession } from "@/server/actions/auth";
-import { listDisposisiRecipients, listDisposisiTimeline } from "@/server/actions/disposisi";
+import {
+  listDisposisiRecipients,
+  listDisposisiTimeline,
+} from "@/server/actions/disposisi";
 import { listSuratMasuk } from "@/server/actions/suratMasuk";
 
 export const metadata: Metadata = {
-  title: "Arsip Surat Masuk | Manajemen Surat IAI Jakarta",
+  title: "Arsip Surat Masuk | ARKA",
 };
 
 export default async function Page() {
@@ -17,11 +20,13 @@ export default async function Page() {
     listDisposisiRecipients(),
   ]);
 
-  const role =
-    (session?.user as { role?: string } | undefined)?.role ?? null;
+  const role = (session?.user as { role?: string } | undefined)?.role ?? null;
 
   return (
-    <PageWrapper title="Arsip Surat Masuk" description="Daftar surat masuk yang tercatat.">
+    <PageWrapper
+      title="Arsip Surat Masuk"
+      description="Daftar surat masuk yang tercatat."
+    >
       <SuratMasukManager
         initialData={data}
         timeline={timeline}

@@ -13,7 +13,7 @@ import { getSuratMasukById } from "@/server/actions/suratMasuk";
 import { SuratMasukDetailWorkspace } from "@/components/surat-masuk/SuratMasukDetailWorkspace";
 
 export const metadata: Metadata = {
-  title: "Detail Surat Masuk | Manajemen Surat IAI Jakarta",
+  title: "Detail Surat Masuk | ARKA",
 };
 
 export default async function Page({
@@ -33,11 +33,12 @@ export default async function Page({
     notFound();
   }
 
-  const role =
-    (session?.user as { role?: string } | undefined)?.role ?? null;
+  const role = (session?.user as { role?: string } | undefined)?.role ?? null;
   const canManage = role === "admin" || role === "staff";
   const canCreateDisposisi = role === "admin" || role === "pejabat";
-  const timelineItems = timeline.filter((item) => item.suratMasukId === surat.id);
+  const timelineItems = timeline.filter(
+    (item) => item.suratMasukId === surat.id,
+  );
 
   return (
     <PageWrapper
@@ -53,9 +54,7 @@ export default async function Page({
           </Button>
           {canManage ? (
             <Button asChild variant="outline">
-              <Link href="/surat-masuk">
-                Kelola Arsip
-              </Link>
+              <Link href="/surat-masuk">Kelola Arsip</Link>
             </Button>
           ) : null}
         </div>

@@ -6,11 +6,15 @@ import { listKelas } from "@/server/actions/jadwal-ujian/kelas";
 import { getAllKonfig } from "@/server/actions/jadwal-ujian/config";
 
 export const metadata: Metadata = {
-  title: "Kelas Ujian | Manajemen Surat IAI Jakarta",
+  title: "Kelas Ujian | ARKA",
 };
 
 export default async function Page() {
-  const [session, data, konfig] = await Promise.all([getSession(), listKelas(), getAllKonfig()]);
+  const [session, data, konfig] = await Promise.all([
+    getSession(),
+    listKelas(),
+    getAllKonfig(),
+  ]);
   const role = (session?.user as { role?: string } | undefined)?.role;
   const canManage = role === "admin" || role === "staff";
 

@@ -31,7 +31,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { optionalFileUrlSchema } from "@/lib/validators/fileUrl";
-import { createPejabat, type PejabatRow, updatePejabat } from "@/server/actions/pejabat";
+import {
+  createPejabat,
+  type PejabatRow,
+  updatePejabat,
+} from "@/server/actions/pejabat";
 
 const formSchema = z.object({
   userId: z.string(),
@@ -124,15 +128,22 @@ export function PejabatForm({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
-            {mode === "edit" ? "Ubah Pejabat Penandatangan" : "Tambah Pejabat Penandatangan"}
+            {mode === "edit"
+              ? "Ubah Pejabat Penandatangan"
+              : "Tambah Pejabat Penandatangan"}
           </DialogTitle>
           <DialogDescription>
-            Data pejabat ini akan menjadi referensi pada modul surat keluar dan dokumen lanjutan.
+            Data pejabat ini akan menjadi referensi pada modul surat keluar dan
+            dokumen lanjutan.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form id="pejabat-form" className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+          <form
+            id="pejabat-form"
+            className="space-y-4"
+            onSubmit={form.handleSubmit(onSubmit)}
+          >
             <FormField
               control={form.control}
               name="namaJabatan"
@@ -140,7 +151,11 @@ export function PejabatForm({
                 <FormItem>
                   <FormLabel>Nama Jabatan</FormLabel>
                   <FormControl>
-                    <Input autoFocus placeholder="Mis. Direktur Eksekutif IAI Wilayah DKI Jakarta" {...field} />
+                    <Input
+                      autoFocus
+                      placeholder="Mis. Direktur Eksekutif IAI Wilayah Jakarta"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -160,7 +175,9 @@ export function PejabatForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="__none__">Tidak dihubungkan</SelectItem>
+                      <SelectItem value="__none__">
+                        Tidak dihubungkan
+                      </SelectItem>
                       {userOptions.map((option) => (
                         <SelectItem key={option.id} value={option.id}>
                           {option.label}
@@ -181,7 +198,11 @@ export function PejabatForm({
                   <FormItem>
                     <FormLabel>Wilayah</FormLabel>
                     <FormControl>
-                      <Input placeholder="Mis. DKI Jakarta" {...field} value={field.value ?? ""} />
+                      <Input
+                        placeholder="Mis. DKI Jakarta"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -218,10 +239,15 @@ export function PejabatForm({
                 <FormItem>
                   <FormLabel>URL Tanda Tangan</FormLabel>
                   <FormControl>
-                    <Input placeholder="Opsional, bisa berupa URL atau path lokal /uploads/..." {...field} value={field.value ?? ""} />
+                    <Input
+                      placeholder="Opsional, bisa berupa URL atau path lokal /uploads/..."
+                      {...field}
+                      value={field.value ?? ""}
+                    />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
-                    Field ini disiapkan untuk integrasi dokumen lanjutan. Boleh dikosongkan untuk sekarang.
+                    Field ini disiapkan untuk integrasi dokumen lanjutan. Boleh
+                    dikosongkan untuk sekarang.
                   </p>
                   <FormMessage />
                 </FormItem>
@@ -231,11 +257,20 @@ export function PejabatForm({
         </Form>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
             Batal
           </Button>
           <Button type="submit" form="pejabat-form" disabled={isPending}>
-            {isPending ? "Menyimpan..." : mode === "edit" ? "Simpan Perubahan" : "Simpan"}
+            {isPending
+              ? "Menyimpan..."
+              : mode === "edit"
+                ? "Simpan Perubahan"
+                : "Simpan"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -6,14 +6,16 @@ import { getSuratKeputusanVerificationById } from "@/server/actions/suratKeputus
 import { formatTanggal } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Verifikasi Surat Keputusan | Manajemen Surat IAI Jakarta",
+  title: "Verifikasi Surat Keputusan | ARKA",
 };
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default async function VerificationSuratKeputusanPage({ params }: PageProps) {
+export default async function VerificationSuratKeputusanPage({
+  params,
+}: PageProps) {
   const { id } = await params;
   const surat = await getSuratKeputusanVerificationById(id);
 
@@ -30,7 +32,7 @@ export default async function VerificationSuratKeputusanPage({ params }: PagePro
             Verifikasi Surat Keputusan
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Dokumen Surat Keputusan ini tercatat di sistem manajemen surat IAI Wilayah DKI Jakarta.
+            Dokumen Surat Keputusan ini tercatat di ARKA.
           </p>
         </section>
 
@@ -38,9 +40,15 @@ export default async function VerificationSuratKeputusanPage({ params }: PagePro
           <InfoItem label="Nomor SK" value={surat.nomorSK} mono />
           <InfoItem label="Tanggal SK" value={formatTanggal(surat.tanggalSK)} />
           <InfoItem label="Perihal" value={surat.perihal} />
-          <InfoItem label="Pejabat Penandatangan" value={surat.pejabatNama ?? "-"} />
+          <InfoItem
+            label="Pejabat Penandatangan"
+            value={surat.pejabatNama ?? "-"}
+          />
           <InfoItem label="Tentang" value={surat.tentang} />
-          <InfoItem label="QR Verifikasi" value={surat.qrCodeUrl ? "Tersedia" : "Belum tersedia"} />
+          <InfoItem
+            label="QR Verifikasi"
+            value={surat.qrCodeUrl ? "Tersedia" : "Belum tersedia"}
+          />
         </section>
 
         {surat.fileUrl ? (

@@ -16,6 +16,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  APP_BRAND_NAME,
+  APP_BRAND_TAGLINE,
+  APP_ORGANIZATION_NAME,
+} from "@/lib/branding";
 import { activateInvitedAccount } from "@/server/actions/invitations";
 
 interface ResetPasswordClientProps {
@@ -117,7 +122,7 @@ export function ResetPasswordClient({
   const appName =
     systemIdentity.namaSistem ||
     process.env.NEXT_PUBLIC_APP_NAME ||
-    "Manajemen Surat IAI Jakarta";
+    APP_BRAND_NAME;
   const year = new Date().getFullYear();
 
   return (
@@ -154,7 +159,7 @@ export function ResetPasswordClient({
             {appName}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            IAI Wilayah DKI Jakarta
+            {APP_BRAND_TAGLINE}
           </p>
         </div>
 
@@ -228,8 +233,8 @@ export function ResetPasswordClient({
                       </button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Minimal 8 karakter. Disarankan kombinasi huruf, angka,
-                      dan simbol.
+                      Minimal 8 karakter. Disarankan kombinasi huruf, angka, dan
+                      simbol.
                     </p>
                   </div>
 
@@ -295,7 +300,9 @@ export function ResetPasswordClient({
         </div>
 
         <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-          <span>© {year} IAI Wilayah DKI Jakarta</span>
+          <span>
+            © {year} {APP_ORGANIZATION_NAME}
+          </span>
           <span className="font-mono">Reset Password</span>
         </div>
       </div>

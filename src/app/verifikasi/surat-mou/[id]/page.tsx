@@ -6,7 +6,7 @@ import { getSuratMouVerificationById } from "@/server/actions/suratMou";
 import { formatTanggal } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Verifikasi Surat MOU | Manajemen Surat IAI Jakarta",
+  title: "Verifikasi Surat MOU | ARKA",
 };
 
 type PageProps = {
@@ -30,17 +30,26 @@ export default async function VerificationSuratMouPage({ params }: PageProps) {
             Verifikasi Surat MOU
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Dokumen Memorandum of Understanding ini tercatat di sistem manajemen surat IAI Wilayah DKI Jakarta.
+            Dokumen Memorandum of Understanding ini tercatat di ARKA.
           </p>
         </section>
 
         <section className="grid gap-4 px-6 py-8 sm:grid-cols-2 sm:px-8">
           <InfoItem label="Nomor MOU" value={surat.nomorMOU} mono />
-          <InfoItem label="Tanggal MOU" value={formatTanggal(surat.tanggalMOU)} />
+          <InfoItem
+            label="Tanggal MOU"
+            value={formatTanggal(surat.tanggalMOU)}
+          />
           <InfoItem label="Perihal" value={surat.perihal} />
           <InfoItem label="Pihak Kedua" value={surat.pihakKedua} />
-          <InfoItem label="Alamat Pihak Kedua" value={surat.pihakKeduaAlamat ?? "-"} />
-          <InfoItem label="Pejabat Penandatangan" value={surat.pejabatNama ?? "-"} />
+          <InfoItem
+            label="Alamat Pihak Kedua"
+            value={surat.pihakKeduaAlamat ?? "-"}
+          />
+          <InfoItem
+            label="Pejabat Penandatangan"
+            value={surat.pejabatNama ?? "-"}
+          />
         </section>
 
         {surat.fileUrl ? (

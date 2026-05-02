@@ -5,7 +5,7 @@ import { getSession } from "@/server/actions/auth";
 import { listPengawas } from "@/server/actions/jadwal-ujian/pengawas";
 
 export const metadata: Metadata = {
-  title: "Pengawas Ujian | Manajemen Surat IAI Jakarta",
+  title: "Pengawas Ujian | ARKA",
 };
 
 export default async function Page() {

@@ -31,11 +31,14 @@ export async function generateQRContact(input: unknown) {
     email: user.email,
     noHp: user.noHp,
     jabatan: user.jabatan,
-    organisasi: "IAI Wilayah DKI Jakarta",
+    organisasi: "IAI Wilayah Jakarta",
   });
   const dataUrl = await generateQRDataURL(vcard, { size: 512 });
 
-  await db.update(users).set({ qrContactUrl: dataUrl }).where(eq(users.id, data.userId));
+  await db
+    .update(users)
+    .set({ qrContactUrl: dataUrl })
+    .where(eq(users.id, data.userId));
 
   return { dataUrl };
 }

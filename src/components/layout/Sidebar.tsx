@@ -1,21 +1,25 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Landmark, LockKeyhole, X } from "lucide-react";
+import { ChevronDown, Landmark, LockKeyhole, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   getNavigationItem,
   navigationSections,
   type NavRole,
 } from "@/components/layout/navigation";
+import {
+  APP_BRAND_DESCRIPTION,
+  APP_BRAND_NAME,
+  APP_BRAND_TAGLINE,
+} from "@/lib/branding";
 import type { Capability } from "@/lib/rbac/capabilities";
+
+const SIDEBAR_COLLAPSED_SECTIONS_KEY = "iai-sidebar-collapsed-sections";
 
 interface SidebarProps {
   unreadDisposisiCount?: number;
@@ -42,7 +46,10 @@ export function Sidebar({
 }: SidebarProps) {
   const pathnameFromHook = usePathname();
   const pathname = pathnameProp ?? pathnameFromHook;
-  const appName = systemIdentity?.namaSistem ?? process.env.NEXT_PUBLIC_APP_NAME ?? "IAI Jakarta";
+  const appName =
+    systemIdentity?.namaSistem ??
+    process.env.NEXT_PUBLIC_APP_NAME ??
+    APP_BRAND_NAME;
   const logoUrl = systemIdentity?.logoUrl ?? "/iai-logo.png";
   const activeItem = getNavigationItem(pathname);
   const capabilitySet = new Set(userCapabilities);
@@ -133,6 +140,67 @@ function SidebarContent({
   mobile?: boolean;
   onNavigate?: () => void;
 }) {
+  const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
+  const [hasLoadedCollapsedState, setHasLoadedCollapsedState] = useState(false);
+
+  const activeSectionTitle = visibleSections.find((section) =>
+    section.items.some(
+      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+    ),
+  )?.title;
+
+  const collapsedSectionSet = useMemo(
+    () => new Set(collapsedSections),
+    [collapsedSections],
+  );
+
+  useEffect(() => {
+    try {
+      const storedValue = window.localStorage.getItem(
+        SIDEBAR_COLLAPSED_SECTIONS_KEY,
+      );
+      if (storedValue) {
+        const parsed = JSON.parse(storedValue);
+        if (Array.isArray(parsed)) {
+          setCollapsedSections(
+            parsed.filter(
+              (value): value is string => typeof value === "string",
+            ),
+          );
+        }
+      }
+    } catch {
+      setCollapsedSections([]);
+    } finally {
+      setHasLoadedCollapsedState(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedCollapsedState) return;
+    window.localStorage.setItem(
+      SIDEBAR_COLLAPSED_SECTIONS_KEY,
+      JSON.stringify(collapsedSections),
+    );
+  }, [collapsedSections, hasLoadedCollapsedState]);
+
+  useEffect(() => {
+    if (!hasLoadedCollapsedState || !activeSectionTitle) return;
+    setCollapsedSections((current) =>
+      current.includes(activeSectionTitle)
+        ? current.filter((sectionTitle) => sectionTitle !== activeSectionTitle)
+        : current,
+    );
+  }, [activeSectionTitle, hasLoadedCollapsedState]);
+
+  function toggleSection(title: string) {
+    setCollapsedSections((current) =>
+      current.includes(title)
+        ? current.filter((sectionTitle) => sectionTitle !== title)
+        : [...current, title],
+    );
+  }
+
   return (
     <>
       <div className="border-b border-border px-4 py-4 lg:px-5 lg:py-5">
@@ -150,85 +218,112 @@ function SidebarContent({
             )}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{appName}</p>
-            <p className="text-xs text-muted-foreground">
-              Manajemen surat internal
+            <p className="truncate text-sm font-semibold text-foreground">
+              {appName}
             </p>
+            <p className="text-xs text-muted-foreground">{APP_BRAND_TAGLINE}</p>
           </div>
         </div>
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
         <div className="space-y-5">
-          {visibleSections.map((section) => (
-            <section key={section.title} className="min-w-0">
-              <p className="px-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {section.title}
-              </p>
-              <ul className="mt-2 space-y-1">
-                {section.items.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          {visibleSections.map((section) => {
+            const isCollapsed = collapsedSectionSet.has(section.title);
 
-                  if (!item.active) {
-                    return (
-                      <li key={item.href}>
-                        <div className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-sm text-muted-foreground opacity-90">
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          <span className="flex-1">{item.label}</span>
-                          <Badge variant="outline" className="rounded-full text-xs">
-                            {item.statusLabel ?? "Nonaktif"}
-                          </Badge>
-                          <LockKeyhole className="h-3.5 w-3.5 shrink-0" />
-                        </div>
-                      </li>
-                    );
-                  }
+            return (
+              <section key={section.title} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.title)}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-expanded={!isCollapsed}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {section.title}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-transform",
+                      isCollapsed && "-rotate-90",
+                    )}
+                  />
+                </button>
 
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={onNavigate}
-                        className={cn(
-                          "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm transition-colors",
-                          isActive
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-foreground hover:bg-muted",
-                        )}
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="flex-1">{item.label}</span>
-                        {item.href === "/disposisi" && unreadDisposisiCount > 0 ? (
-                          <Badge
-                            variant={isActive ? "secondary" : "outline"}
-                            className="rounded-full"
+                {isCollapsed ? null : (
+                  <ul className="mt-2 space-y-1">
+                    {section.items.map((item) => {
+                      const isActive =
+                        pathname === item.href ||
+                        pathname.startsWith(`${item.href}/`);
+
+                      if (!item.active) {
+                        return (
+                          <li key={item.href}>
+                            <div className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-sm text-muted-foreground opacity-90">
+                              <item.icon className="h-4 w-4 shrink-0" />
+                              <span className="flex-1">{item.label}</span>
+                              <Badge
+                                variant="outline"
+                                className="rounded-full text-xs"
+                              >
+                                {item.statusLabel ?? "Nonaktif"}
+                              </Badge>
+                              <LockKeyhole className="h-3.5 w-3.5 shrink-0" />
+                            </div>
+                          </li>
+                        );
+                      }
+
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            onClick={onNavigate}
+                            className={cn(
+                              "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm transition-colors",
+                              isActive
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-foreground hover:bg-muted",
+                            )}
                           >
-                            {unreadDisposisiCount}
-                          </Badge>
-                        ) : null}
-                        {item.href === "/pengumuman" && unreadAnnouncementCount > 0 ? (
-                          <Badge
-                            variant={isActive ? "secondary" : "outline"}
-                            className="rounded-full"
-                          >
-                            {unreadAnnouncementCount}
-                          </Badge>
-                        ) : null}
-                        {isActive ? (
-                          <Badge
-                            variant="secondary"
-                            className="border-0 bg-white/15 text-primary-foreground"
-                          >
-                            Aktif
-                          </Badge>
-                        ) : null}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span className="flex-1">{item.label}</span>
+                            {item.href === "/disposisi" &&
+                            unreadDisposisiCount > 0 ? (
+                              <Badge
+                                variant={isActive ? "secondary" : "outline"}
+                                className="rounded-full"
+                              >
+                                {unreadDisposisiCount}
+                              </Badge>
+                            ) : null}
+                            {item.href === "/pengumuman" &&
+                            unreadAnnouncementCount > 0 ? (
+                              <Badge
+                                variant={isActive ? "secondary" : "outline"}
+                                className="rounded-full"
+                              >
+                                {unreadAnnouncementCount}
+                              </Badge>
+                            ) : null}
+                            {isActive ? (
+                              <Badge
+                                variant="secondary"
+                                className="border-0 bg-white/15 text-primary-foreground"
+                              >
+                                Aktif
+                              </Badge>
+                            ) : null}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
         </div>
       </nav>
 
@@ -242,7 +337,7 @@ function SidebarContent({
           {activeItemLabel ?? "Aplikasi Internal"}
         </p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Akses terbatas untuk pegawai internal IAI Wilayah DKI Jakarta.
+          {APP_BRAND_DESCRIPTION}
         </p>
       </div>
     </>

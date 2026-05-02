@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Banknote, CheckCircle2, Clock, Landmark } from "lucide-react";
+import {
+  ArrowRight,
+  Banknote,
+  CheckCircle2,
+  Clock,
+  Landmark,
+} from "lucide-react";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +14,7 @@ import { getCurrentUserAccess } from "@/server/actions/auth";
 import { listHonorariumBatches } from "@/server/actions/jadwal-otomatis/honorarium";
 
 export const metadata: Metadata = {
-  title: "Dashboard Keuangan | Manajemen Surat IAI Jakarta",
+  title: "Dashboard Keuangan | ARKA",
 };
 
 function formatCurrency(value: number) {
@@ -23,7 +29,9 @@ export default async function Page() {
 
   const pending = batches.filter((b) => b.status === "dikirim_ke_keuangan");
   const inProcess = batches.filter((b) => b.status === "diproses_keuangan");
-  const paid = batches.filter((b) => b.status === "dibayar" || b.status === "locked");
+  const paid = batches.filter(
+    (b) => b.status === "dibayar" || b.status === "locked",
+  );
 
   const pendingTotal = pending.reduce((s, b) => s + b.netAmount, 0);
   const inProcessTotal = inProcess.reduce((s, b) => s + b.netAmount, 0);
@@ -98,7 +106,11 @@ export default async function Page() {
             <CardTitle>Super Admin</CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-3">
-            <Button asChild variant="outline" className="w-full justify-between">
+            <Button
+              asChild
+              variant="outline"
+              className="w-full justify-between"
+            >
               <Link href="/jadwal-otomatis/honorarium">
                 <span className="flex items-center gap-2">
                   <Banknote className="h-4 w-4" />

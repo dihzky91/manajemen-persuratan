@@ -6,7 +6,7 @@ import { listPejabatAktif } from "@/server/actions/suratKeluar";
 import { listSuratKeputusan } from "@/server/actions/suratKeputusan";
 
 export const metadata: Metadata = {
-  title: "Surat Keputusan | Manajemen Surat IAI Jakarta",
+  title: "Surat Keputusan | ARKA",
 };
 
 export default async function Page() {
@@ -18,8 +18,15 @@ export default async function Page() {
   const role = (session?.user as { role?: string } | undefined)?.role ?? null;
 
   return (
-    <PageWrapper title="Surat Keputusan" description="Daftar Surat Keputusan (SK).">
-      <SuratKeputusanManager initialData={data} pejabatList={pejabatList} role={role} />
+    <PageWrapper
+      title="Surat Keputusan"
+      description="Daftar Surat Keputusan (SK)."
+    >
+      <SuratKeputusanManager
+        initialData={data}
+        pejabatList={pejabatList}
+        role={role}
+      />
     </PageWrapper>
   );
 }
